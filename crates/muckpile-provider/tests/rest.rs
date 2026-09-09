@@ -1,0 +1,122 @@
+//! Verifies `JiraRest` builds the right request — method, path, auth header,
+//! body — against a local, in-process mock. Never touches the real
+//! provider: this is exactly what the automated suite is allowed to touch.
+
+use muckpile_provider::provider::{Provider, Transition};
+use muckpile_provider::rest::{Credentials, JiraRest};
+use std::io::{Read, Write};
+use std::net::TcpListener;
+use std::sync::mpsc;
+
+struct Captured {
+    method: String,
+    path: String,
+    body: String,
+    raw: String,
+}
+
+/// A server that answers exactly one request with `response_body` at
+/// `status`, then hands back what it received.
+fn one_shot(status: u16, response_body: &str) -> (String, mpsc::Receiver<Captured>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let (tx, rx) = mpsc::channel();
+    let response_body = response_body.to_string();
+    std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        // ureq writes headers and body as separate socket writes, so a
+        // single `read` can land between the two: keep reading until the
+        // headers are in and the body is as long as `Content-Length` says.
+        let mut data: Vec<u8> = Vec::new();
+        let mut chunk = [0u8; 8192];
+        loop {
+            let text = String::from_utf8_lossy(&data);
+            if let Some(header_end) = text.find("\r\n\r\n") {
+                let content_length: usize = text[..header_end]
+                    .lines()
+                    .find_map(|l| l.split_once(':').filter(|(k, _)| k.eq_ignore_ascii_case("content-length")))
+                    .and_then(|(_, v)| v.trim().parse().ok())
+                    .unwrap_or(0);
+                if data.len() - (header_end + 4) >= content_length {
+                    break;
+                }
+            }
+            let n = stream.read(&mut chunk).unwrap();
+            if n == 0 {
+                break;
+            }
+            data.extend_from_slice(&chunk[..n]);
+        }
+        let text = String::from_utf8_lossy(&data).to_string();
+        let mut lines = text.split("\r\n");
+        let request_line = lines.next().unwrap_or_default();
+        let mut parts = request_line.split(' ');
+        let method = parts.next().unwrap_or_default().to_string();
+        let path = parts.next().unwrap_or_default().to_string();
+        let body = text.split("\r\n\r\n").nth(1).unwrap_or_default().to_string();
+        tx.send(Captured { method, path, body, raw: text }).unwrap();
+
+        let resp = format!(
+            "HTTP/1.1 {status} x\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            response_body.len(),
+            response_body
+        );
+        stream.write_all(resp.as_bytes()).unwrap();
+    });
+    (format!("http://{addr}"), rx)
+}
+
+#[test]
+fn transitions_hits_the_transitions_endpoint_with_get() {
+    let response = r#"{"transitions":[{"id":"31","name":"Listo","to":{"name":"Finalizada"}}]}"#;
+    let (base, rx) = one_shot(200, response);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    let transitions = provider.transitions("ACC-355").unwrap();
+    assert_eq!(transitions, vec![Transition { id: "31".into(), name: "Listo".into(), to: "Finalizada".into() }]);
+
+    let captured = rx.recv().unwrap();
+    assert_eq!(captured.method, "GET");
+    assert_eq!(captured.path, "/rest/api/3/issue/ACC-355/transitions");
+}
+
+#[test]
+fn apply_transition_posts_the_id_never_the_name() {
+    let (base, rx) = one_shot(204, "");
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    provider.apply_transition("ACC-355", "31").unwrap();
+
+    let captured = rx.recv().unwrap();
+    assert_eq!(captured.method, "POST");
+    assert_eq!(captured.path, "/rest/api/3/issue/ACC-355/transitions");
+    let body: serde_json::Value = serde_json::from_str(&captured.body).unwrap();
+    assert_eq!(body["transition"]["id"], "31");
+    assert!(captured.body.contains("31") && !captured.body.contains("Listo"), "the name never travels: {}", captured.body);
+}
+
+/// `base64("a@b.com:tok")`, computed once and hardcoded, so the test doesn't
+/// re-derive it from the same encoder it's checking.
+#[test]
+fn credentials_travel_as_basic_auth() {
+    let (base, rx) = one_shot(200, r#"{"transitions":[]}"#);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+    provider.transitions("ACC-1").unwrap();
+
+    let captured = rx.recv().unwrap();
+    assert!(
+        captured.raw.contains("Authorization: Basic YUBiLmNvbTp0b2s="),
+        "missing or wrong auth header: {}",
+        captured.raw
+    );
+}
+
+#[test]
+fn a_rejected_status_surfaces_the_response_body() {
+    let (base, rx) = one_shot(400, r#"{"errorMessages":["field X is invalid"]}"#);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    let err = provider.transitions("ACC-1").unwrap_err();
+    assert!(format!("{err:#}").contains("field X is invalid"), "{err:#}");
+    rx.recv().unwrap();
+}

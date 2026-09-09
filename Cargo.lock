@@ -314,6 +314,7 @@ name = "muckpile-provider"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "serde_json",
  "ureq",
 ]
 
