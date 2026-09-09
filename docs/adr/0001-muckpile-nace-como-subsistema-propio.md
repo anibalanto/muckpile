@@ -69,8 +69,10 @@ Git local es el registro de "qué es lo último que vi del proveedor": un `pull`
 ```
 multitask/
   .muckpile/                       ← el .git propio de la herramienta: el ledger de la decisión 5
-  sge/                              ← un proyecto
-    base/                           ← clon del repo real, siempre en su rama principal — nunca se trabaja acá
+  sge/                              ← un proyecto — un board de Jira
+    base/
+      sge/                          ← clon del repo real, siempre en su rama principal — nunca se trabaja acá
+      portal-escolar/                ← otro repo del mismo board — ver el párrafo siguiente
     backlog/
       sprint/
         Sprint_3.4_Team_Fernet/     ← una vista de planificación
@@ -84,7 +86,9 @@ multitask/
         SGE-9875_data/
         SGE-9743.task.md            ← otra tarea relacionada
         SGE-9743_data/
-        code-work/                  ← superficie de lectura: worktree de `base/`, rama sge-9876 — git ↔ el remoto del proyecto, muckpile no lo toca
+        code-work/                  ← superficie de lectura: un worktree por repo que la tarea toca
+          sge/                       ← worktree de `base/sge/`, rama jr-9876 — git ↔ el remoto del repo, muckpile no lo toca
+          portal-escolar/             ← worktree de `base/portal-escolar/`, agregado aparte con `code-work add`
   acc/                              ← otro proyecto, sin relación con el primero — mismos tres nombres reservados
     backlog/
       sprint/
@@ -93,6 +97,8 @@ multitask/
           ACC-355_data/
           …
 ```
+
+**`base/` es una carpeta por repo, no un clon.** Un proyecto —un board de Jira— puede involucrar más de un repo real: `SGE` hoy tiene `sge`, `portal-escolar`, `sinide-extdata`, y una tarea puede llevar commits en más de uno. La configuración del proyecto (decisión 9) los lista por nombre, con su remoto y su rama; `base/<repo>/` es uno por cada uno, con el mismo invariante de siempre —siempre en su rama principal, nunca se trabaja ahí— multiplicado por repo en vez de asumido único.
 
 **El sufijo es `_data`, no `<id>/` desnudo** — a diferencia de lo que la decisión 7 hereda de la spec del sprint 23. Adentro de una vista, `<id>` ya está tomado por la carpeta de la vista misma cuando coincide con su ítem ancla; `<id>_data/` es el mismo patrón que ya usa el flujo a mano que esto formaliza, y evita la colisión sin inventar nada nuevo.
 
@@ -104,13 +110,15 @@ multitask/
 
 **Y no hace falta un panorama de qué vista tiene abierto qué.** Si dos vistas traen el mismo ítem, no hay que coordinarlas con nada compartido: la corrección ya la da la decisión 5 — cada `push` vuelve a preguntarle al proveedor antes de escribir, así que la vista que llega segunda se entera ahí, no antes. Lo único que vale la pena ofrecer es un chequeo **local**, contra el propio disco —"¿ya tengo este ítem en otra vista, en esta máquina?"—, que es barato y no puede quedar viejo del mismo modo que un registro compartido: pregunta sobre algo que está ahí mismo, no sobre una copia de otro lado.
 
-**`to-work <id>` arma la vista de una:** crea `<proyecto>/to-work/<id>/`, trae el ítem y su `_data/`, y deja `code-work/` como worktree de `<proyecto>/base/` en la rama derivada del `commit_prefix` del proyecto (decisión 9) — `SGE-9876` con `commit_prefix = "jr"` da `jr-9876`, no la clave completa en minúscula. Es el mismo campo que ya nombra los commits: una sola abreviación gobierna las dos cosas, en vez de que la rama use la clave y el commit use otra cosa. Lo relacionado se agrega después, con `pull` corrido desde adentro de la vista.
+**`to-work <id>` arma sólo la vista, sin tocar código:** crea `<proyecto>/to-work/<id>/`, trae el ítem y su `_data/`. No deja `code-work/` — con un solo repo por proyecto se podía asumir cuál worktree armar, pero con varios ya no hay "el" repo por default, y adivinar cuáles toca esta tarea es apostar. Lo relacionado se agrega después con `pull`, igual que siempre; el código se agrega después con `code-work add`, un repo a la vez.
 
-**Y la rama de `code-work/` no siempre sale de donde el default supone.** El default cubre casi todo solo, con una sola pregunta: ¿ya existe en el remoto la rama derivada de `commit_prefix`? Si existe —retomar un code review, seguir algo que ya se empezó—, se trackea y no hace falta nada más. Si no existe, se crea nueva desde la rama principal de `base/`.
+**`code-work add <repo>`, corrido adentro de la vista, agrega un worktree.** Deja `code-work/<repo>/` como worktree de `<proyecto>/base/<repo>/`, en la rama derivada del `commit_prefix` del proyecto (decisión 9) — `SGE-9876` con `commit_prefix = "jr"` da `jr-9876`, no la clave completa en minúscula. Es el mismo campo que ya nombra los commits: una sola abreviación gobierna las dos cosas. Si `base/<repo>/` todavía no existe en el disco, se clona ahí mismo y no antes — no hace falta clonar los cinco repos de un proyecto para trabajar uno solo.
 
-**La excepción real no es el nombre, es el punto de partida.** Un hotfix sale de `rc-??` y no de la principal, y eso el default no lo puede adivinar. `to-work` acepta `--from <rama>` para pisarlo — la rama nueva se sigue llamando como la clave lo sugiere, lo que cambia es de dónde parte. `--branch <rama>` queda para lo otro: cuando la rama que hay que usar no se llama como la clave —un split front/back, o una que ya existe bajo otro nombre.
+**Y la rama no siempre sale de donde el default supone.** El default cubre casi todo solo, con una sola pregunta: ¿ya existe en el remoto la rama derivada de `commit_prefix`? Si existe —retomar un code review, seguir algo que ya se empezó—, se trackea y no hace falta nada más. Si no existe, se crea nueva desde la rama principal de `base/<repo>/`.
 
-**Y el cherry-pick de vuelta a la principal, cuando el hotfix cierra, queda afuera.** Es integración entre ramas del proyecto externo, no algo que `to-work` resuelva ni necesite entender — se hace a mano, con git, en `code-work/`, igual que cualquier otra operación que no es de abrir o cerrar la vista.
+**La excepción real no es el nombre, es el punto de partida.** Un hotfix sale de `rc-??` y no de la principal, y eso el default no lo puede adivinar. `code-work add` acepta `--from <rama>` para pisarlo — la rama nueva se sigue llamando como la clave lo sugiere, lo que cambia es de dónde parte. `--branch <rama>` queda para lo otro: cuando la rama que hay que usar no se llama como la clave —un split front/back, o una que ya existe bajo otro nombre. Los dos son por repo: una tarea que hace un hotfix en `sge` y desarrollo normal en `portal-escolar` corre `code-work add sge --from rc-3.2` y `code-work add portal-escolar` por separado, cada uno con el punto de partida que le corresponde.
+
+**Y el cherry-pick de vuelta a la principal, cuando el hotfix cierra, queda afuera — por repo.** Es integración entre ramas del proyecto externo, no algo que `muckpile` resuelva ni necesite entender — se hace a mano, con git, adentro de `code-work/<repo>/`, igual que cualquier otra operación que no es de abrir o cerrar la vista.
 
 **Y el nombre de un sprint no es un número chico.** Un proyecto externo preexistente —`SGE`, o el board de otro equipo en `ACC`— ya tiene sus sprints en Jira con nombres compuestos, elegidos por su propia convención: `Sprint 3.4 Team Fernet`. `muckpile` no inventa un id corto para reemplazarlo: usa el nombre que el proveedor ya tiene, sea cual sea la convención de ese proyecto — incluida la de este mismo repo, donde worklist ya escribe `<número> <título>` (`22 Las vistas`).
 
@@ -167,20 +175,27 @@ $ muckpile list backlog/sprint/22_Las_vistas --state "Finalizada"
 
 ### 9. La configuración: `muckpile.toml`, y un archivo aparte para lo que no es de todos
 
-**Dos archivos, porque dos audiencias.** Lo que es igual para cualquiera que trabaje en un proyecto —remoto de `base/`, tipo de issue por tipo de ítem, el prefijo de commit— puede compartirse. La identidad de quien corre `muckpile` —qué cuenta de Jira, qué variable de entorno tiene el token— es de cada máquina, porque la decisión 4 ya estableció que la credencial es por máquina y no una cuenta de servicio única. Meter las dos cosas en un solo archivo obliga a elegir entre filtrar un email en algo compartido o hacer que cada persona edite un archivo que comparte con el resto.
+**Dos archivos, porque dos audiencias.** Lo que es igual para cualquiera que trabaje en un proyecto —remoto y rama de cada repo del proyecto, tipo de issue por tipo de ítem, el prefijo de commit— puede compartirse. La identidad de quien corre `muckpile` —qué cuenta de Jira, qué variable de entorno tiene el token— es de cada máquina, porque la decisión 4 ya estableció que la credencial es por máquina y no una cuenta de servicio única. Meter las dos cosas en un solo archivo obliga a elegir entre filtrar un email en algo compartido o hacer que cada persona edite un archivo que comparte con el resto.
+
+**Y el compartido vive en el proyecto, no en la raíz de `multitask/`.** `multitask/<proyecto>/muckpile.toml`, uno por proyecto — no un único archivo en la raíz con una tabla `[projects.<nombre>]` por cada uno. Nada de lo que un proyecto configura tiene sentido leído junto al de otro: dos boards sin relación no comparten `jira_project_key` ni lista de repos, así que juntarlos en un solo archivo sólo los hace vecinos en un lugar que ninguno de los dos necesita mirar entero.
 
 ```toml
-# multitask/muckpile.toml — compartible
-[projects.sge]
+# multitask/sge/muckpile.toml — compartible
 provider = "jira-rest"              # swap a "muckpile-server" el día que exista — decisión 3
 jira_base_url = "https://lamansys.atlassian.net"
 jira_project_key = "SGE"
 jira_board_id = 12
 commit_prefix = "jr"                # gobierna el commit y la rama de code-work — decisión 6
-base_remote = "git@gitlab.lamansys.ar:minsal/sge.git"
-base_branch = "master"
 
-[projects.sge.item_type]
+[repos.sge]
+remote = "git@gitlab.lamansys.ar:minsal/sge.git"
+branch = "master"
+
+[repos.portal-escolar]
+remote = "git@gitlab.lamansys.ar:minsal/portal-escolar.git"
+branch = "main"
+
+[item_type]
 task = "Tarea"
 user-story = "Historia"
 epic = "Epic"
@@ -270,14 +285,15 @@ El choque de hoy, bajo este modelo, no es un `add/add` que exige `--force`: es u
 | `list` | Ítems por vista, sprint, estado (el string real, sin traducir), categoría (`new`/`indeterminate`/`done`, de Jira) o padre. | `$ muckpile list backlog/sprint/22_Las_vistas --state "Finalizada"`<br>`$ muckpile list backlog/sprint/22_Las_vistas --category done` |
 | `sprint fetch` | Trae los sprints abiertos del proyecto y crea una carpeta vacía por cada uno bajo `backlog/sprint/`, con el nombre slugificado — para tab-completar y para tener contra qué correr `pull`. Nunca borra una carpeta que ya tiene algo adentro. | `$ muckpile sprint fetch` |
 | `states discover` | Lista en vivo los estados del workflow y su categoría (`statusCategory` de Jira), y cachea `{nombre -> categoría}` en `<proyecto>.states.toml` — regenerable, nunca editado a mano. | `$ muckpile states discover` |
-| `to-work` | Arma una vista de trabajo bajo `to-work/`: `to-work/<id>/` con su `_data/` + `code-work/`. Sólo corre parado en la raíz del proyecto — se niega en `base/`, `backlog/`, `backlog/sprint/`, o adentro de `to-work/`. Por default, trackea la rama derivada de la clave si ya existe en el remoto, o la crea desde la principal si no. `--from` pisa el punto de partida (un hotfix desde `rc-??`); `--branch` pisa el nombre cuando no es el derivado (split FE/BE). | `$ muckpile to-work SGE-344`  ← crea `to-work/SGE-344/`<br>`$ cd backlog/sprint/22_Las_vistas && muckpile to-work ACC-355`<br>`error: to-work corre en la raíz del proyecto, no en backlog/sprint/22_Las_vistas` |
+| `to-work` | Arma una vista de trabajo bajo `to-work/`: `to-work/<id>/` con su `_data/`. No toca código — eso es `code-work add`. Sólo corre parado en la raíz del proyecto — se niega en `base/`, `backlog/`, `backlog/sprint/`, o adentro de `to-work/`. | `$ muckpile to-work SGE-344`  ← crea `to-work/SGE-344/`<br>`$ cd backlog/sprint/22_Las_vistas && muckpile to-work ACC-355`<br>`error: to-work corre en la raíz del proyecto, no en backlog/sprint/22_Las_vistas` |
+| `code-work add` | Corrido adentro de una vista de trabajo, agrega un worktree por repo: `code-work/<repo>/`. Por default, trackea la rama derivada de `commit_prefix` si ya existe en el remoto, o la crea desde la principal de `base/<repo>/` si no — clonándolo en el momento si todavía no está en disco. `--from` pisa el punto de partida (un hotfix desde `rc-??`); `--branch` pisa el nombre cuando no es el derivado (split FE/BE). | `$ cd to-work/SGE-9876 && muckpile code-work add sge`<br>`$ muckpile code-work add portal-escolar --from rc-3.2` |
 | `pull` | Trae o actualiza una vista — un ítem, un sprint ya conocido por `sprint fetch` (bajo `backlog/sprint/`), una consulta. Sin argumento, actualiza la vista donde estás parado — misma convención que ya usa `worklist`. Corrido adentro de una vista con un id nuevo, le agrega lo relacionado. Nunca el proyecto entero. | `$ muckpile pull backlog/sprint/22_Las_vistas`  ← desde `acc/`<br>`$ cd acc/backlog/sprint/22_Las_vistas && muckpile pull`  ← la misma, parado adentro<br>`$ cd sge/to-work/SGE-344 && muckpile pull SGE-9875`  ← agrega un relacionado |
 | `push` | Primero resuelve los `@slug` pendientes que la vista toca —busca, crea, renombra archivo y directorio, reescribe referencias, un commit—; después escribe lo editado. Antes de escribir, vuelve a preguntar: si el proveedor cambió desde el último `pull`, no pisa. El cuerpo, además, sólo se sube si es canónico (decisión 10) — si no, se niega y ofrece el diff. | `$ muckpile push backlog/sprint/22_Las_vistas`<br>`ACC-355: cambió del otro lado desde tu último pull — no se escribió nada`<br>`ACC-360: el cuerpo no es canónico — no se sube. Diff: …` |
 | `status` | Compara local contra el proveedor en vivo, sin escribir. | `$ muckpile status backlog/sprint/22_Las_vistas` |
 | `transition` | Reemplaza a `start`/`done`/`close`/`drop` — no hay vocabulario propio que darles (decisión 8). Lista las transiciones del ítem, busca la que lleva al estado pedido, la ejecuta. | `$ muckpile transition ACC-355 "Finalizada"` |
 | `link` | Declara una relación entre dos ítems — `depends`, `blocks` — en el momento. | `$ muckpile link ACC-338 blocks ACC-229` |
 
-Once comandos contra los veintitrés de hoy (once de `worklist`, doce de `worklist-server`). Lo que no está en la tabla — `install-hooks`, `check-push`, `assign-keys`, `bootstrap`, `reconcile`, `removes`, `push-states`, `create-or-find`, `provider set-status`, `window-open`, `propagate`, `adopt` — no falta: era la maquinaria de la asimetría que la decisión 1 saca. `bootstrap`/`reconcile`/`adopt` sí tienen equivalente, pero no como comando aparte: son `pull` con una consulta que trae de a muchos — `muckpile pull backlog --query "project = ACC AND sprint is empty"`.
+Doce comandos contra los veintitrés de hoy (once de `worklist`, doce de `worklist-server`). Lo que no está en la tabla — `install-hooks`, `check-push`, `assign-keys`, `bootstrap`, `reconcile`, `removes`, `push-states`, `create-or-find`, `provider set-status`, `window-open`, `propagate`, `adopt` — no falta: era la maquinaria de la asimetría que la decisión 1 saca. `bootstrap`/`reconcile`/`adopt` sí tienen equivalente, pero no como comando aparte: son `pull` con una consulta que trae de a muchos — `muckpile pull backlog --query "project = ACC AND sprint is empty"`.
 
 ---
 
