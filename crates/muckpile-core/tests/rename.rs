@@ -1,0 +1,235 @@
+//! `rename_one` against a real git repo in a temp directory. No test touches
+//! the project's own repo or any provider.
+
+use std::collections::HashMap;
+use std::path::Path;
+use std::process::Command;
+
+fn git_repo() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    run(dir.path(), &["init", "-q"]);
+    run(dir.path(), &["config", "user.email", "test@test"]);
+    run(dir.path(), &["config", "user.name", "test"]);
+    dir
+}
+
+fn run(repo: &Path, args: &[&str]) {
+    let status = Command::new("git").arg("-C").arg(repo).args(args).status().unwrap();
+    assert!(status.success(), "git {:?} failed", args);
+}
+
+fn write(repo: &Path, name: &str, content: &str) {
+    if let Some(parent) = repo.join(name).parent() {
+        std::fs::create_dir_all(parent).unwrap();
+    }
+    std::fs::write(repo.join(name), content).unwrap();
+}
+
+fn head(repo: &Path) -> String {
+    let out = Command::new("git").arg("-C").arg(repo).args(["rev-parse", "HEAD"]).output().unwrap();
+    String::from_utf8(out.stdout).unwrap().trim().to_string()
+}
+
+#[test]
+fn rename_without_incoming_references() {
+    let dir = git_repo();
+    let repo = dir.path();
+    write(repo, "slug-alone.task.md", "---\ntitle: Alone\nstatus: Open\n---\nNothing references it.\n");
+    run(repo, &["add", "-A"]);
+    run(repo, &["commit", "-q", "-m", "seed"]);
+
+    let touched = muckpile_core::rename_one(repo, "slug-alone", "ACC-1").unwrap();
+    assert!(touched.is_empty());
+    assert!(repo.join("ACC-1.task.md").exists());
+    assert!(!repo.join("slug-alone.task.md").exists());
+}
+
+#[test]
+fn rename_rewrites_delimited_references_and_not_substrings() {
+    let dir = git_repo();
+    let repo = dir.path();
+    write(repo, "slug-a.task.md", "---\ntitle: A\nstatus: Open\n---\n# A\n");
+    write(
+        repo,
+        "slug-b.task.md",
+        "---\ntitle: B\nstatus: Open\nrelation.depends: [slug-a]\n---\nDepends on [`slug-a`](slug-a.task.md).\n",
+    );
+    write(repo, "unrelated.task.md", "---\ntitle: Untouched\nstatus: Open\n---\nMentions slug-a10 and slug-a loose, no backticks.\n");
+    run(repo, &["add", "-A"]);
+    run(repo, &["commit", "-q", "-m", "seed"]);
+
+    let touched = muckpile_core::rename_one(repo, "slug-a", "ACC-101").unwrap();
+    assert_eq!(touched, vec!["slug-b.task.md".to_string()]);
+
+    let b = std::fs::read_to_string(repo.join("slug-b.task.md")).unwrap();
+    assert!(b.contains("relation.depends: [ACC-101]"));
+    assert!(b.contains("[`ACC-101`](ACC-101.task.md)"));
+
+    let unrelated = std::fs::read_to_string(repo.join("unrelated.task.md")).unwrap();
+    assert!(unrelated.contains("slug-a10"), "must not touch the substring");
+    assert!(unrelated.contains("slug-a loose"), "must not touch the loose, backtick-less mention");
+}
+
+#[test]
+fn the_sibling_data_directory_travels_with_the_rename() {
+    let dir = git_repo();
+    let repo = dir.path();
+    write(repo, "slug-q.question.md", "---\ntitle: Q\nstatus: Open\n---\nBody.\n");
+    write(repo, "slug-q_data/thread/1.md", "first message\n");
+    run(repo, &["add", "-A"]);
+    run(repo, &["commit", "-q", "-m", "seed"]);
+
+    muckpile_core::rename_one(repo, "slug-q", "ACC-9").unwrap();
+    assert!(!repo.join("slug-q_data").exists());
+    assert!(repo.join("ACC-9_data/thread/1.md").exists());
+}
+
+#[test]
+fn resolve_batch_respects_topological_order() {
+    let dir = git_repo();
+    let repo = dir.path();
+    write(
+        repo,
+        "slug-c.task.md",
+        "---\ntitle: C\nstatus: Open\nrelation.depends: [slug-d]\n---\nDepends on [`slug-d`](slug-d.task.md).\n",
+    );
+    write(repo, "slug-d.task.md", "---\ntitle: D\nstatus: Open\n---\nNo dependencies.\n");
+    run(repo, &["add", "-A"]);
+    run(repo, &["commit", "-q", "-m", "seed"]);
+
+    let mut map = HashMap::new();
+    map.insert("slug-c".to_string(), "ACC-201".to_string());
+    map.insert("slug-d".to_string(), "ACC-200".to_string());
+    muckpile_core::resolve_batch(repo, &map).unwrap();
+
+    let c = std::fs::read_to_string(repo.join("ACC-201.task.md")).unwrap();
+    assert!(c.contains("relation.depends: [ACC-200]"));
+    assert!(c.contains("[`ACC-200`](ACC-200.task.md)"));
+}
+
+#[test]
+fn a_cycle_is_rejected_without_writing_anything() {
+    let dir = git_repo();
+    let repo = dir.path();
+    write(repo, "slug-e.task.md", "---\ntitle: E\nstatus: Open\nrelation.depends: [slug-f]\n---\nCycle.\n");
+    write(repo, "slug-f.task.md", "---\ntitle: F\nstatus: Open\nrelation.depends: [slug-e]\n---\nCycle.\n");
+    run(repo, &["add", "-A"]);
+    run(repo, &["commit", "-q", "-m", "seed"]);
+    let before = head(repo);
+
+    let mut map = HashMap::new();
+    map.insert("slug-e".to_string(), "ACC-301".to_string());
+    map.insert("slug-f".to_string(), "ACC-302".to_string());
+    let result = muckpile_core::resolve_batch(repo, &map);
+
+    assert!(result.is_err());
+    assert_eq!(before, head(repo), "the repo must not have changed");
+    assert!(repo.join("slug-e.task.md").exists());
+    assert!(repo.join("slug-f.task.md").exists());
+}
+
+/// A `blocks` relation is just another `relation.*` field: `question`
+/// doesn't need special-casing to have its blocking reference rewritten.
+#[test]
+fn a_blocks_relation_is_rewritten_like_any_other() {
+    let text = "---\ntitle: Does the role inherit?\nrelation.blocks: [slug-x]\n---\n\nbody\n";
+    let (out, changed) = muckpile_core::rewrite_references(text, "slug-x", "task", "ACC-229");
+    assert!(changed);
+    assert!(out.contains("relation.blocks: [ACC-229]"), "{out:?}");
+}
+
+#[test]
+fn renaming_the_parent_keeps_the_newline() {
+    let text = "---\ntitle: X\nparent: 1\n---\n\n# X\n\nbody\n";
+    let (out, changed) = muckpile_core::rewrite_references(text, "1", "epic", "ACC-14");
+    assert!(changed);
+    assert_eq!(out, "---\ntitle: X\nparent: ACC-14\n---\n\n# X\n\nbody\n");
+}
+
+#[test]
+fn the_frontmatter_still_splits_after_renaming_the_parent() {
+    let text = "---\ntitle: X\nstatus: Done\nparent: 1\n---\n\n# X\n\nbody\n";
+    let (out, _) = muckpile_core::rewrite_references(text, "1", "epic", "ACC-14");
+    let (fm, body) = muckpile_core::body::split_frontmatter(&out);
+    assert!(fm.contains("parent: ACC-14"), "the frontmatter is the frontmatter: {fm:?}");
+    assert!(!fm.is_empty(), "nothing was split: the whole file would travel as body");
+    assert_eq!(body, "\n# X\n\nbody\n", "and the body is only the body");
+}
+
+#[test]
+fn renaming_a_slug_does_not_touch_one_that_ends_with_it() {
+    let text = "---\ntitle: k\nrelation.depends: [2j]\n---\n\nbody\n";
+    let (out, changed) = muckpile_core::rewrite_references(text, "j", "user-story", "ACC-77");
+    assert!(!changed, "there was no reference to `j`");
+    assert!(out.contains("[2j]"), "left intact: {out:?}");
+}
+
+#[test]
+fn the_right_slug_is_rewritten_with_a_lookalike_next_to_it() {
+    let text = "---\ntitle: k\nrelation.depends: [2j, j]\n---\n\nbody\n";
+    let (out, changed) = muckpile_core::rewrite_references(text, "j", "user-story", "ACC-77");
+    assert!(changed);
+    assert!(out.contains("[2j, ACC-77]"), "{out:?}");
+}
+
+#[test]
+fn two_adjacent_references_are_both_rewritten() {
+    let text = "---\ntitle: x\nrelation.depends: [j,j]\n---\n\nbody\n";
+    let (out, _) = muckpile_core::rewrite_references(text, "j", "task", "ACC-77");
+    assert_eq!(out.matches("ACC-77").count(), 2, "both: {out:?}");
+    assert!(!out.contains(",j]"), "none left unrewritten: {out:?}");
+}
+
+#[test]
+fn a_link_with_dotdot_is_rewritten_keeping_the_prefix() {
+    let text = "- [`4h` The title](../4h.task.md)\n";
+    let (out, changed) = muckpile_core::rewrite_references(text, "4h", "task", "ACC-94");
+    assert!(changed);
+    assert_eq!(out, "- [`ACC-94` The title](../ACC-94.task.md)\n");
+}
+
+/// The rename never crosses into `code-work/`: it's a worktree of the
+/// external project, owned by plain git, not by muckpile.
+#[test]
+fn rename_never_touches_code_work() {
+    let dir = git_repo();
+    let repo = dir.path();
+    write(repo, "4h.task.md", "---\ntitle: The task\nstatus: Open\n---\n\nbody\n");
+    write(repo, "code-work/README.md", "mentions 4h in someone else's repo\n");
+    run(repo, &["add", "-A"]);
+    run(repo, &["commit", "-qm", "seed"]);
+
+    let touched = muckpile_core::rename_one(repo, "4h", "ACC-94").unwrap();
+    assert!(!touched.iter().any(|t| t.contains("code-work")), "{touched:?}");
+    let readme = std::fs::read_to_string(repo.join("code-work/README.md")).unwrap();
+    assert!(readme.contains("mentions 4h"), "code-work must never be rewritten");
+}
+
+/// A marked local id keeps the marker as part of the id: `@a` never matches
+/// inside `@a1` or `x@a`.
+#[test]
+fn renaming_a_marked_id_does_not_eat_the_marker_or_touch_its_neighbors() {
+    let dir = git_repo();
+    let repo = dir.path();
+    write(repo, "@a.task.md", "---\ntitle: A\nstatus: Open\n---\n# A\n");
+    write(repo, "@a1.task.md", "---\ntitle: A1\nstatus: Open\n---\n# A1\n");
+    write(
+        repo,
+        "@b.task.md",
+        "---\ntitle: B\nstatus: Open\nparent: @a\nrelation.depends: [@a1]\n---\nComes from [`@a`](@a.task.md), and mentions @a1 in passing.\n",
+    );
+    run(repo, &["add", "-A"]);
+    run(repo, &["commit", "-q", "-m", "seed"]);
+
+    let touched = muckpile_core::rename_one(repo, "@a", "ACC-347").unwrap();
+    assert_eq!(touched, vec!["@b.task.md".to_string()]);
+    assert!(repo.join("ACC-347.task.md").exists());
+    assert!(!repo.join("@a.task.md").exists());
+
+    let b = std::fs::read_to_string(repo.join("@b.task.md")).unwrap();
+    assert!(b.contains("parent: ACC-347"), "{b}");
+    assert!(b.contains("[`ACC-347`](ACC-347.task.md)"), "{b}");
+    assert!(b.contains("relation.depends: [@a1]"), "the longer lookalike was untouched: {b}");
+    assert!(b.contains("mentions @a1 in passing"), "nor its loose mention: {b}");
+    assert!(repo.join("@a1.task.md").exists());
+}

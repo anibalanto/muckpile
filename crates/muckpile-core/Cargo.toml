@@ -6,7 +6,9 @@ license.workspace = true
 
 [dependencies]
 anyhow = "1"
+regex = "1"
 serde_json = "1"
 atlassian-markdown-converter = "0.1.0"
 
 [dev-dependencies]
+tempfile = "3"
