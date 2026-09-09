@@ -1,7 +1,7 @@
 //! The real transport: Jira's REST API, reached directly — one port, not
 //! three transports each covering for what the other two can't do.
 
-use crate::provider::{Provider, Transition};
+use crate::provider::{Item, Provider, Transition};
 use anyhow::{anyhow, bail, Context, Result};
 
 /// What proves the request is this account. Never written to disk as a
@@ -71,6 +71,27 @@ impl Provider for JiraRest {
         let body = serde_json::json!({ "transition": { "id": transition_id } });
         self.call("POST", &format!("/rest/api/3/issue/{key}/transitions"), Some(body))?;
         Ok(())
+    }
+
+    fn item(&self, key: &str) -> Result<Item> {
+        let v = self.call("GET", &format!("/rest/api/3/issue/{key}?fields=summary,status,issuetype,parent,description"), None)?;
+        let fields = v.get("fields").ok_or_else(|| anyhow!("the response for {key} carries no `fields`"))?;
+        let title = fields.get("summary").and_then(|s| s.as_str()).unwrap_or_default().to_string();
+        let status = fields
+            .get("status")
+            .and_then(|s| s.get("name"))
+            .and_then(|s| s.as_str())
+            .ok_or_else(|| anyhow!("{key}: no fields.status.name in the response"))?
+            .to_string();
+        let jira_type = fields
+            .get("issuetype")
+            .and_then(|s| s.get("name"))
+            .and_then(|s| s.as_str())
+            .ok_or_else(|| anyhow!("{key}: no fields.issuetype.name in the response"))?
+            .to_string();
+        let parent = fields.get("parent").and_then(|p| p.get("key")).and_then(|k| k.as_str()).map(str::to_string);
+        let body_adf = fields.get("description").filter(|d| !d.is_null()).map(|d| d.to_string());
+        Ok(Item { jira_type, title, status, parent, body_adf })
     }
 }
 

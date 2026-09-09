@@ -120,3 +120,39 @@ fn a_rejected_status_surfaces_the_response_body() {
     assert!(format!("{err:#}").contains("field X is invalid"), "{err:#}");
     rx.recv().unwrap();
 }
+
+#[test]
+fn item_hits_the_issue_endpoint_and_parses_every_field() {
+    let response = r#"{"fields":{
+        "summary":"Vistas de trabajo",
+        "status":{"name":"En curso"},
+        "issuetype":{"name":"Tarea"},
+        "parent":{"key":"ACC-100"},
+        "description":{"type":"doc","version":1,"content":[]}
+    }}"#;
+    let (base, rx) = one_shot(200, response);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    let item = provider.item("ACC-355").unwrap();
+    assert_eq!(item.title, "Vistas de trabajo");
+    assert_eq!(item.status, "En curso");
+    assert_eq!(item.jira_type, "Tarea");
+    assert_eq!(item.parent.as_deref(), Some("ACC-100"));
+    assert!(item.body_adf.is_some());
+
+    let captured = rx.recv().unwrap();
+    assert_eq!(captured.method, "GET");
+    assert!(captured.path.starts_with("/rest/api/3/issue/ACC-355"), "{}", captured.path);
+}
+
+#[test]
+fn item_with_no_parent_or_description_leaves_both_absent() {
+    let response = r#"{"fields":{"summary":"x","status":{"name":"Abierta"},"issuetype":{"name":"Tarea"}}}"#;
+    let (base, rx) = one_shot(200, response);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    let item = provider.item("ACC-1").unwrap();
+    assert_eq!(item.parent, None);
+    assert_eq!(item.body_adf, None);
+    rx.recv().unwrap();
+}

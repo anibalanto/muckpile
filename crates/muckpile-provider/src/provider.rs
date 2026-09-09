@@ -17,6 +17,18 @@ pub struct Transition {
     pub to: String,
 }
 
+/// An item's fields, exactly as the provider holds them — no translation:
+/// `status` and `jira_type` are the provider's own strings (decision 8).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Item {
+    pub jira_type: String,
+    pub title: String,
+    pub status: String,
+    pub parent: Option<String>,
+    /// The description, as ADF, serialized. `None` when the item has none.
+    pub body_adf: Option<String>,
+}
+
 pub trait Provider {
     /// The transitions the workflow allows **today** for this item. Asked
     /// fresh before every attempt, since it's where the id to apply comes
@@ -25,4 +37,7 @@ pub trait Provider {
 
     /// Applies one transition, by id.
     fn apply_transition(&self, key: &str, transition_id: &str) -> Result<()>;
+
+    /// The item's current fields.
+    fn item(&self, key: &str) -> Result<Item>;
 }

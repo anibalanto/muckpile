@@ -326,6 +326,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "muckpile-core",
+ "muckpile-provider",
  "tempfile",
 ]
 
