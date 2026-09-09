@@ -321,6 +321,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "muckpile-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "muckpile-core",
+ "tempfile",
+]
+
+[[package]]
 name = "muckpile-core"
 version = "0.1.0"
 dependencies = [

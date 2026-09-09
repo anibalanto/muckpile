@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/muckpile-core", "crates/muckpile-provider"]
+members = ["crates/muckpile-core", "crates/muckpile-provider", "crates/muckpile-cli"]
 resolver = "2"
 
 [workspace.package]

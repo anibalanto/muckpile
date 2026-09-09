@@ -1,0 +1,16 @@
+[package]
+name = "muckpile-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "muckpile"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+muckpile-core = { path = "../muckpile-core" }
+
+[dev-dependencies]
+tempfile = "3"
