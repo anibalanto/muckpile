@@ -68,8 +68,8 @@ Git local es el registro de "qué es lo último que vi del proveedor": un `pull`
 
 ```
 multitask/
-  .muckpile/                       ← el .git propio de la herramienta: el ledger de la decisión 5
   sge/                              ← un proyecto — un board de Jira
+    .muckpile/                      ← el .git propio de la herramienta: el ledger de la decisión 5 — uno por proyecto
     base/
       sge/                          ← clon del repo real, siempre en su rama principal — nunca se trabaja acá
       portal-escolar/                ← otro repo del mismo board — ver el párrafo siguiente
@@ -310,7 +310,7 @@ Doce comandos contra los veintitrés de hoy (once de `worklist`, doce de `workli
 **Lo que no cambia, porque no es de esta capa:** los problemas del cuerpo — que Jira pode `strong`+`code`, que la búsqueda por título en JQL se rompa con `--` o con `[]` — siguen estando, porque son del schema de Jira y de su buscador. `muckpile` hereda la API de Jira tal cual es.
 
 **Lo que este ADR no decide:**
-- Si el `.git` de la carpeta multitask es uno solo para todos los proyectos o uno por proyecto, y si necesita algún metadato propio además de lo que git ya da.
+- Si `.muckpile/` —uno por proyecto, según decisión 6— necesita algún metadato propio además de lo que git ya da.
 - El vocabulario completo de relaciones más allá de `depends` y `blocks` — qué otros tipos hacen falta, si alguno.
 - Cómo el workflow del proveedor hace cumplir `blocks` en la práctica — decisión 7/8 dice que es su responsabilidad y no la de `muckpile`, pero no dice cómo se configura eso en un board real.
 - Si el formato de archivo de un ítem (`<id>.<tipo>.md`, frontmatter con `title`/`status`/`parent`/`relation.*`) se conserva tal cual — este ADR asume que sí, porque nada de lo de arriba lo obliga a cambiar.
