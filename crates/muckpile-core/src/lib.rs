@@ -1,4 +1,5 @@
 pub mod body;
+pub mod project;
 
 use anyhow::{anyhow, bail, Context, Result};
 use regex::Regex;
