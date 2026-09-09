@@ -1,0 +1,12 @@
+[package]
+name = "muckpile-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow = "1"
+serde_json = "1"
+atlassian-markdown-converter = "0.1.0"
+
+[dev-dependencies]
