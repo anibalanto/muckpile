@@ -9,8 +9,9 @@ fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.as_slice() {
         [cmd, id] if cmd == "to-work" => run_to_work(id),
-        [cmd] if cmd == "pull" => run_pull(),
-        _ => bail!("uso: muckpile to-work <id> | muckpile pull"),
+        [cmd] if cmd == "pull" => run_pull(None),
+        [cmd, id] if cmd == "pull" => run_pull(Some(id)),
+        _ => bail!("uso: muckpile to-work <id> | muckpile pull [id]"),
     }
 }
 
@@ -22,11 +23,11 @@ fn run_to_work(id: &str) -> Result<()> {
     Ok(())
 }
 
-fn run_pull() -> Result<()> {
+fn run_pull(id: Option<&str>) -> Result<()> {
     let (root, cwd) = standing_in_a_project()?;
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
-    let path = muckpile_cli::pull(&root, &cwd, provider.as_ref(), &config)?;
+    let path = muckpile_cli::pull(&root, &cwd, id, provider.as_ref(), &config)?;
     let rel = path.strip_prefix(&root).unwrap_or(&path);
     println!("{} traído", rel.display());
     Ok(())

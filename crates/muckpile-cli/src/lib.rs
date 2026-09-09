@@ -26,11 +26,22 @@ pub fn to_work(root: &Path, cwd: &Path, id: &str) -> Result<PathBuf> {
     Ok(view)
 }
 
-/// `pull`, with no id: refreshes the view where `cwd` stands — its own
-/// anchor item, fetched fresh and written as `<id>.<type>.md`. An explicit
-/// id, a sprint, or a query are a different call this doesn't cover yet.
-pub fn pull(root: &Path, cwd: &Path, provider: &dyn Provider, config: &ProjectConfig) -> Result<PathBuf> {
-    let id = view_id(root, cwd)?;
+/// Fetches one item and writes it as `<id>.<type>.md` into the `to-work/`
+/// view `cwd` stands exactly in. With no `id`, it's the view's own anchor —
+/// the same convention `worklist` already uses. Given one, it's a related
+/// item added to that same view, not a new one. A sprint or a query are a
+/// different call this doesn't cover yet.
+pub fn pull(root: &Path, cwd: &Path, id: Option<&str>, provider: &dyn Provider, config: &ProjectConfig) -> Result<PathBuf> {
+    let own_id = view_id(root, cwd)?;
+    let id = match id {
+        Some(id) => {
+            if !is_valid_id(id) {
+                bail!("{id}: no es un id válido");
+            }
+            id.to_string()
+        }
+        None => own_id,
+    };
     let item = provider.item(&id)?;
     let item_type = muckpile_type_of(config, &item.jira_type)?;
 
