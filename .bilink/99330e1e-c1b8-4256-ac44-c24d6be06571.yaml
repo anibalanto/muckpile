@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture 246a8af412e52fd78a4f12de2fb4063b
+    accepted:
+    - agree:
+      - anibal
+      link: capture 246a8af412e52fd78a4f12de2fb4063b
+      hash: 50e2704c5a0fed4ae01757b2c97d8ea856e67daee031678301e9458328309ec8
+    name: attach-spec
+  1:
+    link: capture abe88d713fa845ba77f34850b02ee269
+    accepted:
+    - agree:
+      - anibal
+      link: capture abe88d713fa845ba77f34850b02ee269
+      hash: 40fbd318000eb5e78f28a42f810d4b1f060f9853a196be68657536ae4083cdee
+      hash_ast: 82d4969c5caf38a602cec46fe4fa617c82063744003bb3fbb536b4c405e754c2
+      n: declined
+    name: attach-impl

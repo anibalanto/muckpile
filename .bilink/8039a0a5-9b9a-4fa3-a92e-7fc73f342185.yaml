@@ -9,12 +9,12 @@ endpoint:
       hash: 4ea4414c2ea745f6eae387ccfbfcbeb39260ccdb489a26c9d28f56c6973be363
     name: question-spec
   1:
-    link: capture b01de01c0bda8b49a571fbb9a2411747
+    link: capture 173676d8e8b0c5760a82777493ae7953
     accepted:
     - agree:
       - anibal
-      link: capture b01de01c0bda8b49a571fbb9a2411747
-      hash: d34907a48d3d69834f90703b4b471547eb399cd11cf34dd840c878dc3ab89246
-      hash_ast: fb9d1c6f19cb9eebc60f5ed837eba6111f26fb2e3c6a22bcce6c7b261534ffd9
+      link: capture 173676d8e8b0c5760a82777493ae7953
+      hash: 4b812b624a021499a0e898a98c7d0a495321062152ba2905e679abad16f6d8e3
+      hash_ast: 20b0858247ea9491989db0fb25caf1654ce61cfda65c53cb85c8465d92fb74bb
       n: declined
-    name: resolve_pending
+    name: rest-add-comment
