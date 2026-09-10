@@ -123,13 +123,13 @@ fn sends_the_body_when_it_changed_and_is_canonical() {
     assert!(sent.contains("edited body"), "{sent}");
 }
 
-/// A text node carrying `code` and `strong` together is exactly what ADF's
-/// schema can hold but GFM can't reproduce on the way back through — the
-/// same combination `muckpile_core::body`'s own tests use to prove
-/// `prune_marks` fires. Seeded directly as ADF, the way a person's edit in
-/// Jira's rich editor could have produced it, never through our own
-/// (pruning) `body_to_adf`.
-const NON_CANONICAL_ADF: &str = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"bilinker","marks":[{"type":"code"},{"type":"strong"}]}]}]}"#;
+/// A table with its rows numbered on the provider's side. Its markdown is
+/// exactly an unnumbered table's, and that markdown goes to ADF and back to
+/// the same markdown — so judged on the markdown it looks canonical, and
+/// writing it back would drop the numbering.
+const NON_CANONICAL_ADF: &str = r#"{"version":1,"type":"doc","content":[{"type":"table","attrs":{"isNumberColumnEnabled":true},"content":[
+    {"type":"tableRow","content":[{"type":"tableHeader","content":[{"type":"paragraph","content":[{"type":"text","text":"field"}]}]}]},
+    {"type":"tableRow","content":[{"type":"tableCell","content":[{"type":"paragraph","content":[{"type":"text","text":"status"}]}]}]}]}]}"#;
 
 #[test]
 fn refuses_a_noncanonical_body_but_still_sends_the_title() {
@@ -151,9 +151,34 @@ fn refuses_a_noncanonical_body_but_still_sends_the_title() {
     };
     assert!(*title, "title has nothing to do with canonicity");
     assert!(!*body);
-    assert!(body_refused.is_some(), "a diff should explain the refusal");
+    let refused = body_refused.as_ref().expect("the refusal should say why");
+    assert!(!refused.losses.is_empty());
     assert_eq!(provider.title_of("ACC-1").as_deref(), Some("nueva"));
     assert_eq!(provider.body_adf_of("ACC-1").as_deref(), Some(NON_CANONICAL_ADF), "the body must be untouched");
+}
+
+/// The diff is against what the provider holds, so it shows what sending
+/// the draft would take away from it — not the draft against its own trip
+/// through markdown, which can't know about the numbering at all.
+#[test]
+fn the_diff_of_a_refused_body_is_against_the_provider_s_adf() {
+    let dir = git_view();
+    let view = dir.path();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-1", "Tarea", "x", "Abierta", None, Some(NON_CANONICAL_ADF));
+    let pulled_body = muckpile_core::body::adf_to_body(NON_CANONICAL_ADF).unwrap();
+    seed_pulled(view, "ACC-1", "Abierta", "x", &pulled_body);
+    edit_title(view, "ACC-1", "Abierta", "x", &format!("{pulled_body}\nOne more line.\n"));
+
+    let outcomes = push(view, &provider, &config()).unwrap();
+
+    let PushResult::Written { body_refused: Some(refused), .. } = &outcomes[0].result else {
+        panic!("expected a refused body, got {:?}", outcomes[0].result);
+    };
+    let removed = |needle: &str| refused.diff.lines().any(|l| l.starts_with('-') && l.contains(needle));
+    let added = |needle: &str| refused.diff.lines().any(|l| l.starts_with('+') && l.contains(needle));
+    assert!(removed("isNumberColumnEnabled"), "{}", refused.diff);
+    assert!(added("One more line."), "{}", refused.diff);
 }
 
 #[test]

@@ -216,8 +216,13 @@ fn run_push(view_arg: &str) -> Result<()> {
                 if !sent.is_empty() {
                     println!("{}: {} enviado(s)", outcome.id, sent.join(", "));
                 }
-                if let Some(diff) = body_refused {
-                    println!("{}: el cuerpo no es canónico — no se sube. Diff:\n{diff}", outcome.id);
+                if let Some(refused) = body_refused {
+                    println!(
+                        "{}: el cuerpo no es canónico ({}) — no se sube. Diff contra el ADF del proveedor:\n{}",
+                        outcome.id,
+                        describe_losses(&refused.losses),
+                        refused.diff
+                    );
                 }
             }
         }

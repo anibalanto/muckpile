@@ -395,9 +395,9 @@ pub enum PushResult {
     /// refused rather than overwritten.
     Stale,
     /// The compare-and-swap cleared; what was actually sent. `body_refused`
-    /// carries a diff when the body changed locally but wasn't safe to
-    /// send — title is judged on its own and can be `true` independently.
-    Written { title: bool, body: bool, body_refused: Option<String> },
+    /// says why when the body changed locally but wasn't safe to send —
+    /// title is judged on its own and can be `true` independently.
+    Written { title: bool, body: bool, body_refused: Option<BodyRefused> },
     /// A pending `@slug` got a real id this run — found on the provider, or
     /// created there. `PushOutcome::id` for this case is still the original
     /// slug: the file has already moved to `id.<type>.md` by the time this
@@ -407,6 +407,16 @@ pub enum PushResult {
     /// creating it failed, or it depends on another pending item that
     /// failed first. The file is left exactly as it was, still pending.
     ResolveFailed(String),
+}
+
+/// A body edit `push` wouldn't send: why the provider's body can't be
+/// written back through markdown, and what sending the draft would do to it
+/// — for a person, or anything else working on the provider directly, to
+/// apply there with the loss already in view.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BodyRefused {
+    pub losses: Vec<Loss>,
+    pub diff: String,
 }
 
 /// First resolves every pending `@slug` the view carries — search or
@@ -545,7 +555,8 @@ fn push_one(view: &Path, local: &ItemSummary, provider: &dyn Provider) -> Result
     // commit — not the working copy, which is expected to differ by
     // exactly the edit this call is trying to send.
     let remote = provider.item(&local.id)?;
-    if render_pulled_text(&remote)?.0 != head {
+    let (remote_text, losses) = render_pulled_text(&remote)?;
+    if remote_text != head {
         return Ok(outcome(PushResult::Stale));
     }
 
@@ -564,19 +575,18 @@ fn push_one(view: &Path, local: &ItemSummary, provider: &dyn Provider) -> Result
     let mut body_refused = None;
     let mut sent_adf = None;
     if body_changed {
-        // Canonicity is a property of the *pulled* body, not of whatever
-        // draft is sitting in the working copy: it was true or false the
-        // moment this body was last fetched, and that's what decides
-        // whether editing it locally was ever safe to begin with.
-        if body::canonical(&head)? == head {
+        // Canonicity is decided on the provider's ADF as it is right now —
+        // just confirmed to still be what this view last pulled — and never
+        // on the committed markdown, which can come back from its own trip
+        // unchanged while the ADF behind it doesn't. Only a body read from
+        // some ADF can have losses.
+        if let Some(real) = remote.body_adf.as_deref().filter(|_| !losses.is_empty()) {
+            body_refused = Some(BodyRefused { losses, diff: body::adf_diff(real, working_body)? });
+        } else {
             let adf = body_to_adf(working_body)?;
             provider.update_body(&local.id, &adf)?;
             body_sent = true;
             sent_adf = Some(adf);
-        } else {
-            let round_tripped = body::canonical(&working)?;
-            let (_, round_tripped_body) = body::split_frontmatter(&round_tripped);
-            body_refused = Some(body::line_diff(working_body, round_tripped_body));
         }
     }
 

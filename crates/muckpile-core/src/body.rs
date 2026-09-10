@@ -145,19 +145,6 @@ pub fn adf_diff(real_adf: &str, draft: &str) -> Result<String> {
     Ok(line_diff(&real, &sent))
 }
 
-/// The canonical form of a file's body: markdown to ADF and back, with the
-/// same converter, frontmatter left untouched.
-///
-/// Comparing two bodies in canonical form is what tells apart *the same
-/// thing written another way* from *someone wrote something else* — a diff
-/// in canonical form is a diff that matters. It exists so a client can
-/// compute it without knowing anything about the provider: no live document
-/// to compare against, no network call.
-pub fn canonical(text: &str) -> Result<String> {
-    let (frontmatter, body) = split_frontmatter(text);
-    Ok(format!("{frontmatter}{}", adf_to_body(&body_to_adf(body)?)?))
-}
-
 /// A line-by-line diff of `before` against `after`, `git diff`-flavored but
 /// with no external tool behind it: ` ` for a line kept, `-` for one only in
 /// `before`, `+` for one only in `after`. Meant for a person to read before
