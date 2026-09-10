@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `b11a915`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `2d25a58`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -473,7 +473,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **El h1 es cuerpo, como cualquier otra línea.** En `ACC` casi toda descripción arranca con un h1 que repite el título —medido el 2026-09-10 sobre los últimos 100 ítems: 97 arrancan con un h1, y en 5 ya no coincide con el `summary`, porque se cambió de un lado y no del otro—. Es la convención de worklist, subida tal cual a Jira. `muckpile` no la sigue ni la limpia: el título es `summary`, un campo aparte, y lo que diga un h1 es contenido de la descripción.
 
-**Avance: 2/7.**
+**Avance: 3/7.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -483,7 +483,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 | `link` y `unlink` aceptan la frase con `_` | `pendiente` | `link` compara la frase tal cual, con espacios |
 | `push` no sube nada del header: un header editado a mano choca, el ítem no se manda, y `push` sugiere el comando | `cerrada` | `header_edits` ↔ esta decisión: cada campo y cada relación que el archivo dice distinto del proveedor; `push_one` ↔ fila `push`: si hay alguno, `PushResult::HeaderClash` y nada más. El comando sugerido lo arma `main.rs` |
 | Después de escribir, el comando hace lo que un `pull` del ítem en la vista | `diverge` | `transition` y `link` no tocan la vista: el `push` siguiente ve lo que escribieron como un cambio del otro lado, y no pisa |
-| Si el proveedor cambia el tipo de un ítem, `pull` renombra el archivo y reescribe los links al nombre viejo | `pendiente` | Hoy `pull` escribe `<id>.<tipo nuevo>.md` y deja el archivo viejo al lado — dos archivos para el mismo ítem |
+| Si el proveedor cambia el tipo de un ítem, `pull` renombra el archivo y reescribe los links al nombre viejo | `cerrada` | `retype` ↔ esta decisión: mueve el archivo y reescribe cada link al nombre viejo, sin commitear; `fetch_and_commit` lo llama cuando el tipo que baja no es el del archivo, y lo commitea en el mismo `pull` |
 
 ---
 
