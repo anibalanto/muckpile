@@ -5,14 +5,16 @@
 use anyhow::{bail, Context, Result};
 use muckpile_core::body::{self, adf_to_body, body_to_adf};
 use muckpile_core::codework::{add_worktree, derive_branch, ensure_cloned};
-use muckpile_core::item::{list_summaries, parse_full, read_full, ItemSummary};
+use muckpile_core::item::{self, list_summaries, parse_full, read_full, ItemSummary};
 use muckpile_core::project::{classify, require_root, Position, ProjectConfig};
 use muckpile_core::states::write_states_cache;
-use muckpile_core::{commit_paths, find_file, head_text, is_valid_id, slugify_title, MARKER, TYPES};
+use muckpile_core::{
+    commit_paths, find_file, head_text, is_valid_id, read_frontmatter_refs, resolve_batch, slugify_title, topo_order, MARKER, TYPES,
+};
 use muckpile_provider::link::{link as provider_link, Outcome as LinkOutcome};
 use muckpile_provider::provider::{Item, Provider, Sprint};
 use muckpile_provider::transition::{transition as provider_transition, Outcome};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 /// Assembles a working view: `<root>/to-work/<id>/`, empty. Fetching the
@@ -77,18 +79,27 @@ pub fn pull(root: &Path, cwd: &Path, id: Option<&str>, provider: &dyn Provider, 
         }
         None => own_id,
     };
-    let item = provider.item(&id)?;
+    fetch_and_commit(cwd, &id, provider, config)
+}
+
+/// Fetches `id` and writes/commits it into `dir` in pulled form — the tail
+/// `pull` runs for its own argument, and what resolving a pending `@slug`
+/// runs once it has a real key, so that a freshly created or found item
+/// ends up with the same commit `push`'s compare-and-swap already knows how
+/// to read.
+fn fetch_and_commit(dir: &Path, id: &str, provider: &dyn Provider, config: &ProjectConfig) -> Result<PathBuf> {
+    let item = provider.item(id)?;
     let item_type = muckpile_type_of(config, &item.jira_type)?;
     let text = render_pulled_text(&item)?;
 
     let filename = format!("{id}.{item_type}.md");
-    let path = cwd.join(&filename);
+    let path = dir.join(&filename);
     std::fs::write(&path, &text).with_context(|| format!("writing {}", path.display()))?;
 
     // The commit is what lets `push` later ask "did the provider change
     // since I last asked?" without a state file of its own — see
     // `commit_paths`.
-    commit_paths(cwd, &[&filename], &format!("pull {id}"))?;
+    commit_paths(dir, &[&filename], &format!("pull {id}"))?;
     Ok(path)
 }
 
@@ -358,10 +369,7 @@ pub struct PushOutcome {
     pub result: PushResult,
 }
 
-/// What `push` found for one item, resolved down to a single case. An item
-/// still waiting on its first sync never reaches this at all —
-/// `list_summaries` already leaves it out, since there's no prior state yet
-/// to compare it against.
+/// What `push` found for one item, resolved down to a single case.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PushResult {
     /// The file matches the last `pull` this view recorded for it — nothing
@@ -378,20 +386,132 @@ pub enum PushResult {
     /// carries a diff when the body changed locally but wasn't safe to
     /// send — title is judged on its own and can be `true` independently.
     Written { title: bool, body: bool, body_refused: Option<String> },
+    /// A pending `@slug` got a real id this run — found on the provider, or
+    /// created there. `PushOutcome::id` for this case is still the original
+    /// slug: the file has already moved to `id.<type>.md` by the time this
+    /// comes back.
+    Resolved { id: String, created: bool },
+    /// A pending `@slug` couldn't be resolved this run — searching or
+    /// creating it failed, or it depends on another pending item that
+    /// failed first. The file is left exactly as it was, still pending.
+    ResolveFailed(String),
 }
 
-/// Sends every item under `view` whose title or body changed since the last
-/// `pull`, refusing anything the provider moved on since then. Status and
-/// parent never travel this way — nothing here writes a status directly,
-/// and nothing re-parents an item that already has a key — so a commit this
-/// makes always re-renders those two straight from the provider, discarding
-/// any local edit to a field this function never reads in the first place.
-pub fn push(view: &Path, provider: &dyn Provider) -> Result<Vec<PushOutcome>> {
-    let mut outcomes = Vec::new();
+/// First resolves every pending `@slug` the view carries — search or
+/// create, then rename, rewrite references, and settle a fresh baseline for
+/// it, same as a `pull` — and then sends every item that already had a real
+/// id whose title or body changed since its own last `pull`, refusing
+/// anything the provider moved on since then. Status and parent never
+/// travel through the second half — nothing here writes a status directly,
+/// and nothing re-parents an item that already had a key before this run —
+/// so a commit it makes there always re-renders those two straight from the
+/// provider, discarding any local edit to a field this never reads.
+pub fn push(view: &Path, provider: &dyn Provider, config: &ProjectConfig) -> Result<Vec<PushOutcome>> {
+    let mut outcomes = resolve_pending(view, provider, config)?;
+    let just_resolved: HashSet<String> = outcomes
+        .iter()
+        .filter_map(|o| match &o.result {
+            PushResult::Resolved { id, .. } => Some(id.clone()),
+            _ => None,
+        })
+        .collect();
+
     for local in list_summaries(view)? {
+        if just_resolved.contains(&local.id) {
+            // Its baseline was just committed fresh — nothing this same run
+            // could have edited yet.
+            continue;
+        }
         outcomes.push(push_one(view, &local, provider)?);
     }
     Ok(outcomes)
+}
+
+/// Resolves every pending `@slug` directly under `view`: searches by exact
+/// title before creating, so a retry never duplicates; a `parent` naming
+/// another pending item in the same batch is translated to that item's
+/// freshly resolved id first, since the provider has to already know about
+/// a parent before it can be named on creation. Processed in topological
+/// order over the batch's own internal references — `parent` and any
+/// `relation.*` — so a dependency is always resolved before what depends on
+/// it is attempted, and never attempted at all once its dependency failed.
+fn resolve_pending(view: &Path, provider: &dyn Provider, config: &ProjectConfig) -> Result<Vec<PushOutcome>> {
+    let pending = item::list_pending(view)?;
+    if pending.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let slugs: Vec<String> = pending.iter().map(|p| p.slug.clone()).collect();
+    let order = topo_order(view, &slugs)?;
+    let by_slug: HashMap<&str, &item::PendingItem> = pending.iter().map(|p| (p.slug.as_str(), p)).collect();
+
+    let mut resolved: HashMap<String, String> = HashMap::new();
+    let mut outcomes = Vec::new();
+
+    for slug in &order {
+        let pending_item = by_slug[slug.as_str()];
+
+        let (path, _) = find_file(view, slug)?;
+        let text = std::fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
+        let blocked_by = read_frontmatter_refs(&text).into_iter().find(|r| by_slug.contains_key(r.as_str()) && !resolved.contains_key(r));
+        if let Some(blocker) = blocked_by {
+            outcomes.push(PushOutcome { id: slug.clone(), result: PushResult::ResolveFailed(format!("depende de {blocker}, que no se pudo resolver")) });
+            continue;
+        }
+
+        let Some(jira_type) = config.item_type.get(&pending_item.item_type) else {
+            outcomes.push(PushOutcome {
+                id: slug.clone(),
+                result: PushResult::ResolveFailed(format!("{}: sin tipo de item para él en muckpile.toml", pending_item.item_type)),
+            });
+            continue;
+        };
+        let real_parent = pending_item.parent.as_deref().map(|p| resolved.get(p).map(String::as_str).unwrap_or(p));
+
+        match resolve_one(pending_item, jira_type, real_parent, provider, config) {
+            Ok((id, created)) => {
+                resolved.insert(slug.clone(), id.clone());
+                outcomes.push(PushOutcome { id: slug.clone(), result: PushResult::Resolved { id, created } });
+            }
+            Err(e) => outcomes.push(PushOutcome { id: slug.clone(), result: PushResult::ResolveFailed(e.to_string()) }),
+        }
+    }
+
+    if !resolved.is_empty() {
+        // `git mv` needs its source tracked, and nothing commits a fresh
+        // `@slug` draft before this — `new` writes it and stops there, the
+        // same way `pull` used to. A no-op if it's already committed.
+        for slug in resolved.keys() {
+            let pending_item = by_slug[slug.as_str()];
+            let filename = format!("{}.{}.md", pending_item.slug, pending_item.item_type);
+            commit_paths(view, &[&filename], &format!("new {slug}"))?;
+        }
+        resolve_batch(view, &resolved)?;
+        for id in resolved.values() {
+            fetch_and_commit(view, id, provider, config)?;
+        }
+    }
+
+    Ok(outcomes)
+}
+
+/// One pending item, already past the batch-dependency check: search by
+/// title, and only create when nothing matches. A found item never sends
+/// its draft body or parent — both only ever travel at creation, and
+/// finding means something already existed before this run touched it.
+fn resolve_one(
+    pending: &item::PendingItem,
+    jira_type: &str,
+    real_parent: Option<&str>,
+    provider: &dyn Provider,
+    config: &ProjectConfig,
+) -> Result<(String, bool)> {
+    if let Some(id) = provider.find_by_title(&config.jira_project_key, jira_type, &pending.title)? {
+        return Ok((id, false));
+    }
+    let body_adf = if pending.body.trim().is_empty() { None } else { Some(body_to_adf(&pending.body)?) };
+    let id = provider.create_item(&config.jira_project_key, jira_type, &pending.title, real_parent, body_adf.as_deref())?;
+    Ok((id, true))
 }
 
 fn push_one(view: &Path, local: &ItemSummary, provider: &dyn Provider) -> Result<PushOutcome> {

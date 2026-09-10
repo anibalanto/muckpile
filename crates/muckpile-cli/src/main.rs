@@ -174,11 +174,16 @@ fn run_push(view_arg: &str) -> Result<()> {
     let provider = build_provider(&root, &config)?;
     let view = cwd.join(view_arg);
 
-    for outcome in muckpile_cli::push(&view, provider.as_ref())? {
+    for outcome in muckpile_cli::push(&view, provider.as_ref(), &config)? {
         match outcome.result {
             PushResult::Unchanged => println!("{}: sin cambios", outcome.id),
             PushResult::NeverPulled => println!("{}: nunca se hizo pull acá — nada para comparar", outcome.id),
             PushResult::Stale => println!("{}: cambió del otro lado desde tu último pull — no se escribió nada", outcome.id),
+            PushResult::Resolved { id, created } => {
+                let how = if created { "creado" } else { "encontrado" };
+                println!("{}: {how} como {id}", outcome.id);
+            }
+            PushResult::ResolveFailed(reason) => println!("{}: no se pudo resolver — {reason}", outcome.id),
             PushResult::Written { title, body, body_refused } => {
                 let mut sent = Vec::new();
                 if title {
