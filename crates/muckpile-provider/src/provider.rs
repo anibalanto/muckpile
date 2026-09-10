@@ -32,6 +32,29 @@ pub struct Item {
     /// The item's labels — what tells apart two muckpile types that share
     /// one provider type.
     pub labels: Vec<String>,
+    /// The files attached to the item.
+    pub attachments: Vec<Attachment>,
+}
+
+/// One comment on an item, as the provider holds it. `author` is the name a
+/// person reads and isn't unique; `author_id` is the account, which is.
+/// `parent` is the comment this one replies to — `None` for a root.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Comment {
+    pub id: String,
+    pub author: String,
+    pub author_id: String,
+    pub created: String,
+    pub parent: Option<String>,
+    /// The comment's body, as ADF, serialized.
+    pub body_adf: String,
+}
+
+/// One file attached to an item: its id, and the name it was uploaded with.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Attachment {
+    pub id: String,
+    pub filename: String,
 }
 
 /// One link, seen from the item that carries it: the phrase from its own
@@ -55,6 +78,13 @@ pub trait Provider {
 
     /// The item's current fields.
     fn item(&self, key: &str) -> Result<Item>;
+
+    /// Every comment on the item, oldest first, each with the comment it
+    /// replies to.
+    fn comments(&self, key: &str) -> Result<Vec<Comment>>;
+
+    /// The bytes of one attachment.
+    fn attachment_content(&self, attachment_id: &str) -> Result<Vec<u8>>;
 
     /// The board's currently open sprints.
     fn open_sprints(&self, board_id: u64) -> Result<Vec<Sprint>>;

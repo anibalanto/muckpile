@@ -12,7 +12,7 @@ use muckpile_core::{
     commit_paths, find_file, head_text, is_valid_id, read_frontmatter_refs, read_relations, resolve_batch, slugify_title, topo_order, MARKER, TYPES,
 };
 use muckpile_provider::link::{link as provider_link, Outcome as LinkOutcome};
-use muckpile_provider::provider::{Item, ItemLink, Provider, Sprint};
+use muckpile_provider::provider::{Attachment, Comment, Item, ItemLink, Provider, Sprint};
 use muckpile_provider::transition::{transition as provider_transition, Outcome};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -106,12 +106,86 @@ fn fetch_and_commit(dir: &Path, id: &str, provider: &dyn Provider, config: &Proj
     let filename = format!("{id}.{item_type}.md");
     let path = dir.join(&filename);
     std::fs::write(&path, &text).with_context(|| format!("writing {}", path.display()))?;
+    let mut written = vec![filename];
+    written.extend(write_thread(dir, id, provider)?);
+    written.extend(write_files(dir, id, &item.attachments, provider)?);
 
     // The commit is what lets `push` later ask "did the provider change
     // since I last asked?" without a state file of its own — see
     // `commit_paths`.
-    commit_paths(dir, &[&filename], &format!("pull {id}"))?;
+    let written: Vec<&str> = written.iter().map(String::as_str).collect();
+    commit_paths(dir, &written, &format!("pull {id}"))?;
     Ok(Pulled { path, losses })
+}
+
+/// Writes each of the item's comments as `<id>_data/thread/<comment id>.md`
+/// and returns the paths written, relative to `dir`.
+fn write_thread(dir: &Path, id: &str, provider: &dyn Provider) -> Result<Vec<String>> {
+    let mut written = Vec::new();
+    for comment in provider.comments(id)? {
+        let rel = format!("{id}_data/thread/{}.md", comment.id);
+        write_under(dir, &rel, render_comment(&comment)?.as_bytes())?;
+        written.push(rel);
+    }
+    Ok(written)
+}
+
+/// A comment as a thread file: who wrote it and when, the comment it
+/// replies to, and — when it opens with `ai: <model>`, the model as code —
+/// that model, taken out of the body and into the header.
+fn render_comment(comment: &Comment) -> Result<String> {
+    let markdown = JiraAdfMarkdownFilter::filter(&comment.body_adf)?.markdown;
+    let (ai, body) = split_ai(&markdown);
+
+    let mut text = format!("---\nauthor: {}\nauthor_id: {}\ncreated: {}\n", comment.author, comment.author_id, comment.created);
+    if let Some(parent) = &comment.parent {
+        text.push_str(&format!("in-reply-to: {parent}\n"));
+    }
+    if let Some(ai) = ai {
+        text.push_str(&format!("ai: {ai}\n"));
+    }
+    text.push_str("---\n");
+    text.push_str(body);
+    Ok(text)
+}
+
+/// The model a comment opens with, `ai: <model>` as its own first
+/// paragraph, and the body after it — or no model, and the body whole.
+fn split_ai(markdown: &str) -> (Option<&str>, &str) {
+    let opened = markdown.strip_prefix("ai: `").and_then(|rest| rest.split_once("`\n"));
+    match opened {
+        Some((model, after)) if !model.is_empty() && !model.contains(['`', '\n']) => match after.strip_prefix('\n') {
+            Some(body) => (Some(model), body),
+            None if after.is_empty() => (Some(model), after),
+            None => (None, markdown),
+        },
+        _ => (None, markdown),
+    }
+}
+
+/// Downloads each attachment into `<id>_data/files/`, under its own name —
+/// or with its id in front, when another attachment shares that name — and
+/// returns the paths written. Nothing else in `files/` is touched: it also
+/// holds the drafts nobody uploaded.
+fn write_files(dir: &Path, id: &str, attachments: &[Attachment], provider: &dyn Provider) -> Result<Vec<String>> {
+    let mut written = Vec::new();
+    for attachment in attachments {
+        let shared = attachments.iter().filter(|a| a.filename == attachment.filename).count() > 1;
+        let name = Path::new(&attachment.filename).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| attachment.id.clone());
+        let name = if shared { format!("{}-{name}", attachment.id) } else { name };
+        let rel = format!("{id}_data/files/{name}");
+        write_under(dir, &rel, &provider.attachment_content(&attachment.id)?)?;
+        written.push(rel);
+    }
+    Ok(written)
+}
+
+fn write_under(dir: &Path, rel: &str, bytes: &[u8]) -> Result<()> {
+    let path = dir.join(rel);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
+    }
+    std::fs::write(&path, bytes).with_context(|| format!("writing {}", path.display()))
 }
 
 /// The exact text `pull` writes for a fetched item, and why its body can't
@@ -653,6 +727,7 @@ fn push_one(view: &Path, local: &ItemSummary, provider: &dyn Provider) -> Result
         body_adf: if body_sent { sent_adf } else { remote.body_adf.clone() },
         links: remote.links.clone(),
         labels: remote.labels.clone(),
+        attachments: remote.attachments.clone(),
     };
     let (new_text, _) = render_pulled_text(&committed)?;
     std::fs::write(&working_path, &new_text).with_context(|| format!("writing {}", working_path.display()))?;

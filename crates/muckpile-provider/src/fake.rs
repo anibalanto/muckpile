@@ -3,7 +3,7 @@
 //! has its place, exploratory and by hand, never inside a suite that runs on
 //! every `cargo test`.
 
-use crate::provider::{self, ItemLink, LinkType, Provider, Sprint, Status, Transition};
+use crate::provider::{self, Attachment, Comment, ItemLink, LinkType, Provider, Sprint, Status, Transition};
 use anyhow::{bail, Context, Result};
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
@@ -28,6 +28,8 @@ struct Entry {
     body_adf: Option<String>,
     links: Vec<ItemLink>,
     labels: Vec<String>,
+    comments: Vec<Comment>,
+    attachments: Vec<(Attachment, Vec<u8>)>,
 }
 
 impl FakeProvider {
@@ -92,6 +94,8 @@ impl FakeProvider {
                 body_adf: None,
                 links: Vec::new(),
                 labels: Vec::new(),
+                comments: Vec::new(),
+                attachments: Vec::new(),
             },
         );
     }
@@ -110,8 +114,23 @@ impl FakeProvider {
                 body_adf: body_adf.map(|s| s.to_string()),
                 links: Vec::new(),
                 labels: Vec::new(),
+                comments: Vec::new(),
+                attachments: Vec::new(),
             },
         );
+    }
+
+    /// Seeds the comments of an already-seeded item, oldest first.
+    pub fn seed_comments(&self, key: &str, comments: Vec<Comment>) {
+        let mut items = self.items.borrow_mut();
+        items.get_mut(key).unwrap_or_else(|| panic!("FakeProvider: seed {key} before its comments")).comments = comments;
+    }
+
+    /// Attaches a file to an already-seeded item.
+    pub fn seed_attachment(&self, key: &str, id: &str, filename: &str, bytes: &[u8]) {
+        let mut items = self.items.borrow_mut();
+        let item = items.get_mut(key).unwrap_or_else(|| panic!("FakeProvider: seed {key} before its attachments"));
+        item.attachments.push((Attachment { id: id.to_string(), filename: filename.to_string() }, bytes.to_vec()));
     }
 
     /// Seeds the labels of an already-seeded item.
@@ -180,7 +199,24 @@ impl Provider for FakeProvider {
             body_adf: i.body_adf.clone(),
             links: i.links.clone(),
             labels: i.labels.clone(),
+            attachments: i.attachments.iter().map(|(a, _)| a.clone()).collect(),
         })
+    }
+
+    fn comments(&self, key: &str) -> Result<Vec<Comment>> {
+        let items = self.items.borrow();
+        let Some(i) = items.get(key) else { bail!("no such item: {key}") };
+        Ok(i.comments.clone())
+    }
+
+    fn attachment_content(&self, attachment_id: &str) -> Result<Vec<u8>> {
+        let items = self.items.borrow();
+        items
+            .values()
+            .flat_map(|i| &i.attachments)
+            .find(|(a, _)| a.id == attachment_id)
+            .map(|(_, bytes)| bytes.clone())
+            .with_context(|| format!("no such attachment: {attachment_id}"))
     }
 
     fn open_sprints(&self, _board_id: u64) -> Result<Vec<Sprint>> {
@@ -255,6 +291,8 @@ impl Provider for FakeProvider {
                 body_adf: body_adf.map(str::to_string),
                 links: Vec::new(),
                 labels: label.map(|l| vec![l.to_string()]).unwrap_or_default(),
+                comments: Vec::new(),
+                attachments: Vec::new(),
             },
         );
         Ok(key)

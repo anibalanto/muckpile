@@ -7,6 +7,7 @@
 use muckpile_cli::pull;
 use muckpile_core::project::load_project_config;
 use muckpile_provider::fake::FakeProvider;
+use muckpile_provider::provider::Comment;
 use std::path::Path;
 use std::process::Command;
 
@@ -266,4 +267,112 @@ fn a_task_with_no_label_comes_down_as_a_task() {
     let path = pull(root, &view, None, &provider, &config).unwrap().path;
 
     assert_eq!(path, view.join("ACC-355.task.md"));
+}
+
+fn paragraph(text: &str) -> String {
+    format!(r#"{{"version":1,"type":"doc","content":[{{"type":"paragraph","content":[{{"type":"text","text":"{text}"}}]}}]}}"#)
+}
+
+fn comment(id: &str, author: &str, parent: Option<&str>, body_adf: String) -> Comment {
+    Comment { id: id.into(), author: author.into(), author_id: format!("{author}-id"), created: "2026-09-02T13:06:47.823-0300".into(), parent: parent.map(Into::into), body_adf }
+}
+
+#[test]
+fn brings_each_comment_into_the_thread_with_the_one_it_replies_to() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    let config = load_project_config(root).unwrap();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-355", "Tarea", "Vistas", "Abierta", None, None);
+    provider.seed_comments("ACC-355", vec![comment("42180", "Ana", None, paragraph("una pregunta")), comment("42224", "Beto", Some("42180"), paragraph("la respuesta"))]);
+
+    let view = root.join("to-work/ACC-355");
+    pull(root, &view, None, &provider, &config).unwrap();
+
+    let root_msg = std::fs::read_to_string(view.join("ACC-355_data/thread/42180.md")).unwrap();
+    assert_eq!(root_msg, "---\nauthor: Ana\nauthor_id: Ana-id\ncreated: 2026-09-02T13:06:47.823-0300\n---\nuna pregunta\n");
+    let reply = std::fs::read_to_string(view.join("ACC-355_data/thread/42224.md")).unwrap();
+    assert!(reply.contains("\nin-reply-to: 42180\n"), "{reply}");
+    let committed = muckpile_core::head_text(&view, "ACC-355_data/thread/42224.md").unwrap();
+    assert_eq!(committed, Some(reply), "the thread lands in the same pull commit");
+}
+
+/// A comment an AI wrote starts with `ai: <model>`, the model as code; the
+/// thread file carries it in its header, not in its body.
+#[test]
+fn the_model_that_wrote_a_comment_goes_to_the_header() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    let config = load_project_config(root).unwrap();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-355", "Tarea", "Vistas", "Abierta", None, None);
+    let body = r#"{"version":1,"type":"doc","content":[
+        {"type":"paragraph","content":[{"type":"text","text":"ai: "},{"type":"text","text":"claude-opus-5","marks":[{"type":"code"}]}]},
+        {"type":"paragraph","content":[{"type":"text","text":"lo que dijo"}]}]}"#;
+    provider.seed_comments("ACC-355", vec![comment("42300", "Ana", None, body.to_string())]);
+
+    let view = root.join("to-work/ACC-355");
+    pull(root, &view, None, &provider, &config).unwrap();
+
+    let msg = std::fs::read_to_string(view.join("ACC-355_data/thread/42300.md")).unwrap();
+    assert!(msg.contains("\nai: claude-opus-5\n---\nlo que dijo\n"), "{msg}");
+}
+
+#[test]
+fn brings_each_attachment_into_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    let config = load_project_config(root).unwrap();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-355", "Tarea", "Vistas", "Abierta", None, None);
+    provider.seed_attachment("ACC-355", "44892", "captura.png", b"png bytes");
+
+    let view = root.join("to-work/ACC-355");
+    pull(root, &view, None, &provider, &config).unwrap();
+
+    assert_eq!(std::fs::read(view.join("ACC-355_data/files/captura.png")).unwrap(), b"png bytes");
+}
+
+/// Two attachments with the same name both carry their id in front, so
+/// neither hides the other.
+#[test]
+fn two_attachments_with_the_same_name_both_carry_their_id() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    let config = load_project_config(root).unwrap();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-355", "Tarea", "Vistas", "Abierta", None, None);
+    provider.seed_attachment("ACC-355", "1", "log.txt", b"primero");
+    provider.seed_attachment("ACC-355", "2", "log.txt", b"segundo");
+
+    let view = root.join("to-work/ACC-355");
+    pull(root, &view, None, &provider, &config).unwrap();
+
+    assert_eq!(std::fs::read(view.join("ACC-355_data/files/1-log.txt")).unwrap(), b"primero");
+    assert_eq!(std::fs::read(view.join("ACC-355_data/files/2-log.txt")).unwrap(), b"segundo");
+    assert!(!view.join("ACC-355_data/files/log.txt").exists());
+}
+
+/// `files/` also holds the drafts nobody uploaded: `pull` never touches a
+/// file it didn't bring.
+#[test]
+fn a_local_draft_in_files_is_left_alone() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    let config = load_project_config(root).unwrap();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-355", "Tarea", "Vistas", "Abierta", None, None);
+    provider.seed_attachment("ACC-355", "44892", "captura.png", b"png bytes");
+    let view = root.join("to-work/ACC-355");
+    std::fs::create_dir_all(view.join("ACC-355_data/files")).unwrap();
+    std::fs::write(view.join("ACC-355_data/files/borrador-adr.md"), "no decidido").unwrap();
+
+    pull(root, &view, None, &provider, &config).unwrap();
+
+    assert_eq!(std::fs::read_to_string(view.join("ACC-355_data/files/borrador-adr.md")).unwrap(), "no decidido");
 }

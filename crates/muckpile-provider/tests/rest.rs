@@ -2,7 +2,7 @@
 //! body — against a local, in-process mock. Never touches the real
 //! provider: this is exactly what the automated suite is allowed to touch.
 
-use muckpile_provider::provider::{ItemLink, LinkType, Provider, Sprint, Status, Transition};
+use muckpile_provider::provider::{Attachment, Comment, ItemLink, LinkType, Provider, Sprint, Status, Transition};
 use muckpile_provider::rest::{Credentials, JiraRest};
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -424,4 +424,58 @@ fn item_reads_the_labels() {
 
     assert_eq!(item.labels, vec!["question".to_string()]);
     assert!(rx.recv().unwrap().path.contains("labels"));
+}
+
+/// Shape measured on SGE-7699 on 2026-09-10: `id` a string, `parentId` a
+/// number on a reply and absent — or `null` — on a root. Only this endpoint
+/// carries `parentId`; the issue's own `comment` field doesn't.
+#[test]
+fn comments_reads_each_one_with_the_comment_it_replies_to() {
+    let response = r#"{"startAt":0,"maxResults":100,"total":2,"comments":[
+        {"id":"42180","author":{"accountId":"a-1","displayName":"Ana"},"created":"2026-09-02T13:06:47.823-0300",
+         "body":{"type":"doc","version":1,"content":[]}},
+        {"id":"42224","parentId":42180,"author":{"accountId":"b-2","displayName":"Beto"},"created":"2026-09-02T15:47:55.222-0300",
+         "body":{"type":"doc","version":1,"content":[]}}
+    ]}"#;
+    let (base, rx) = one_shot(200, response);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    let comments = provider.comments("SGE-7699").unwrap();
+
+    let doc = r#"{"content":[],"type":"doc","version":1}"#.to_string();
+    assert_eq!(
+        comments,
+        vec![
+            Comment { id: "42180".into(), author: "Ana".into(), author_id: "a-1".into(), created: "2026-09-02T13:06:47.823-0300".into(), parent: None, body_adf: doc.clone() },
+            Comment { id: "42224".into(), author: "Beto".into(), author_id: "b-2".into(), created: "2026-09-02T15:47:55.222-0300".into(), parent: Some("42180".into()), body_adf: doc },
+        ]
+    );
+    let captured = rx.recv().unwrap();
+    assert!(captured.path.starts_with("/rest/api/3/issue/SGE-7699/comment"), "{}", captured.path);
+}
+
+#[test]
+fn item_reads_the_attachments() {
+    let response = r#"{"fields":{"summary":"x","status":{"name":"Abierta"},"issuetype":{"name":"Mejora"},
+        "attachment":[{"id":"44892","filename":"captura.png","mimeType":"image/png","size":34828}]}}"#;
+    let (base, rx) = one_shot(200, response);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    let item = provider.item("SGE-7699").unwrap();
+
+    assert_eq!(item.attachments, vec![Attachment { id: "44892".into(), filename: "captura.png".into() }]);
+    assert!(rx.recv().unwrap().path.contains("attachment"));
+}
+
+/// Measured on 2026-09-10: without `redirect=false` the provider answers 303
+/// toward another host; with it, the file itself, byte for byte.
+#[test]
+fn attachment_content_asks_for_the_bytes_without_a_redirect() {
+    let (base, rx) = one_shot(200, "the bytes");
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    let bytes = provider.attachment_content("44892").unwrap();
+
+    assert_eq!(bytes, b"the bytes");
+    assert_eq!(rx.recv().unwrap().path, "/rest/api/3/attachment/content/44892?redirect=false");
 }

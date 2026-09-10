@@ -2,9 +2,10 @@
 //! three transports each covering for what the other two can't do.
 
 use crate::jql::search_text;
-use crate::provider::{Item, ItemLink, LinkType, Provider, Sprint, Status, Transition};
+use crate::provider::{Attachment, Comment, Item, ItemLink, LinkType, Provider, Sprint, Status, Transition};
 use anyhow::{anyhow, bail, Context, Result};
 use std::collections::BTreeMap;
+use std::io::Read;
 
 /// What proves the request is this account. Never written to disk as a
 /// whole — only the token's environment variable name is, and the value is
@@ -66,6 +67,20 @@ fn link_from_own_side(entry: &serde_json::Value) -> Option<ItemLink> {
     Some(ItemLink { phrase: phrase.as_str()?.to_string(), other: other.get("key")?.as_str()?.to_string() })
 }
 
+/// One entry of the comments endpoint. `parentId` comes as a number, and
+/// only on a reply.
+fn comment_from(c: &serde_json::Value) -> Option<Comment> {
+    let author = c.get("author")?;
+    Some(Comment {
+        id: c.get("id")?.as_str()?.to_string(),
+        author: author.get("displayName")?.as_str()?.to_string(),
+        author_id: author.get("accountId")?.as_str()?.to_string(),
+        created: c.get("created")?.as_str()?.to_string(),
+        parent: c.get("parentId").filter(|p| !p.is_null()).map(|p| p.as_str().map(str::to_string).unwrap_or_else(|| p.to_string())),
+        body_adf: c.get("body")?.to_string(),
+    })
+}
+
 impl Provider for JiraRest {
     fn transitions(&self, key: &str) -> Result<Vec<Transition>> {
         let v = self.call("GET", &format!("/rest/api/3/issue/{key}/transitions"), None)?;
@@ -92,7 +107,7 @@ impl Provider for JiraRest {
     }
 
     fn item(&self, key: &str) -> Result<Item> {
-        let v = self.call("GET", &format!("/rest/api/3/issue/{key}?fields=summary,status,issuetype,parent,description,issuelinks,labels"), None)?;
+        let v = self.call("GET", &format!("/rest/api/3/issue/{key}?fields=summary,status,issuetype,parent,description,issuelinks,labels,attachment"), None)?;
         let fields = v.get("fields").ok_or_else(|| anyhow!("the response for {key} carries no `fields`"))?;
         let title = fields.get("summary").and_then(|s| s.as_str()).unwrap_or_default().to_string();
         let status = fields
@@ -115,7 +130,45 @@ impl Provider for JiraRest {
             .and_then(|l| l.as_array())
             .map(|l| l.iter().filter_map(|l| l.as_str().map(str::to_string)).collect())
             .unwrap_or_default();
-        Ok(Item { jira_type, title, status, parent, body_adf, links, labels })
+        let attachments = fields
+            .get("attachment")
+            .and_then(|a| a.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|a| Some(Attachment { id: a.get("id")?.as_str()?.to_string(), filename: a.get("filename")?.as_str()?.to_string() }))
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok(Item { jira_type, title, status, parent, body_adf, links, labels, attachments })
+    }
+
+    /// From the comments' own endpoint, a page at a time: it's the only one
+    /// that carries `parentId` — the issue's `comment` field leaves it out.
+    fn comments(&self, key: &str) -> Result<Vec<Comment>> {
+        let mut out = Vec::new();
+        loop {
+            let v = self.call("GET", &format!("/rest/api/3/issue/{key}/comment?startAt={}&maxResults=100", out.len()), None)?;
+            let page = v.get("comments").and_then(|c| c.as_array()).ok_or_else(|| anyhow!("the comments of {key} carry no `comments`"))?;
+            for c in page {
+                out.push(comment_from(c).ok_or_else(|| anyhow!("{key}: a comment without id, author, created or body: {c}"))?);
+            }
+            let total = v.get("total").and_then(|t| t.as_u64()).unwrap_or(0) as usize;
+            if page.is_empty() || out.len() >= total {
+                return Ok(out);
+            }
+        }
+    }
+
+    /// With `redirect=false` the provider answers with the file itself —
+    /// measured: without it, a 303 toward another host.
+    fn attachment_content(&self, attachment_id: &str) -> Result<Vec<u8>> {
+        let path = format!("/rest/api/3/attachment/content/{attachment_id}?redirect=false");
+        let url = format!("{}{path}", self.base);
+        let (status, bytes) = http_bytes(&url, &self.creds.basic_auth()).with_context(|| format!("talking to {url}"))?;
+        if !(200..300).contains(&status) {
+            bail!("GET {path} returned {status}: {}", String::from_utf8_lossy(&bytes));
+        }
+        Ok(bytes)
     }
 
     fn open_sprints(&self, board_id: u64) -> Result<Vec<Sprint>> {
@@ -261,6 +314,20 @@ fn http(method: &str, url: &str, auth: &str, body: Option<serde_json::Value>) ->
             Ok((status, r.into_string().unwrap_or_default()))
         }
         Err(ureq::Error::Status(status, r)) => Ok((status, r.into_string().unwrap_or_default())),
+        Err(e) => Err(anyhow!("{e}")),
+    }
+}
+
+/// Like `http`, for a GET whose answer is a file rather than JSON.
+fn http_bytes(url: &str, auth: &str) -> Result<(u16, Vec<u8>)> {
+    let read = |r: ureq::Response| -> Result<Vec<u8>> {
+        let mut bytes = Vec::new();
+        r.into_reader().read_to_end(&mut bytes)?;
+        Ok(bytes)
+    };
+    match ureq::get(url).set("Authorization", auth).call() {
+        Ok(r) => Ok((r.status(), read(r)?)),
+        Err(ureq::Error::Status(status, r)) => Ok((status, read(r)?)),
         Err(e) => Err(anyhow!("{e}")),
     }
 }
