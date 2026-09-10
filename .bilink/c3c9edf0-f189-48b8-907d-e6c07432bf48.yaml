@@ -9,12 +9,12 @@ endpoint:
       hash: 1edc85878c6f48e5c99817eb4c00958fbafce439fb366d22e2f6ff23ff3e94b1
     name: slug-resolution
   1:
-    link: capture a130e7e866b7e4ef41e8d2ae17b173f4
+    link: capture 997cba7ce656b859b76949893fd21ead
     accepted:
     - agree:
       - anibal
-      link: capture a130e7e866b7e4ef41e8d2ae17b173f4
-      hash: 49b33fa58b60e18933dc0420974d0c8725c8f58d1ae9e4e9eee7fcb6acca287f
-      hash_ast: 8b3819ec17c0e924f86f17a1e4f5cc94d0deea4e196b22049ee3363192ee468b
+      link: capture 997cba7ce656b859b76949893fd21ead
+      hash: a7028fd430dab015d1e2b821cb686116a71b5f881fc47195da13eef6849ef50f
+      hash_ast: 2e894f69a007043c86ceac125af6f6e5b610bde302582dd8ed939b5b24d4eabc
       n: declined
-    name: rest-find-by-title
+    name: rename-one
