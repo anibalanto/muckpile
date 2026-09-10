@@ -127,6 +127,8 @@ Git local es el registro de "qué es lo último que vi del proveedor", y lo llev
 
 **La rama del proveedor no se protege, porque nunca decide sola.** En un git local nada impide un `git update-ref`, y la única traba sería un hook — lo que la decisión 1 sacó. No hace falta: `push` le pregunta al proveedor antes de escribir, siempre. Si alguien movió la ref a mano, el `push` siguiente ve que el proveedor no coincide, registra lo que tiene de verdad, y queda una divergencia falsa que el rebase resuelve — nunca una escritura equivocada en el proveedor.
 
+**Y nada de esto hace `git push`, así que el rebase nunca obliga a un `push --force`.** Al proveedor se le habla por la API; la ref del proveedor y las ramas de las vistas viven sólo en `.muckpile/`, en la máquina de quien trabaja, y lo que el rebase reescribe son commits que nadie más tiene. Si algún día `.muckpile/` tiene un remoto git —un respaldo—, las refs del proveedor viajan sin forzar, porque sólo avanzan; lo único que pediría forzar son las ramas de las vistas, y eso se decide ese día.
+
 **La ref del proveedor guarda también el ADF**, al lado del markdown: `.provider/<id>.adf.json`, adentro de la vista. Es lo que el proveedor devolvió, literalmente; el markdown se deriva de él. Con eso, la pregunta de `push` compara ADF contra ADF —lo que el proveedor tiene ahora contra la punta de su ref—, no markdown contra markdown, y ve también lo que el markdown no muestra: alguien numeró las filas de una tabla. Y el historial de git dice exactamente qué cambió del lado del proveedor. Es un registro, no el que decide: `push` pregunta igual antes de escribir.
 
 **Y el rebase pone dos condiciones.** Con ediciones sin commitear en la vista, `pull` y `push` se niegan —commitear o descartar primero—: reponerlas solas después del rebase puede chocar, y ese choque es más difícil de entender que uno de rebase. Y con un rebase a medias, todo comando que toque la vista se niega hasta que se termine (`git rebase --continue`).
@@ -226,6 +228,8 @@ backlog/sprint/22_Las_vistas/  backlog/sprint/23_Las_questions/     ← no hay a
 
 **Y el proveedor puede entregar el nombre ya cortado — medido, no hipotético.** El board real de este mismo repo (`ACC`, 701) tiene sprints cuyo `name` llega truncado a 29 caracteres con una elipsis (`…`) de parte del proveedor — confirmado contra dos endpoints distintos (`board/{id}/sprint` y `sprint/{id}`), así que no es un límite del listado: es el dato que Jira tiene guardado. El número que ya antecede al nombre (`"11 El worklist se sincroniza…"`) alcanza para no colisionar — dos sprints de este proyecto no comparten número —, así que lo que hace falta no es evitar una colisión sino no dejar un carácter sin información al final del slug. `sprint fetch` reemplaza esa `…` final por la fecha de creación del sprint (`createdDate`, sólo la parte de fecha: `AAAA-MM-DD`) antes de sluggificar: `"11 El worklist se sincroniza…"` con `createdDate` `2026-09-05T19:13:14.128Z` da `11_El_worklist_se_sincroniza_2026-09-05`. Un nombre sin esa `…` no se toca.
 
+**Un proyecto lo crea `init`, y ningún otro comando.** Corrido en `multitask/`, `muckpile init <proyecto>` deja `<proyecto>/.muckpile/` —el git del proyecto, sin worktree propio: el registro de la decisión 5—, un `muckpile.toml` para completar (decisión 9), y las tres carpetas reservadas. Cada vista la crea después el comando que la necesita —`to-work` una de trabajo, `sprint fetch` una por sprint—, como un worktree de `.muckpile/` parado en su rama. Fuera de un proyecto iniciado, los demás comandos se niegan: ninguno arma un `.muckpile/` de paso.
+
 **Avance: 3/8.**
 
 | Dimensión | Estado | Evidencia |
@@ -237,7 +241,7 @@ backlog/sprint/22_Las_vistas/  backlog/sprint/23_Las_questions/     ← no hay a
 | `pull` de una vista de sprint (`backlog/sprint/<slug>`) | `pendiente` | `pull` sólo corre parado en `to-work/<id>/` |
 | `pull` con una consulta — lo que reemplaza a `bootstrap`/`reconcile`/`adopt` | `pendiente` | — |
 | El chequeo local: "¿ya tengo este ítem en otra vista, en esta máquina?" | `pendiente` | — |
-| Cómo nace un proyecto: quién crea `.muckpile/`, `muckpile.toml` y las tres carpetas | `falta spec` | Tampoco hay código: hoy se arma a mano, y la interfaz no tiene un `init` |
+| `init` crea el proyecto —`.muckpile/`, `muckpile.toml`, las tres carpetas—, y las vistas nacen como worktrees suyos | `pendiente` | Hoy se arma a mano, y `to-work`/`sprint fetch` crean carpetas comunes |
 
 ### 7. `question` desde el día uno: tipo, la relación `blocks`, y el directorio de datos del ítem
 
@@ -461,6 +465,7 @@ El choque de hoy, bajo este modelo, no es un `add/add` que exige `--force`: es u
 
 | Comando | Qué hace | Ejemplo |
 |---|---|---|
+| `init` | Crea un proyecto: `<proyecto>/.muckpile/`, un `muckpile.toml` para completar, y `base/`, `backlog/`, `to-work/`. Es el único comando que crea `.muckpile/` (decisión 6). | `$ cd multitask && muckpile init sge` |
 | `new` | Escribe `@slug.<tipo>.md` local — sin red. El slug sale de slugificar el título entero, sin tope de largo — la misma regla que `worklist new` ya documenta. `<tipo>` incluye `question`, con su relación al ítem que bloquea. | `$ muckpile new question "¿el rol se hereda de la capa de arriba?" --blocks ACC-229`<br>`@el-rol-se-hereda-de-la-capa-de-arriba.question.md creado` |
 | `show` | Frontmatter, cuerpo, y el listado de `<id>_data/` si existe (decisión 6) — del proveedor en vivo o de la copia local con `--local`. | `$ muckpile show ACC-355` |
 | `list` | Ítems por vista, sprint, estado (el string real, sin traducir), categoría (`new`/`indeterminate`/`done`, de Jira) o padre. | `$ muckpile list backlog/sprint/22_Las_vistas --state "Finalizada"`<br>`$ muckpile list backlog/sprint/22_Las_vistas --category done` |
@@ -474,9 +479,9 @@ El choque de hoy, bajo este modelo, no es un `add/add` que exige `--force`: es u
 | `transition` | Reemplaza a `start`/`done`/`close`/`drop` — no hay vocabulario propio que darles (decisión 8). Lista las transiciones del ítem, busca la que lleva al estado pedido, la ejecuta. | `$ muckpile transition ACC-355 "Finalizada"` |
 | `link` | Declara una relación entre dos ítems, en el momento — sin vocabulario propio (decisión 8): la frase es una de las dos que el proveedor ya usa para ese tipo, de ida (`outward`) o de vuelta (`inward`). | `$ muckpile link ACC-338 blocks ACC-229`<br>`$ muckpile link ACC-229 "is blocked by" ACC-338` |
 
-**Avance de la tabla: las doce filas tienen bilink aceptado** (`show` tiene dos, uno por camino). Que la fila esté atada no quiere decir que el comando esté completo: `pull` y `push` son parciales —lo que les falta está en las decisiones 5, 6, 7, 8 y 10—, y `to-work` diverge de su propia fila (decisión 6).
+**Avance de la tabla: doce de las trece filas tienen bilink aceptado** (`show` tiene dos, uno por camino); `init` todavía no tiene código. Que la fila esté atada no quiere decir que el comando esté completo: `pull` y `push` son parciales —lo que les falta está en las decisiones 5, 6, 7, 8 y 10—, y `to-work` diverge de su propia fila (decisión 6).
 
-Doce comandos contra los veintitrés de hoy (once de `worklist`, doce de `worklist-server`). Lo que no está en la tabla — `install-hooks`, `check-push`, `assign-keys`, `bootstrap`, `reconcile`, `removes`, `push-states`, `create-or-find`, `provider set-status`, `window-open`, `propagate`, `adopt` — no falta: era la maquinaria de la asimetría que la decisión 1 saca. `bootstrap`/`reconcile`/`adopt` sí tienen equivalente, pero no como comando aparte: son `pull` con una consulta que trae de a muchos — `muckpile pull backlog --query "project = ACC AND sprint is empty"`.
+Trece comandos contra los veintitrés de hoy (once de `worklist`, doce de `worklist-server`). Lo que no está en la tabla — `install-hooks`, `check-push`, `assign-keys`, `bootstrap`, `reconcile`, `removes`, `push-states`, `create-or-find`, `provider set-status`, `window-open`, `propagate`, `adopt` — no falta: era la maquinaria de la asimetría que la decisión 1 saca. `bootstrap`/`reconcile`/`adopt` sí tienen equivalente, pero no como comando aparte: son `pull` con una consulta que trae de a muchos — `muckpile pull backlog --query "project = ACC AND sprint is empty"`.
 
 ---
 
