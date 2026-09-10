@@ -52,9 +52,8 @@ pub fn read_full(path: &Path) -> Result<FullItem> {
 }
 
 /// Like `read_full`, but from text already in hand rather than a path on
-/// disk — `push` uses it on both the working copy of an item and a
-/// git-committed snapshot of it (see `head_text`), neither of which is
-/// necessarily what's on disk right now.
+/// disk — `push` reads the working copy through it, and the copy the
+/// provider's ref recorded is never on disk at all.
 pub fn parse_full(id: String, item_type: String, text: &str) -> Result<FullItem> {
     let parsed = parse_frontmatter(text).with_context(|| format!("{id}.{item_type}.md: no empieza con frontmatter"))?;
     Ok(FullItem {

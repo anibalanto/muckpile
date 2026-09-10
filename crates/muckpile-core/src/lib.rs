@@ -155,28 +155,6 @@ pub fn rewrite_type_references(text: &str, id: &str, old_type: &str, new_type: &
     (out, changed)
 }
 
-/// Moves `<id>.<old_type>.md` to `<id>.<new_type>.md` in `view` and rewrites
-/// every link to the old name — without committing: the caller commits it
-/// together with whatever it's recording. Returns every path touched,
-/// relative to `view`, the old name and the new one included.
-pub fn retype(view: &Path, id: &str, old_type: &str, new_type: &str) -> Result<Vec<String>> {
-    let old_name = format!("{id}.{old_type}.md");
-    let new_name = format!("{id}.{new_type}.md");
-    let mut touched = Vec::new();
-    for path in markdown_files(view) {
-        let text = std::fs::read_to_string(&path)?;
-        let (new_text, changed) = rewrite_type_references(&text, id, old_type, new_type);
-        if changed {
-            std::fs::write(&path, new_text)?;
-            touched.push(path.strip_prefix(view).unwrap_or(&path).to_string_lossy().to_string());
-        }
-    }
-    std::fs::rename(view.join(&old_name), view.join(&new_name)).with_context(|| format!("renaming {old_name} to {new_name}"))?;
-    touched.push(old_name);
-    touched.push(new_name);
-    Ok(touched)
-}
-
 fn replace_boundary(re: &Regex, text: &str, changed: &mut bool, new_head: &str) -> String {
     replace_boundary_inner(re, text, changed, new_head, false)
 }
@@ -321,13 +299,6 @@ pub fn commit_paths(view: &Path, paths: &[&str], message: &str) -> Result<bool> 
     Ok(true)
 }
 
-/// `git status --porcelain` for `paths` (relative to `view`), one entry per
-/// line — `?? ` for a path git doesn't track, anything else for a change to
-/// one it does. Empty when all of them match what's committed.
-pub fn status_lines(view: &Path, paths: &[&str]) -> Result<Vec<String>> {
-    Ok(status_of(view, paths)?.lines().map(str::to_string).collect())
-}
-
 fn status_of(view: &Path, paths: &[&str]) -> Result<String> {
     let mut args = vec!["status", "--porcelain", "--"];
     args.extend(paths);
@@ -341,27 +312,6 @@ fn status_of(view: &Path, paths: &[&str]) -> Result<String> {
         bail!("git {:?} failed with {}", args, out.status);
     }
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
-}
-
-/// The content `path` (relative to `view`) had at the tip of whatever git
-/// repository governs `view` — `None` when there's no commit yet, or none
-/// that ever carried this path. The caller can't tell those two apart from
-/// this alone, and doesn't need to: both mean "nothing to compare against".
-pub fn head_text(view: &Path, path: &str) -> Result<Option<String>> {
-    // `HEAD:<path>` resolves from the repository root, not from `-C`'s
-    // directory — measured. The leading `./` is what makes it relative to
-    // `view`, the same way `git show HEAD:./file` already means "the file
-    // named `file` right here".
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(view)
-        .args(["show", &format!("HEAD:./{path}")])
-        .output()
-        .with_context(|| format!("running git show HEAD:./{path}"))?;
-    if !out.status.success() {
-        return Ok(None);
-    }
-    Ok(Some(String::from_utf8_lossy(&out.stdout).into_owned()))
 }
 
 /// Every file a reference can be written in, under `view`: the `.md` items,
@@ -487,14 +437,3 @@ fn is_tracked(view: &Path, path: &str) -> bool {
     Command::new("git").arg("-C").arg(view).args(["ls-files", "--error-unmatch", "--", path]).output().map(|o| o.status.success()).unwrap_or(false)
 }
 
-/// Renames a batch of requests in topological order. On a cycle, nothing is
-/// written: `topo_order` fails before touching the view.
-pub fn resolve_batch(view: &Path, slug_to_id: &HashMap<String, String>) -> Result<()> {
-    let slugs: Vec<String> = slug_to_id.keys().cloned().collect();
-    let order = topo_order(view, &slugs)?;
-    for slug in order {
-        let new_id = &slug_to_id[&slug];
-        rename_one(view, &slug, new_id)?;
-    }
-    Ok(())
-}

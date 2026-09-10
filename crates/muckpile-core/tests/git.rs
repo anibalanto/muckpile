@@ -1,6 +1,5 @@
-//! `commit_paths` and `head_text`: the plumbing that lets `pull` leave a
-//! record of what the provider returned, and lets `push` read that record
-//! back later without any state file of its own.
+//! `commit_paths`: committing exactly the paths named, and nothing else
+//! the repository happens to hold.
 
 use std::path::Path;
 use std::process::Command;
@@ -108,34 +107,3 @@ fn does_not_sweep_in_something_already_staged_elsewhere() {
     assert_eq!(String::from_utf8(out.stdout).unwrap(), "other-view/ACC-9.task.md\n", "still staged");
 }
 
-#[test]
-fn head_text_is_none_before_anything_is_committed() {
-    let dir = git_repo();
-    let repo = dir.path();
-    std::fs::write(repo.join("ACC-1.task.md"), "---\ntitle: x\nstatus: Open\n---\n").unwrap();
-
-    assert_eq!(muckpile_core::head_text(repo, "ACC-1.task.md").unwrap(), None);
-}
-
-#[test]
-fn head_text_is_none_for_a_path_head_never_carried() {
-    let dir = git_repo();
-    let repo = dir.path();
-    std::fs::write(repo.join("ACC-1.task.md"), "---\ntitle: x\nstatus: Open\n---\n").unwrap();
-    muckpile_core::commit_paths(repo, &["ACC-1.task.md"], "pull ACC-1").unwrap();
-
-    assert_eq!(muckpile_core::head_text(repo, "ACC-2.task.md").unwrap(), None);
-}
-
-#[test]
-fn head_text_reads_back_the_last_committed_content_not_the_working_copy() {
-    let dir = git_repo();
-    let repo = dir.path();
-    std::fs::write(repo.join("ACC-1.task.md"), "---\ntitle: x\nstatus: Open\n---\n").unwrap();
-    muckpile_core::commit_paths(repo, &["ACC-1.task.md"], "pull ACC-1").unwrap();
-
-    // Edited locally, not committed again.
-    std::fs::write(repo.join("ACC-1.task.md"), "---\ntitle: edited\nstatus: Open\n---\n").unwrap();
-
-    assert_eq!(muckpile_core::head_text(repo, "ACC-1.task.md").unwrap(), Some("---\ntitle: x\nstatus: Open\n---\n".to_string()));
-}

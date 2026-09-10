@@ -1,7 +1,6 @@
 //! `rename_one` against a real git repo in a temp directory. No test touches
 //! the project's own repo or any provider.
 
-use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
 
@@ -85,29 +84,6 @@ fn the_sibling_data_directory_travels_with_the_rename() {
 }
 
 #[test]
-fn resolve_batch_respects_topological_order() {
-    let dir = git_repo();
-    let repo = dir.path();
-    write(
-        repo,
-        "slug-c.task.md",
-        "---\ntitle: C\nstatus: Open\nrelation.depends: [slug-d]\n---\nDepends on [`slug-d`](slug-d.task.md).\n",
-    );
-    write(repo, "slug-d.task.md", "---\ntitle: D\nstatus: Open\n---\nNo dependencies.\n");
-    run(repo, &["add", "-A"]);
-    run(repo, &["commit", "-q", "-m", "seed"]);
-
-    let mut map = HashMap::new();
-    map.insert("slug-c".to_string(), "ACC-201".to_string());
-    map.insert("slug-d".to_string(), "ACC-200".to_string());
-    muckpile_core::resolve_batch(repo, &map).unwrap();
-
-    let c = std::fs::read_to_string(repo.join("ACC-201.task.md")).unwrap();
-    assert!(c.contains("relation.depends: [ACC-200]"));
-    assert!(c.contains("[`ACC-200`](ACC-200.task.md)"));
-}
-
-#[test]
 fn a_cycle_is_rejected_without_writing_anything() {
     let dir = git_repo();
     let repo = dir.path();
@@ -117,10 +93,7 @@ fn a_cycle_is_rejected_without_writing_anything() {
     run(repo, &["commit", "-q", "-m", "seed"]);
     let before = head(repo);
 
-    let mut map = HashMap::new();
-    map.insert("slug-e".to_string(), "ACC-301".to_string());
-    map.insert("slug-f".to_string(), "ACC-302".to_string());
-    let result = muckpile_core::resolve_batch(repo, &map);
+    let result = muckpile_core::topo_order(repo, &["slug-e".to_string(), "slug-f".to_string()]);
 
     assert!(result.is_err());
     assert_eq!(before, head(repo), "the repo must not have changed");
