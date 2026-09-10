@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture 44adc2f6894c7ebf5e8eb291d6efecf5
+    accepted:
+    - agree:
+      - anibal
+      link: capture 44adc2f6894c7ebf5e8eb291d6efecf5
+      hash: 8052b97b0c0a93f440d4d86dd704adf6ad2cd5ec5999801807a6e7c6f427feba
+    name: views-spec
+  1:
+    link: capture f6e607c06e34e1c523c99fc92ad58bf7
+    accepted:
+    - agree:
+      - anibal
+      link: capture f6e607c06e34e1c523c99fc92ad58bf7
+      hash: 7a2939aa2c865c2ac8b3180f2f82b43bbef2d1b6a1944a2ae7228fa159878ee9
+      hash_ast: 90efb770f0b87caaafaeefda84d1a5286aa464eea72c4b8a1653ecd613539af7
+      n: declined
+    name: other-views-holding

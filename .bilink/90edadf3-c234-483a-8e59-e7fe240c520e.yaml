@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 44adc2f6894c7ebf5e8eb291d6efecf5
-      hash: 2d016b75f794196ea4912379df1107e19f656f87a62ec9b90f4c7d8a8f05a164
+      hash: 8052b97b0c0a93f440d4d86dd704adf6ad2cd5ec5999801807a6e7c6f427feba
     name: truncated-sprint-name-spec
   1:
     link: capture 3c6116d6a26eeba63dca406defa3a118

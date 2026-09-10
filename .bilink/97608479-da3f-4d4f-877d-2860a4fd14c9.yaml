@@ -9,12 +9,12 @@ endpoint:
       hash: 3df7fa044e8bb75726abd72aa3bf8f885d2abd852922ba2f35f00c4f8fd14eca
     name: pull-spec
   1:
-    link: capture 194dcecf893a0cf7cb67dd9335df0df7
+    link: capture aeb5a11492f41bde07f63d928930f3fd
     accepted:
     - agree:
       - anibal
-      link: capture 194dcecf893a0cf7cb67dd9335df0df7
-      hash: 1065a4eaee211b5bcc79a6c9b0a653e632f99469a0316dda9e7add8609b7aec8
-      hash_ast: 861734b391296c28fd44e4921a95b3dc3a8d202ed179bc5ab8d2ae34c0b58fa4
+      link: capture aeb5a11492f41bde07f63d928930f3fd
+      hash: 4878b7f429815a75fdc2101e3a4eb1abf430837c0292efdea882d8d6fef08a3a
+      hash_ast: 32332683fc491e7bb0542acd0d13c2805558b15207b7e0e523d0dba6616f4a10
       n: declined
-    name: pull-impl
+    name: pull-sprint-impl
