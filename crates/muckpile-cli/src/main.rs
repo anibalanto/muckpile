@@ -277,12 +277,12 @@ fn catch_up_view(cwd: &Path, id: &str, provider: &dyn Provider, config: &Project
 }
 
 fn run_parent(id: &str, parent_id: &str) -> Result<()> {
-    let (root, _cwd) = standing_in_a_project()?;
+    let (root, cwd) = standing_in_a_project()?;
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
     muckpile_cli::parent(id, parent_id, provider.as_ref())?;
     println!("{id}: padre cambiado a {parent_id}");
-    Ok(())
+    catch_up_view(&cwd, id, provider.as_ref(), &config)
 }
 
 fn run_comment(id: &str, file: &str, flags: &[String]) -> Result<()> {
