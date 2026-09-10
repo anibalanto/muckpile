@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `390ca17`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `ffc8dbb`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -477,18 +477,18 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **El h1 es cuerpo, como cualquier otra línea.** En `ACC` casi toda descripción arranca con un h1 que repite el título —medido el 2026-09-10 sobre los últimos 100 ítems: 97 arrancan con un h1, y en 5 ya no coincide con el `summary`, porque se cambió de un lado y no del otro—. Es la convención de worklist, subida tal cual a Jira. `muckpile` no la sigue ni la limpia: el título es `summary`, un campo aparte, y lo que diga un h1 es contenido de la descripción.
 
-**Avance: 7/8.**
+**Avance: 8/8.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
 | `title <id> "<nuevo título>"` | `cerrada` | `title` ↔ fila `title` de la interfaz |
-| `parent <id> <padre>`, y `new --parent` | `cerrada` | `parent` ↔ fila `parent`: valida los dos ids, se niega a que un ítem sea su propio padre, y pone la vista al día; `new` ↔ fila `new`: `--parent` escribe `parent:` en el borrador, un id real u otro `@slug` que `push` traduce. El `PUT` del padre está probado contra el mock del transporte, todavía no contra el board |
-| `unlink <a> <frase> <b>` | `cerrada` | `unlink` ↔ fila `unlink`: quita el link que `link` con la misma frase crearía, y pone la vista al día en sus dos puntas; `JiraRest::delete_link` ↔ decisión 8: busca el id en los `issuelinks` del que dice la frase de ida, y lo borra —`DELETE /issueLink/{id}`, medido: 204—. Probado contra el mock del transporte, todavía no contra el board |
+| `parent <id> <padre>`, y `new --parent` | `cerrada` | `parent` ↔ fila `parent`: valida los dos ids, se niega a que un ítem sea su propio padre, y pone la vista al día; `new` ↔ fila `new`: `--parent` escribe `parent:` en el borrador, un id real u otro `@slug` que `push` traduce. Probado el 2026-09-10 en el board: `parent ACC-360 ACC-105` lo colgó de la épica, y la vista bajó `parent: ACC-105` |
+| `unlink <a> <frase> <b>` | `cerrada` | `unlink` ↔ fila `unlink`: quita el link que `link` con la misma frase crearía, y pone la vista al día en sus dos puntas; `JiraRest::delete_link` ↔ decisión 8: busca el id en los `issuelinks` del que dice la frase de ida, y lo borra —`DELETE /issueLink/{id}`, medido: 204—. Probado el 2026-09-10 en el board: un `push` creó `ACC-361` con `relation.blocks: [ACC-360]` —Jira: "ACC-360 is blocked by ACC-361"—, y `unlink ACC-361 blocks ACC-360` lo quitó. `ACC-360` y `ACC-361` eran descartables, y se borraron |
 | `link` y `unlink` aceptan la frase con `_` | `cerrada` | `edge`, en `link.rs` ↔ esta decisión: el tipo y la dirección salen de la frase igual para los dos, con espacios o con `_` |
 | `push` no sube nada del header: un header editado a mano choca, el ítem no se manda, y `push` sugiere el comando | `cerrada` | `header_edits` ↔ esta decisión: cada campo y cada relación que el archivo dice distinto del proveedor; `push_one` ↔ fila `push`: si hay alguno, `PushResult::HeaderClash` y nada más. El comando sugerido lo arma `main.rs` |
 | Después de escribir, el comando hace lo que un `pull` del ítem en la vista | `cerrada` | `catch_up` ↔ esta decisión: si la vista tiene el ítem, lo trae y lo commitea; si el archivo, o algo ya trackeado en su `_data/`, tiene cambios sin commitear, no toca nada y dice que la vista queda atrás —un borrador sin commitear en `files/` no estorba: sólo se escribe lo que viene del proveedor—. Lo llaman `title`, `transition`, `link` —en sus dos puntas—, `comment` y `attach`. Probado el 2026-09-10 con el binario en `ACC-360`: después de `title`, la vista quedó al día y el `push` siguiente dijo "sin cambios" |
 | Si el proveedor cambia el tipo de un ítem, `pull` renombra el archivo y reescribe los links al nombre viejo | `cerrada` | `retype` ↔ esta decisión: mueve el archivo y reescribe cada link al nombre viejo, sin commitear; `fetch_and_commit` lo llama cuando el tipo que baja no es el del archivo, y lo commitea en el mismo `pull` |
-| `unlink` de un tipo cuyas dos frases son la misma —`Relates`: `relates to` de ida y de vuelta— lo busca en las dos direcciones | `pendiente` | Hoy busca sólo con `a` de ida: si el link se creó al revés, dice que no existe, aunque el header de `a` muestre `relation.relates_to: [b]` |
+| `unlink` de un tipo cuyas dos frases son la misma —`Relates`: `relates to` de ida y de vuelta— lo busca en las dos direcciones | `cerrada` | `link::unlink` ↔ esta decisión: si no lo encuentra en la dirección de la frase y el tipo dice lo mismo de los dos lados, prueba la otra. Probado el 2026-09-10 en el board: un `Relates` creado desde `ACC-361` se quitó con `unlink ACC-360 relates_to ACC-361` |
 
 ---
 
