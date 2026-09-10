@@ -276,7 +276,7 @@ fn run_comment(id: &str, file: &str, flags: &[String]) -> Result<()> {
     let author = match (model, human) {
         (Some(_), true) => bail!("--ai y --i-human a la vez: un comentario lo escribió uno de los dos"),
         (Some(model), false) => Some(muckpile_cli::Author::Ai(model)),
-        (None, true) => Some(muckpile_cli::Author::Human),
+        (None, true) => Some(muckpile_cli::Author::Human(muckpile_cli::confirm_human(ask_on_terminal)?)),
         (None, false) => None,
     };
     let (root, cwd) = standing_in_a_project()?;
@@ -285,6 +285,22 @@ fn run_comment(id: &str, file: &str, flags: &[String]) -> Result<()> {
     let comment_id = muckpile_cli::comment(id, &cwd.join(file), reply_to, author, provider.as_ref())?;
     println!("{id}: comentario {comment_id} agregado");
     Ok(())
+}
+
+/// Shows `phrase` on the terminal and reads the answer from it — the
+/// terminal itself, never standard input, so a pipe can't answer.
+fn ask_on_terminal(phrase: &str) -> Result<String> {
+    use std::io::{BufRead, Write};
+    #[cfg(windows)]
+    let (input, output) = ("CONIN$", "CONOUT$");
+    #[cfg(not(windows))]
+    let (input, output) = ("/dev/tty", "/dev/tty");
+    let mut out = std::fs::OpenOptions::new().write(true).open(output).with_context(|| format!("abriendo {output}"))?;
+    write!(out, "Para confirmar que lo escribió una persona, escribí: {phrase}\n> ")?;
+    out.flush()?;
+    let mut answer = String::new();
+    std::io::BufReader::new(std::fs::File::open(input).with_context(|| format!("abriendo {input}"))?).read_line(&mut answer)?;
+    Ok(answer)
 }
 
 fn run_attach(id: &str, file: &str) -> Result<()> {

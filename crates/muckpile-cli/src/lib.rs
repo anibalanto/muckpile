@@ -781,8 +781,52 @@ pub enum Author<'a> {
     /// A model, named: it goes at the top of the comment, where anyone
     /// reading the provider sees it and `pull` reads it back.
     Ai(&'a str),
-    /// A person, declared by whoever runs the command: nothing is added.
-    Human,
+    /// A person, confirmed at a terminal: nothing is added to the comment.
+    Human(HumanProof),
+}
+
+/// That someone at a terminal retyped a phrase they were just shown — the
+/// only way to build an `Author::Human`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HumanProof(());
+
+/// Shows `ask` a phrase that's different every time, and confirms only when
+/// what comes back is that phrase. `ask` is the terminal itself — never
+/// standard input, which a pipe can fill — so with no terminal there's no
+/// answer, and no confirmation.
+pub fn confirm_human(ask: impl FnOnce(&str) -> Result<String>) -> Result<HumanProof> {
+    let phrase = random_phrase();
+    let typed = ask(&phrase).context("--i-human necesita una terminal donde una persona escriba la frase")?;
+    if typed.trim() != phrase {
+        bail!("--i-human: lo escrito no es la frase que se mostró");
+    }
+    Ok(HumanProof(()))
+}
+
+/// Two short words, `noun-adjective` — `faro-azul`, `puma-veloz` — with no
+/// accents and adjectives that don't change with gender, so it's quick to
+/// type and always reads right.
+pub fn random_phrase() -> String {
+    const NOUNS: [&str; 40] = [
+        "faro", "nube", "puma", "lago", "sol", "luna", "mar", "pino", "roble", "tren", "barco", "puente", "cerro", "valle",
+        "bosque", "llama", "condor", "zorro", "lobo", "oso", "gato", "tigre", "delfin", "halcon", "cometa", "volcan", "isla",
+        "selva", "playa", "piedra", "arena", "trueno", "rayo", "viento", "fuego", "hielo", "cielo", "puerto", "ancla", "mapa",
+    ];
+    const ADJECTIVES: [&str; 36] = [
+        "azul", "verde", "gris", "feliz", "veloz", "libre", "leal", "fiel", "breve", "suave", "fuerte", "grande", "dulce",
+        "audaz", "capaz", "tenaz", "joven", "alegre", "triste", "noble", "firme", "simple", "sutil", "feroz", "sagaz", "voraz",
+        "fugaz", "lunar", "solar", "polar", "astral", "rural", "real", "total", "genial", "gentil",
+    ];
+    format!("{}-{}", NOUNS[random_below(NOUNS.len())], ADJECTIVES[random_below(ADJECTIVES.len())])
+}
+
+/// A number below `n`, from the random keys the standard library already
+/// seeds its hash maps with — enough for a phrase that only has to differ.
+fn random_below(n: usize) -> usize {
+    use std::hash::{BuildHasher, Hasher};
+    let mut hasher = std::collections::hash_map::RandomState::new().build_hasher();
+    hasher.write_u128(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or_default());
+    (hasher.finish() % n as u64) as usize
 }
 
 /// Sends the markdown in `file` as a comment on `id` — a reply to
@@ -809,7 +853,7 @@ pub fn comment(id: &str, file: &Path, reply_to: Option<&str>, author: Option<Aut
             }
             format!("ai: `{model}`\n\n{text}")
         }
-        Author::Human => text,
+        Author::Human(_) => text,
     };
     provider.add_comment(id, &body_to_adf(&markdown)?, reply_to)
 }
