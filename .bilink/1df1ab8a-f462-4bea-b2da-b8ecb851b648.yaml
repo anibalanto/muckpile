@@ -9,12 +9,12 @@ endpoint:
       hash: 680ceed4f8d58c782972a560a0f61b47ebb1d3b1b6ecff05424b7267d24a7f73
     name: canonicity-spec
   1:
-    link: capture 31535b5f714d57ffb8fdbab35db097b9
+    link: capture bda5e87ae9c059a6152fb76f537b7939
     accepted:
     - agree:
       - anibal
-      link: capture 31535b5f714d57ffb8fdbab35db097b9
-      hash: caed17da8823c0a3b16ca5f9a242bd81575aac06a26fd147e394fd47ca0b293f
-      hash_ast: b12f18571c60652f6bf1a4c97c0ccd89e764d1cdd99da2175d19bd2c9d8f2d02
+      link: capture bda5e87ae9c059a6152fb76f537b7939
+      hash: 487a2570d6ac4658e2739ef69128d16e44bf28107a2572fde1432810556acc24
+      hash_ast: cb89bff3693c056fbddc8500788879c575a4d305d62979b91eb70e14c39a1508
       n: declined
-    name: push_one
+    name: cards-to-file-links

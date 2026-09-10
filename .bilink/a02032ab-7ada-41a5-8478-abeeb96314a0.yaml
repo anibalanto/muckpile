@@ -9,12 +9,12 @@ endpoint:
       hash: 680ceed4f8d58c782972a560a0f61b47ebb1d3b1b6ecff05424b7267d24a7f73
     name: canonicity-spec
   1:
-    link: capture 31535b5f714d57ffb8fdbab35db097b9
+    link: capture 73fab8cba40f730226c9f01314621671
     accepted:
     - agree:
       - anibal
-      link: capture 31535b5f714d57ffb8fdbab35db097b9
-      hash: caed17da8823c0a3b16ca5f9a242bd81575aac06a26fd147e394fd47ca0b293f
-      hash_ast: b12f18571c60652f6bf1a4c97c0ccd89e764d1cdd99da2175d19bd2c9d8f2d02
+      link: capture 73fab8cba40f730226c9f01314621671
+      hash: aea3509cb3df416886be7b8b0440105a95139ec5494de2224f4fc218f93d7ca7
+      hash_ast: 9adda022be08c1d0c2954a27eb05a20eff039352170a953a0d9587fddc1ac9a2
       n: declined
-    name: push_one
+    name: to-markdown

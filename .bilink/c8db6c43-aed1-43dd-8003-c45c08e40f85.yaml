@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture e86ee0f210f359b43560be57566fb77e
-      hash: 36fd067202b47a96fc72ce979a588585c2f76a58810d09e5a91b8f7a1e1fd847
+      hash: 680ceed4f8d58c782972a560a0f61b47ebb1d3b1b6ecff05424b7267d24a7f73
     name: canonicity-spec
   1:
     link: capture dff78d2f95ede5e889743ca7669a03e4
@@ -14,7 +14,7 @@ endpoint:
     - agree:
       - anibal
       link: capture dff78d2f95ede5e889743ca7669a03e4
-      hash: f311d1f4c907e188c137a6f5061d41409a8888cdf9b8a6d12e08b5e4baa957e3
-      hash_ast: bae4c4aad78b5357dfca581b7d6fbb3718b5f2512f27a4d4a711fe1c4431b3bc
+      hash: 852036ae1d8182d6eebda9d619aecb6082596f12dd7c58d41d1a416f32a71207
+      hash_ast: cf203318715ff06127aee9c1b36339fc77c037550293882a5720367e20e95b96
       n: declined
     name: adf-diff
