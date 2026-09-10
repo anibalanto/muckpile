@@ -2,7 +2,7 @@
 //! body — against a local, in-process mock. Never touches the real
 //! provider: this is exactly what the automated suite is allowed to touch.
 
-use muckpile_provider::provider::{Provider, Transition};
+use muckpile_provider::provider::{Provider, Sprint, Transition};
 use muckpile_provider::rest::{Credentials, JiraRest};
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -143,6 +143,29 @@ fn item_hits_the_issue_endpoint_and_parses_every_field() {
     let captured = rx.recv().unwrap();
     assert_eq!(captured.method, "GET");
     assert!(captured.path.starts_with("/rest/api/3/issue/ACC-355"), "{}", captured.path);
+}
+
+#[test]
+fn open_sprints_hits_the_board_s_sprint_endpoint_and_lists_names_and_dates_verbatim() {
+    let response = r#"{"values":[
+        {"id":1,"name":"22 Las vistas","state":"active","createdDate":"2026-08-01T00:00:00.000Z"},
+        {"id":2,"name":"23 Las questions","state":"active","createdDate":"2026-08-05T00:00:00.000Z"}
+    ]}"#;
+    let (base, rx) = one_shot(200, response);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    let sprints = provider.open_sprints(701).unwrap();
+    assert_eq!(
+        sprints,
+        vec![
+            Sprint { name: "22 Las vistas".into(), created: "2026-08-01T00:00:00.000Z".into() },
+            Sprint { name: "23 Las questions".into(), created: "2026-08-05T00:00:00.000Z".into() },
+        ]
+    );
+
+    let captured = rx.recv().unwrap();
+    assert_eq!(captured.method, "GET");
+    assert!(captured.path.starts_with("/rest/agile/1.0/board/701/sprint"), "{}", captured.path);
 }
 
 #[test]

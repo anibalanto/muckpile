@@ -3,13 +3,14 @@
 //! has its place, exploratory and by hand, never inside a suite that runs on
 //! every `cargo test`.
 
-use crate::provider::{self, Provider, Transition};
+use crate::provider::{self, Provider, Sprint, Transition};
 use anyhow::{bail, Result};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
 pub struct FakeProvider {
     items: RefCell<HashMap<String, Entry>>,
+    sprints: RefCell<Vec<Sprint>>,
 }
 
 /// What `FakeProvider` holds per item — a superset of what any one `Provider`
@@ -25,7 +26,14 @@ struct Entry {
 
 impl FakeProvider {
     pub fn new() -> Self {
-        FakeProvider { items: RefCell::new(HashMap::new()) }
+        FakeProvider { items: RefCell::new(HashMap::new()), sprints: RefCell::new(Vec::new()) }
+    }
+
+    /// Seeds the board's open sprints as `(name, created)` pairs, ignoring
+    /// which board id asks.
+    pub fn seed_sprints(&self, sprints: &[(&str, &str)]) {
+        *self.sprints.borrow_mut() =
+            sprints.iter().map(|(name, created)| Sprint { name: name.to_string(), created: created.to_string() }).collect();
     }
 
     /// Seeds an item at `status`, with `transitions` reachable from it.
@@ -90,5 +98,9 @@ impl Provider for FakeProvider {
             parent: i.parent.clone(),
             body_adf: i.body_adf.clone(),
         })
+    }
+
+    fn open_sprints(&self, _board_id: u64) -> Result<Vec<Sprint>> {
+        Ok(self.sprints.borrow().clone())
     }
 }

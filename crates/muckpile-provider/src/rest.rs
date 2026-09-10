@@ -1,7 +1,7 @@
 //! The real transport: Jira's REST API, reached directly — one port, not
 //! three transports each covering for what the other two can't do.
 
-use crate::provider::{Item, Provider, Transition};
+use crate::provider::{Item, Provider, Sprint, Transition};
 use anyhow::{anyhow, bail, Context, Result};
 
 /// What proves the request is this account. Never written to disk as a
@@ -92,6 +92,20 @@ impl Provider for JiraRest {
         let parent = fields.get("parent").and_then(|p| p.get("key")).and_then(|k| k.as_str()).map(str::to_string);
         let body_adf = fields.get("description").filter(|d| !d.is_null()).map(|d| d.to_string());
         Ok(Item { jira_type, title, status, parent, body_adf })
+    }
+
+    fn open_sprints(&self, board_id: u64) -> Result<Vec<Sprint>> {
+        let v = self.call("GET", &format!("/rest/agile/1.0/board/{board_id}/sprint?state=active"), None)?;
+        let arr = v.get("values").and_then(|v| v.as_array()).ok_or_else(|| anyhow!("no `values` in the sprint response"))?;
+        Ok(arr
+            .iter()
+            .filter_map(|s| {
+                Some(Sprint {
+                    name: s.get("name")?.as_str()?.to_string(),
+                    created: s.get("createdDate")?.as_str()?.to_string(),
+                })
+            })
+            .collect())
     }
 }
 

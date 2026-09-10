@@ -40,4 +40,18 @@ pub trait Provider {
 
     /// The item's current fields.
     fn item(&self, key: &str) -> Result<Item>;
+
+    /// The board's currently open sprints.
+    fn open_sprints(&self, board_id: u64) -> Result<Vec<Sprint>>;
+}
+
+/// A sprint, as the provider names and dates it — a project's own naming
+/// convention (`"22 Las vistas"`) is the provider's data, not something to
+/// invent an id for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Sprint {
+    pub name: String,
+    /// When the provider created the sprint, ISO-8601. Read only when
+    /// `name` is provider-truncated — see `sprint_fetch`.
+    pub created: String,
 }
