@@ -206,14 +206,23 @@ pub fn read_frontmatter_refs(text: &str) -> HashSet<String> {
     if let Some(c) = parent_re.captures(fm) {
         refs.insert(c[1].to_string());
     }
-    let rel_re = Regex::new(r"relation\.[^\s:]+:\s*(\[[^\]]*\]|\S+)").unwrap();
-    let id_re = Regex::new(r"@?[A-Za-z0-9_-]+").unwrap();
-    for c in rel_re.captures_iter(fm) {
-        for id in id_re.find_iter(&c[1]) {
-            refs.insert(id.as_str().to_string());
-        }
+    for (_, ids) in read_relations(text) {
+        refs.extend(ids);
     }
     refs
+}
+
+/// Every `relation.<key>:` in `text`'s frontmatter, in the order written:
+/// the key as it stands, and the ids it lists — a bracketed list or a bare
+/// value.
+pub fn read_relations(text: &str) -> Vec<(String, Vec<String>)> {
+    let Some(end) = frontmatter_end(text) else { return Vec::new() };
+    let rel_re = Regex::new(r"(?m)^relation\.([^\s:]+):\s*(\[[^\]]*\]|\S+)").unwrap();
+    let id_re = Regex::new(r"@?[A-Za-z0-9_-]+").unwrap();
+    rel_re
+        .captures_iter(&text[..end])
+        .map(|c| (c[1].to_string(), id_re.find_iter(&c[2]).map(|m| m.as_str().to_string()).collect()))
+        .collect()
 }
 
 /// Topological order of `slugs` (all unassigned) by their references to other

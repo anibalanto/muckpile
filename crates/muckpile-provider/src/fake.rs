@@ -180,8 +180,19 @@ impl Provider for FakeProvider {
         Ok(self.link_types.borrow().clone())
     }
 
+    /// Records the link, and — when the type was seeded — puts it on both
+    /// items it joins, each told from its own side, the way `item` reads a
+    /// link back.
     fn create_link(&self, type_name: &str, outward_key: &str, inward_key: &str) -> Result<()> {
         self.links_created.borrow_mut().push((type_name.to_string(), outward_key.to_string(), inward_key.to_string()));
+        let Some(t) = self.link_types.borrow().iter().find(|t| t.name == type_name).cloned() else { return Ok(()) };
+        let mut items = self.items.borrow_mut();
+        if let Some(item) = items.get_mut(outward_key) {
+            item.links.push(ItemLink { phrase: t.outward.clone(), other: inward_key.to_string() });
+        }
+        if let Some(item) = items.get_mut(inward_key) {
+            item.links.push(ItemLink { phrase: t.inward.clone(), other: outward_key.to_string() });
+        }
         Ok(())
     }
 

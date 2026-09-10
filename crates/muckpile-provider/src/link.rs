@@ -20,14 +20,17 @@ pub enum Outcome {
 /// `a phrase b`: if `phrase` is a type's outward wording, `a` plays that
 /// type's outward role toward `b`; if it's the inward wording, the roles
 /// reverse — `"b is blocked by a"` and `"a blocks b"` are the same edge.
+/// The phrase can come with `_` for each space, the way an item's header
+/// shows it: `is_blocked_by` is `is blocked by`.
 pub fn link(provider: &dyn Provider, a: &str, phrase: &str, b: &str) -> Result<Outcome> {
     let types = provider.link_types()?;
+    let says = |wording: &str| wording == phrase || wording.replace(' ', "_") == phrase;
     for t in &types {
-        if t.outward == phrase {
+        if says(&t.outward) {
             provider.create_link(&t.name, a, b)?;
             return Ok(Outcome::Applied { type_name: t.name.clone() });
         }
-        if t.inward == phrase {
+        if says(&t.inward) {
             provider.create_link(&t.name, b, a)?;
             return Ok(Outcome::Applied { type_name: t.name.clone() });
         }

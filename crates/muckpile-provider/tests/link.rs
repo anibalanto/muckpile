@@ -67,3 +67,16 @@ fn a_type_whose_two_phrases_are_identical_lists_the_phrase_once() {
         Outcome::Applied { .. } => panic!("\"nope\" isn't offered"),
     }
 }
+
+/// The header shows a phrase with `_` for each space, so a phrase copied
+/// from there is the same phrase.
+#[test]
+fn a_phrase_with_underscores_for_spaces_is_the_same_phrase() {
+    let p = FakeProvider::new();
+    p.seed_link_types(&[("Blocks", "blocks", "is blocked by")]);
+
+    let outcome = link(&p, "ACC-338", "is_blocked_by", "ACC-229").unwrap();
+
+    assert!(matches!(outcome, Outcome::Applied { .. }));
+    assert_eq!(p.links_created(), vec![("Blocks".to_string(), "ACC-229".to_string(), "ACC-338".to_string())]);
+}
