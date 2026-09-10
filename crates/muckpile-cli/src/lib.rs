@@ -14,7 +14,7 @@ use muckpile_core::{
 use muckpile_provider::link::{link as provider_link, Outcome as LinkOutcome};
 use muckpile_provider::provider::{Item, ItemLink, Provider, Sprint};
 use muckpile_provider::transition::{transition as provider_transition, Outcome};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 /// Assembles a working view: `<root>/to-work/<id>/`, empty. Fetching the
@@ -411,10 +411,12 @@ pub enum PushResult {
     /// The provider moved since the last `pull` this view recorded —
     /// refused rather than overwritten.
     Stale,
-    /// The compare-and-swap cleared; what was actually sent. `body_refused`
-    /// says why when the body changed locally but wasn't safe to send —
-    /// title is judged on its own and can be `true` independently.
-    Written { title: bool, body: bool, body_refused: Option<BodyRefused> },
+    /// The header was edited by hand, and the header only changes by command:
+    /// nothing of the item was sent, and the file is left as it is.
+    HeaderClash(Vec<HeaderEdit>),
+    /// The compare-and-swap cleared; whether the body was sent, and why not
+    /// when it changed locally but wasn't safe to send.
+    Written { body: bool, body_refused: Option<BodyRefused> },
     /// A pending `@slug` got a real id this run — found on the provider, or
     /// created there. `PushOutcome::id` for this case is still the original
     /// slug: the file has already moved to `id.<type>.md` by the time this
@@ -431,6 +433,18 @@ pub enum PushResult {
     RelationFailed { phrase: String, other: String, reason: String },
 }
 
+/// One thing in an item's header that the file says and the provider
+/// doesn't — each one is what a command would change instead.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HeaderEdit {
+    /// `title`, `status` or `parent`: the file's value and the provider's,
+    /// either absent when the field is.
+    Field { name: String, written: Option<String>, provider: Option<String> },
+    /// A relation the file has and the provider doesn't (`added`), or the
+    /// other way round — what `link` or `unlink` does.
+    Relation { phrase: String, other: String, added: bool },
+}
+
 /// A body edit `push` wouldn't send: why the provider's body can't be
 /// written back through markdown, and what sending the draft would do to it
 /// — for a person, or anything else working on the provider directly, to
@@ -443,13 +457,11 @@ pub struct BodyRefused {
 
 /// First resolves every pending `@slug` the view carries — search or
 /// create, then rename, rewrite references, and settle a fresh baseline for
-/// it, same as a `pull` — and then sends every item that already had a real
-/// id whose title or body changed since its own last `pull`, refusing
-/// anything the provider moved on since then. Status and parent never
-/// travel through the second half — nothing here writes a status directly,
-/// and nothing re-parents an item that already had a key before this run —
-/// so a commit it makes there always re-renders those two straight from the
-/// provider, discarding any local edit to a field this never reads.
+/// it, same as a `pull` — and then sends the body of every item that
+/// already had a real id and changed since its own last `pull`, refusing
+/// anything the provider moved on since then. The header never travels
+/// through the second half: it only changes by command, so an item whose
+/// header was edited by hand is reported and left exactly as it is.
 pub fn push(view: &Path, provider: &dyn Provider, config: &ProjectConfig) -> Result<Vec<PushOutcome>> {
     let mut outcomes = resolve_pending(view, provider, config)?;
     let just_resolved: HashSet<String> = outcomes
@@ -606,16 +618,17 @@ fn push_one(view: &Path, local: &ItemSummary, provider: &dyn Provider) -> Result
         return Ok(outcome(PushResult::Stale));
     }
 
-    let head_title = parse_full(local.id.clone(), local.item_type.clone(), &head)?.title;
+    // The header only changes by command. Nothing of the item goes — not
+    // even a body edit next to it: the commit that records a send is
+    // rebuilt from the provider, and would take the header edit with it.
+    let edits = header_edits(&local.id, &local.item_type, &working, &remote)?;
+    if !edits.is_empty() {
+        return Ok(outcome(PushResult::HeaderClash(edits)));
+    }
+
     let (_, head_body) = body::split_frontmatter(&head);
     let (_, working_body) = body::split_frontmatter(&working);
-
-    let title_changed = local.title != head_title;
     let body_changed = working_body != head_body;
-
-    if title_changed {
-        provider.update_title(&local.id, &local.title)?;
-    }
 
     let mut body_sent = false;
     let mut body_refused = None;
@@ -636,13 +649,12 @@ fn push_one(view: &Path, local: &ItemSummary, provider: &dyn Provider) -> Result
         }
     }
 
-    // The new baseline is rendered fresh from the provider's own fields —
-    // status and parent as they really are, title/body swapped in only for
-    // what was actually confirmed sent. A refused body edit, or a hand-edit
-    // to a field `push` doesn't manage, never gets to look committed.
+    // The new baseline is rendered fresh from the provider's own fields,
+    // the body swapped in only when it was actually confirmed sent. A
+    // refused body edit never gets to look committed.
     let committed = Item {
         jira_type: remote.jira_type.clone(),
-        title: if title_changed { local.title.clone() } else { remote.title.clone() },
+        title: remote.title.clone(),
         status: remote.status.clone(),
         parent: remote.parent.clone(),
         body_adf: if body_sent { sent_adf } else { remote.body_adf.clone() },
@@ -652,8 +664,35 @@ fn push_one(view: &Path, local: &ItemSummary, provider: &dyn Provider) -> Result
     std::fs::write(&working_path, &new_text).with_context(|| format!("writing {}", working_path.display()))?;
     commit_paths(view, &[&filename], &format!("push {}", local.id))?;
 
-    Ok(outcome(PushResult::Written { title: title_changed, body: body_sent, body_refused }))
+    Ok(outcome(PushResult::Written { body: body_sent, body_refused }))
 }
+
+/// Every header field `working` says differently from the provider — the
+/// fields one by one, then each relation added or taken out, ordered.
+fn header_edits(id: &str, item_type: &str, working: &str, remote: &Item) -> Result<Vec<HeaderEdit>> {
+    let written = parse_full(id.to_string(), item_type.to_string(), working)?;
+    let mut edits = Vec::new();
+    let mut compare = |name: &str, written: Option<String>, provider: Option<String>| {
+        if written != provider {
+            edits.push(HeaderEdit::Field { name: name.to_string(), written, provider });
+        }
+    };
+    compare("title", Some(written.title), Some(remote.title.clone()));
+    compare("status", written.status, Some(remote.status.clone()));
+    compare("parent", written.parent, remote.parent.clone());
+
+    let pairs = |relations: Vec<(String, Vec<String>)>| -> BTreeSet<(String, String)> {
+        relations.into_iter().flat_map(|(phrase, others)| others.into_iter().map(move |o| (phrase.clone(), o))).collect()
+    };
+    let in_file = pairs(read_relations(working));
+    let on_provider = pairs(relations(&remote.links).into_iter().collect());
+    let mut changed: Vec<(&(String, String), bool)> =
+        in_file.difference(&on_provider).map(|pair| (pair, true)).chain(on_provider.difference(&in_file).map(|pair| (pair, false))).collect();
+    changed.sort();
+    edits.extend(changed.into_iter().map(|((phrase, other), added)| HeaderEdit::Relation { phrase: phrase.clone(), other: other.clone(), added }));
+    Ok(edits)
+}
+
 
 /// The only way an item's title changes: written to the provider right
 /// away, with no conversion — `push` never sends a title edited by hand.

@@ -3,7 +3,7 @@ use muckpile_core::body::Loss;
 use muckpile_core::identity::load_identity;
 use muckpile_core::project::{find_project_root, load_project_config, ProjectConfig};
 use muckpile_core::states::read_states_cache;
-use muckpile_cli::{ListFilter, PushResult};
+use muckpile_cli::{HeaderEdit, ListFilter, PushResult};
 use muckpile_provider::link::Outcome as LinkOutcome;
 use muckpile_provider::provider::Provider;
 use muckpile_provider::rest::{Credentials, JiraRest};
@@ -55,6 +55,25 @@ fn run_pull(id: Option<&str>) -> Result<()> {
         println!("{} traído — el cuerpo es de sólo lectura: {}", rel.display(), describe_losses(&pulled.losses));
     }
     Ok(())
+}
+
+/// One header edit `push` won't send, and the command that makes it — as help:
+/// the file is left as it is either way.
+fn describe_header_edit(id: &str, edit: &HeaderEdit) -> String {
+    let shown = |v: &Option<String>| v.as_deref().map(|v| format!("\"{v}\"")).unwrap_or_else(|| "nada".to_string());
+    match edit {
+        HeaderEdit::Field { name, written, provider } => {
+            let command = match (name.as_str(), written) {
+                ("title", Some(v)) => format!("muckpile title {id} \"{v}\""),
+                ("status", Some(v)) => format!("muckpile transition {id} \"{v}\""),
+                ("parent", Some(v)) => format!("muckpile parent {id} {v}"),
+                _ => "ningún comando lo borra".to_string(),
+            };
+            format!("{name}: {} (el proveedor tiene {}) — {command}", shown(written), shown(provider))
+        }
+        HeaderEdit::Relation { phrase, other, added: true } => format!("relation.{phrase}: {other} agregada — muckpile link {id} {phrase} {other}"),
+        HeaderEdit::Relation { phrase, other, added: false } => format!("relation.{phrase}: {other} quitada — muckpile unlink {id} {phrase} {other}"),
+    }
 }
 
 /// Every reason a body can't be edited locally, on one line.
@@ -206,20 +225,15 @@ fn run_push(view_arg: &str) -> Result<()> {
                 "{}: relation.{phrase} {other} no llegó al proveedor — {reason}. Para reintentarlo: muckpile link {} {phrase} {other}",
                 outcome.id, outcome.id
             ),
-            PushResult::Written { title, body, body_refused } => {
-                let mut sent = Vec::new();
-                if title {
-                    sent.push("title".to_string());
+            PushResult::HeaderClash(edits) => {
+                println!("{}: el header no es el del proveedor — no se manda nada de este ítem (git diff muestra qué se editó):", outcome.id);
+                for edit in &edits {
+                    println!("  {}", describe_header_edit(&outcome.id, edit));
                 }
+            }
+            PushResult::Written { body, body_refused } => {
                 if body {
-                    sent.push("body".to_string());
-                }
-                if sent.is_empty() && body_refused.is_none() {
-                    println!("{}: sin cambios para enviar", outcome.id);
-                    continue;
-                }
-                if !sent.is_empty() {
-                    println!("{}: {} enviado(s)", outcome.id, sent.join(", "));
+                    println!("{}: cuerpo enviado", outcome.id);
                 }
                 if let Some(refused) = body_refused {
                     println!(
@@ -228,6 +242,8 @@ fn run_push(view_arg: &str) -> Result<()> {
                         describe_losses(&refused.losses),
                         refused.diff
                     );
+                } else if !body {
+                    println!("{}: sin cambios para enviar", outcome.id);
                 }
             }
         }
