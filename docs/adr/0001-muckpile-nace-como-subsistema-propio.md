@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `12e5cae`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `f0f5b6b`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -401,7 +401,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 | `RsMarkdownAdfFilter` reescribe el borrador a su forma canónica, en un commit propio, y eso es lo que se manda | `diverge` | `prune_marks` corta la marca sobre el ADF, en silencio: el archivo no cambia, y el cuerpo que crea nace no canónico |
 | No canónico → `push` no sube el cuerpo y ofrece el diff | `cerrada` | `push_one` ↔ fila `push` |
 | El diff es contra el ADF real | `cerrada` | `adf_diff` ↔ esta decisión, llamado desde `push_one`: el ADF real en la forma canónica del conversor contra el borrador como se mandaría |
-| El título y la transición no pasan por esto | `cerrada` | `push_one` manda el título aparte del cuerpo ↔ fila `push` |
+| El header no pasa por esto | `cerrada` | `push_one` ↔ fila `push`: un header editado a mano choca antes de llegar a la canonicidad, y `title`/`transition` lo escriben sin conversión |
 
 ### 11. El código va en inglés entero — identificadores y comentarios, sin cita externa
 
@@ -446,15 +446,15 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **El h1 es cuerpo, como cualquier otra línea.** En `ACC` casi toda descripción arranca con un h1 que repite el título —medido el 2026-09-10 sobre los últimos 100 ítems: 97 arrancan con un h1, y en 5 ya no coincide con el `summary`, porque se cambió de un lado y no del otro—. Es la convención de worklist, subida tal cual a Jira. `muckpile` no la sigue ni la limpia: el título es `summary`, un campo aparte, y lo que diga un h1 es contenido de la descripción.
 
-**Avance: 0/7.**
+**Avance: 2/7.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
-| `title <id> "<nuevo título>"` | `pendiente` | Hoy el título cambia editando el header, y `push` lo manda (`push_one`) |
+| `title <id> "<nuevo título>"` | `cerrada` | `title` ↔ fila `title` de la interfaz |
 | `parent <id> <padre>`, y `new --parent` | `pendiente` | Nada cambia el padre de un ítem ya sincronizado; un borrador sólo lo tiene si alguien lo escribe a mano |
 | `unlink <a> <frase> <b>` | `pendiente` | — |
 | `link` y `unlink` aceptan la frase con `_` | `pendiente` | `link` compara la frase tal cual, con espacios |
-| `push` no sube nada del header: un header editado a mano choca, el ítem no se manda, y `push` sugiere el comando | `diverge` | `push_one` manda el título editado; una edición de `status:`, `parent:` o `relation.*` se descarta sin aviso cuando el header se vuelve a armar desde el proveedor |
+| `push` no sube nada del header: un header editado a mano choca, el ítem no se manda, y `push` sugiere el comando | `cerrada` | `header_edits` ↔ esta decisión: cada campo y cada relación que el archivo dice distinto del proveedor; `push_one` ↔ fila `push`: si hay alguno, `PushResult::HeaderClash` y nada más. El comando sugerido lo arma `main.rs` |
 | Después de escribir, el comando hace lo que un `pull` del ítem en la vista | `diverge` | `transition` y `link` no tocan la vista: el `push` siguiente ve lo que escribieron como un cambio del otro lado, y no pisa |
 | Si el proveedor cambia el tipo de un ítem, `pull` renombra el archivo y reescribe los links al nombre viejo | `pendiente` | Hoy `pull` escribe `<id>.<tipo nuevo>.md` y deja el archivo viejo al lado — dos archivos para el mismo ítem |
 
@@ -526,7 +526,7 @@ El choque de hoy, bajo este modelo, no es un `add/add` que exige `--force`: es u
 | `title` | Cambia el título de un ítem, en el momento. Es la única forma: editar `title:` en el header no se sube (decisión 12). | `$ muckpile title ACC-355 "Vistas de trabajo, con su ítem y su _data/"` |
 | `parent` | Cambia el padre de un ítem, en el momento (decisión 12). | `$ muckpile parent ACC-355 ACC-339` |
 
-**Avance de la tabla: doce de las dieciséis filas tienen bilink aceptado** (`show` tiene dos, uno por camino); `init`, `unlink`, `title` y `parent` todavía no tienen código. Que la fila esté atada no quiere decir que el comando esté completo: `pull` y `push` son parciales —lo que les falta está en las decisiones 5, 6, 7, 8 y 10—, y `to-work` diverge de su propia fila (decisión 6).
+**Avance de la tabla: trece de las dieciséis filas tienen bilink aceptado** (`show` tiene dos, uno por camino); `init`, `unlink` y `parent` todavía no tienen código. Que la fila esté atada no quiere decir que el comando esté completo: `pull` y `push` son parciales —lo que les falta está en las decisiones 5, 6, 7, 8 y 10—, y `to-work` diverge de su propia fila (decisión 6).
 
 Dieciséis comandos contra los veintitrés de hoy (once de `worklist`, doce de `worklist-server`). Lo que no está en la tabla — `install-hooks`, `check-push`, `assign-keys`, `bootstrap`, `reconcile`, `removes`, `push-states`, `create-or-find`, `provider set-status`, `window-open`, `propagate`, `adopt` — no falta: era la maquinaria de la asimetría que la decisión 1 saca. `bootstrap`/`reconcile`/`adopt` sí tienen equivalente, pero no como comando aparte: son `pull` con una consulta que trae de a muchos — `muckpile pull backlog --query "project = ACC AND sprint is empty"`.
 
