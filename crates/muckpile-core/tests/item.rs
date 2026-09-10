@@ -120,16 +120,22 @@ fn list_pending_finds_only_unassigned_slugs_at_the_top_level() {
 }
 
 #[test]
-fn list_pending_carries_title_type_and_parent() {
+fn list_pending_carries_title_type_parent_and_body() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
-    write(root, "@un-borrador.task.md", "---\ntitle: un borrador\nparent: ACC-100\n---\n");
+    write(root, "@un-borrador.task.md", "---\ntitle: un borrador\nparent: ACC-100\n---\nun cuerpo\n");
 
     let pending = list_pending(root).unwrap();
 
     assert_eq!(
         pending,
-        vec![PendingItem { slug: "@un-borrador".into(), item_type: "task".into(), title: "un borrador".into(), parent: Some("ACC-100".into()) }]
+        vec![PendingItem {
+            slug: "@un-borrador".into(),
+            item_type: "task".into(),
+            title: "un borrador".into(),
+            parent: Some("ACC-100".into()),
+            body: "un cuerpo".into(),
+        }]
     );
 }
 

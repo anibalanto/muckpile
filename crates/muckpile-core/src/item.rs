@@ -121,6 +121,7 @@ pub struct PendingItem {
     pub item_type: String,
     pub title: String,
     pub parent: Option<String>,
+    pub body: String,
 }
 
 /// Every `@slug.<type>.md` directly inside `view` — the mirror image of
@@ -148,6 +149,7 @@ pub fn list_pending(view: &Path) -> Result<Vec<PendingItem>> {
             item_type,
             title: parsed.title.with_context(|| format!("{}: sin title en el frontmatter", path.display()))?,
             parent: parsed.parent,
+            body: parsed.body,
         });
     }
     out.sort_by(|a, b| a.slug.cmp(&b.slug));
