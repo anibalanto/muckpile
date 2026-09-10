@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `c57d9d0`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `63f17ac`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -147,7 +147,7 @@ Git local es el registro de "qué es lo último que vi del proveedor", y lo llev
 
 **Cada vista es un worktree de `.muckpile/`**, el git del proyecto (decisión 6), parado en la rama de la vista. `code-work/`, adentro de una vista de trabajo, queda excluido: es un worktree de otro repo.
 
-**Avance: 10/11.**
+**Avance: 11/12.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -161,6 +161,7 @@ Git local es el registro de "qué es lo último que vi del proveedor", y lo llev
 | El registro es git local, en `.muckpile/` — uno por proyecto, y cada vista un worktree suyo | `cerrada` | `ledger::open_view` ↔ esta decisión: `.muckpile/` es un git sin worktree propio, cada vista un worktree en su rama, con la ref del proveedor como upstream; `code-work/` excluido en todas |
 | Los commits que hace `muckpile` los firma `muckpile`; los de la persona, la persona | `cerrada` | `ledger::record`, `ledger::rebase` y `ledger::tool_commit` ↔ esta decisión: firman `muckpile <muckpile@localhost>`; `commit_paths` y `rename_one` commitean por `tool_commit`. Un commit de la persona, rebaseado, conserva su autor |
 | Una vista nace vacía, de un commit sin archivos en sus dos refs | `cerrada` | `ledger::open_view` ↔ esta decisión |
+| La rama lleva `_` donde git no acepta un carácter del nombre de la vista | `cerrada` | `branch_name`, en `ledger.rs` ↔ esta decisión. Probado el 2026-09-10: `sprint fetch` abrió los 21 sprints de `ACC`, `12_El_formato:_…` incluido |
 | Qué hace `push` con un ítem que la vista nunca registró | `falta spec` | Lo decide el código: se niega (`PushResult::NeverPulled`) en vez de comparar contra el proveedor sin base |
 
 ### 6. Multi-proyecto: una carpeta propia, y vistas que agrupan un conjunto de ítems para un contexto de desarrollo
@@ -242,7 +243,7 @@ backlog/sprint/22_Las_vistas/  backlog/sprint/23_Las_questions/     ← no hay a
 
 **Un proyecto lo crea `init`, y ningún otro comando.** Corrido en `multitask/`, `muckpile init <proyecto>` deja `<proyecto>/.muckpile/` —el git del proyecto, sin worktree propio: el registro de la decisión 5—, un `muckpile.toml` para completar (decisión 9), y las tres carpetas reservadas. Cada vista la crea después el comando que la necesita —`to-work` una de trabajo, `sprint fetch` una por sprint—, como un worktree de `.muckpile/` parado en su rama. Fuera de un proyecto iniciado, los demás comandos se niegan: ninguno arma un `.muckpile/` de paso.
 
-**Avance: 4/9.**
+**Avance: 6/9.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -250,9 +251,9 @@ backlog/sprint/22_Las_vistas/  backlog/sprint/23_Las_questions/     ← no hay a
 | `to-work <id>` trae el ítem y su `_data/` | `diverge` | Crea `to-work/<id>/` vacía y nada más: el ítem llega con un `pull` aparte, y `_data/` no lo crea nadie. El bilink de la fila está aceptado igual |
 | `code-work add`: rama derivada de `commit_prefix`, clon a demanda de `base/<repo>/`, `--from`, `--branch` | `cerrada` | `code_work_add` ↔ fila `code-work add` |
 | `sprint fetch`: una carpeta vacía por sprint abierto, `…` → fecha, nunca borra una poblada | `cerrada` | `sprint_fetch` ↔ fila; `legible_name` ↔ esta decisión. Un borde: borra cualquier carpeta vacía que no sea de un sprint abierto, aunque no la haya dejado él |
-| `pull` de una vista de sprint (`backlog/sprint/<slug>`) | `pendiente` | `pull` sólo corre parado en `to-work/<id>/` |
+| `pull` de una vista de sprint (`backlog/sprint/<slug>`) | `cerrada` | `pull_sprint` ↔ esta decisión: la vista queda con exactamente lo que el sprint tiene —lo que entró viene, lo que salió se va, con todo lo que la ref registró para él—, en un solo commit de la ref del proveedor. Probado el 2026-09-10 con el binario, sólo leyendo: `pull backlog/sprint/17_Los_sprints_en_el_board` trajo sus 6 ítems de `ACC` |
 | `pull` con una consulta — lo que reemplaza a `bootstrap`/`reconcile`/`adopt` | `pendiente` | — |
-| El chequeo local: "¿ya tengo este ítem en otra vista, en esta máquina?" | `pendiente` | — |
+| El chequeo local: "¿ya tengo este ítem en otra vista, en esta máquina?" | `cerrada` | `other_views_holding` ↔ esta decisión: `pull` dice en qué otras vistas del proyecto está cada ítem que trae, mirando el disco. Probado: el `pull` de `to-work/ACC-269` dijo `también en backlog/sprint/17_Los_sprints_en_el_board` |
 | `init` crea el proyecto —`.muckpile/`, `muckpile.toml`, las tres carpetas—, y las vistas nacen como worktrees suyos | `cerrada` | `init` ↔ fila `init`; `to_work` y `sprint_fetch` abren cada vista con `ledger::open_view`, y `sprint fetch` cierra con `ledger::close_empty_view` sólo la que nadie usó |
 | `init` que recupera un proyecto: `.muckpile/` borrado con vistas todavía en disco | `falta spec` | Esta decisión sólo dice que `init` crea un proyecto nuevo. Con qué parámetros se recupera uno, y qué pasa con lo que cada vista no subió, queda para el final: es fino |
 
