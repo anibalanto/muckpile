@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture e86ee0f210f359b43560be57566fb77e
-      hash: 0185e09a79ef0c1cd6fe692928d15231e5c493a2bd78ea466f01292d9a4d7096
+      hash: 36fd067202b47a96fc72ce979a588585c2f76a58810d09e5a91b8f7a1e1fd847
     name: canonicity-spec
   1:
     link: capture 31535b5f714d57ffb8fdbab35db097b9
@@ -14,7 +14,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 31535b5f714d57ffb8fdbab35db097b9
-      hash: 34687035f62ce98177c0bc7bdd13c2ee0eabab764582c624e7645f618df2dd7c
-      hash_ast: eec1c1ac4d852f1c94eba944fd4f5aab52023b09c9e1100fa9a2917b7e45bb72
+      hash: 44c6bac4e595934529ce886ee18e1c5f644020918ffdadf0df5d4323bc0949c2
+      hash_ast: ad37e43bc974a9a9c02ba456db2366e6b0e7f2fbb3f552a06983862348109bd8
       n: declined
     name: push_one

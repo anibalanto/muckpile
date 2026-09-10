@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 25da143e1e4fe94eef9d2195eab499de
-      hash: 582d0e013f2728db79550240e3cb9af27e5b99d45987c320b5e08e54ae63c912
+      hash: 0353a3b19971b6fd80f7461ec476fc0c245f0c55da821cb869e9600360176559
     name: push-row
   1:
     link: capture 31535b5f714d57ffb8fdbab35db097b9
@@ -14,7 +14,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 31535b5f714d57ffb8fdbab35db097b9
-      hash: 34687035f62ce98177c0bc7bdd13c2ee0eabab764582c624e7645f618df2dd7c
-      hash_ast: eec1c1ac4d852f1c94eba944fd4f5aab52023b09c9e1100fa9a2917b7e45bb72
+      hash: 44c6bac4e595934529ce886ee18e1c5f644020918ffdadf0df5d4323bc0949c2
+      hash_ast: ad37e43bc974a9a9c02ba456db2366e6b0e7f2fbb3f552a06983862348109bd8
       n: declined
     name: push_one

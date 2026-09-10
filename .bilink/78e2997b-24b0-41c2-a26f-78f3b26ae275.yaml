@@ -9,12 +9,12 @@ endpoint:
       hash: c2f18ce04bd120158a4cecdf5bae15d9835a6068016df3abd3bf006ca78a111a
     name: header-spec
   1:
-    link: capture 5cc6359664634400a7020e93cc21c319
+    link: capture 301cfb7146174367ed484551aafa404a
     accepted:
     - agree:
       - anibal
-      link: capture 5cc6359664634400a7020e93cc21c319
-      hash: 48b3a218217eca7b30496f16d0d793ff76be37abd29f7561a743bbd0745b2f82
-      hash_ast: e12299f6203ec0c960da0a226734e19067a3845cc4653c0ba0c4e512ceb718b8
+      link: capture 301cfb7146174367ed484551aafa404a
+      hash: 72873ecc7a43e5990c5c1f45009f986a0919bf800d67753b435f68ace76048a3
+      hash_ast: 1acb241d662f709e6020a8abf32b6319c92064bdb38316c352d9868ee120f39f
       n: declined
-    name: relations
+    name: header-edits
