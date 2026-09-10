@@ -2,7 +2,7 @@
 //! `title`, `status`, and an optional `parent`, ahead of the body. `list`
 //! filters over this instead of asking the provider again.
 
-use crate::TYPES;
+use crate::{is_unassigned, TYPES};
 use anyhow::{bail, Context, Result};
 use std::path::Path;
 
@@ -58,9 +58,11 @@ fn id_and_type(path: &Path) -> Result<(String, String)> {
     Ok((id.to_string(), item_type.to_string()))
 }
 
-/// Every `<id>.<type>.md` directly inside `view` — never recursing, so a
-/// worktree under `code-work/` or a question's `_data/` never leaks in as an
-/// item.
+/// Every `<id>.<type>.md` directly inside `view` that has actually synced —
+/// never recursing, so a worktree under `code-work/` or a question's
+/// `_data/` never leaks in as an item, and never a `@slug` still waiting on
+/// its first `push`: it has no status yet, nothing to list or compare
+/// against the provider by.
 pub fn list_summaries(view: &Path) -> Result<Vec<ItemSummary>> {
     let mut out = Vec::new();
     for entry in std::fs::read_dir(view).with_context(|| format!("reading {}", view.display()))? {
@@ -70,7 +72,8 @@ pub fn list_summaries(view: &Path) -> Result<Vec<ItemSummary>> {
             continue;
         }
         let Some(name) = path.file_name().and_then(|n| n.to_str()) else { continue };
-        if !TYPES.iter().any(|t| name.ends_with(&format!(".{t}.md"))) {
+        let Some(id) = TYPES.iter().find_map(|t| name.strip_suffix(&format!(".{t}.md"))) else { continue };
+        if is_unassigned(id) {
             continue;
         }
         out.push(read_summary(&path)?);

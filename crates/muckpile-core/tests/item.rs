@@ -54,3 +54,18 @@ fn list_summaries_only_picks_up_known_item_types_at_the_top_level() {
     let ids: Vec<&str> = summaries.iter().map(|s| s.id.as_str()).collect();
     assert_eq!(ids, vec!["ACC-355", "ACC-360"], "README and anything under code-work/ must not appear");
 }
+
+/// A freshly `new`-ed item has no status yet — nothing to compare against
+/// the provider, so `list`/`status` skip it rather than fail parsing it.
+#[test]
+fn list_summaries_skips_a_slug_that_has_not_synced_yet() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(root, "ACC-355.task.md", "---\ntitle: a\nstatus: Abierta\n---\n");
+    write(root, "@un-borrador.task.md", "---\ntitle: un borrador\n---\n");
+
+    let summaries = list_summaries(root).unwrap();
+
+    let ids: Vec<&str> = summaries.iter().map(|s| s.id.as_str()).collect();
+    assert_eq!(ids, vec!["ACC-355"]);
+}
