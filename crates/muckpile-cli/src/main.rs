@@ -1,9 +1,12 @@
 use anyhow::{bail, Context, Result};
 use muckpile_core::identity::load_identity;
 use muckpile_core::project::{find_project_root, load_project_config, ProjectConfig};
+use muckpile_core::states::read_states_cache;
+use muckpile_cli::ListFilter;
 use muckpile_provider::provider::Provider;
 use muckpile_provider::rest::{Credentials, JiraRest};
 use muckpile_provider::transition::Outcome;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 fn main() -> Result<()> {
@@ -15,8 +18,9 @@ fn main() -> Result<()> {
         [cmd, sub] if cmd == "sprint" && sub == "fetch" => run_sprint_fetch(),
         [cmd, id, status] if cmd == "transition" => run_transition(id, status),
         [cmd, sub] if cmd == "states" && sub == "discover" => run_states_discover(),
+        [cmd, rest @ ..] if cmd == "list" => run_list(rest),
         _ => bail!(
-            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover"
+            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>]"
         ),
     }
 }
@@ -83,6 +87,46 @@ fn run_states_discover() -> Result<()> {
         println!("  {name}    {category}");
     }
     println!("cacheado en {project}.states.toml");
+    Ok(())
+}
+
+fn run_list(args: &[String]) -> Result<()> {
+    let Some((view_arg, flags)) = args.split_first() else {
+        bail!("uso: muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>]");
+    };
+
+    let mut state = None;
+    let mut category = None;
+    let mut parent = None;
+    let mut i = 0;
+    while i < flags.len() {
+        let flag = &flags[i];
+        let value = flags.get(i + 1).with_context(|| format!("{flag}: falta el valor"))?;
+        match flag.as_str() {
+            "--state" => state = Some(value.as_str()),
+            "--category" => category = Some(value.as_str()),
+            "--parent" => parent = Some(value.as_str()),
+            _ => bail!("{flag}: opción desconocida"),
+        }
+        i += 2;
+    }
+
+    let (root, cwd) = standing_in_a_project()?;
+    let view = cwd.join(view_arg);
+
+    let categories = match category {
+        Some(_) => {
+            let project = root.file_name().context("la raíz del proyecto no tiene nombre")?.to_string_lossy().into_owned();
+            read_states_cache(&root.join(format!("{project}.states.toml")))?
+        }
+        None => BTreeMap::new(),
+    };
+
+    let filter = ListFilter { state, category, parent };
+    let items = muckpile_cli::list(&view, &filter, &categories)?;
+    for item in &items {
+        println!("{}  {}  {}  {}", item.id, item.item_type, item.status, item.title);
+    }
     Ok(())
 }
 

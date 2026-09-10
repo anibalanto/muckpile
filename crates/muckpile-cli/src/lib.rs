@@ -5,6 +5,7 @@
 use anyhow::{bail, Context, Result};
 use muckpile_core::body::adf_to_body;
 use muckpile_core::is_valid_id;
+use muckpile_core::item::{list_summaries, ItemSummary};
 use muckpile_core::project::{classify, require_root, Position, ProjectConfig};
 use muckpile_core::states::write_states_cache;
 use muckpile_provider::provider::{Provider, Sprint};
@@ -190,4 +191,30 @@ pub fn states_discover(root: &Path, project: &str, provider: &dyn Provider, conf
     let path = root.join(format!("{project}.states.toml"));
     write_states_cache(&path, &states)?;
     Ok(states)
+}
+
+/// What `list` narrows by — each present field is one more AND clause.
+#[derive(Debug, Default)]
+pub struct ListFilter<'a> {
+    pub state: Option<&'a str>,
+    pub category: Option<&'a str>,
+    pub parent: Option<&'a str>,
+}
+
+/// Items already pulled into `view`, filtered without asking the provider
+/// again — `state` compares the provider's own string, `category` looks it
+/// up in `categories` (the cache `states discover` wrote; a status the cache
+/// doesn't hold can't be claimed to match), `parent` compares by id.
+pub fn list(view: &Path, filter: &ListFilter, categories: &BTreeMap<String, String>) -> Result<Vec<ItemSummary>> {
+    let mut items = list_summaries(view)?;
+    if let Some(state) = filter.state {
+        items.retain(|i| i.status == state);
+    }
+    if let Some(category) = filter.category {
+        items.retain(|i| categories.get(&i.status).is_some_and(|c| c == category));
+    }
+    if let Some(parent) = filter.parent {
+        items.retain(|i| i.parent.as_deref() == Some(parent));
+    }
+    Ok(items)
 }
