@@ -410,13 +410,15 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **`RsMarkdownAdfFilter` va de markdown a ADF, alrededor del conversor de Rust, y corre antes de mandar un cuerpo — al crear un `@slug` y en `push`.** Lleva las reglas de lo que el esquema de Jira no acepta tal como se escribió: una negrita o cursiva sobre un `code` se corta alrededor del `code`, porque el esquema rechaza el documento entero por un solo nodo así, y gana `code` porque dice que es un identificador. La regla no se aplica en silencio sobre el ADF: el borrador se reescribe en el archivo a su forma canónica —``**el `reach`, y el que falla**`` pasa a ``**el** `reach`**, y el que falla**``—, y la reescritura queda como un commit propio, encima del borrador de quien escribió. Los commits van para adelante y ninguno se edita: quien escribió ve en git, en markdown, qué hubo que cambiar para llegar a la forma canónica, y lo que se manda es el resultado.
 
+**Un link a un ítem del proyecto viaja como tarjeta de Jira.** En markdown, un ítem se cita por su archivo: `[ACC-338](ACC-338.task.md)`. En Jira eso no lleva a ningún lado; lo que Jira sabe mostrar es una tarjeta —un `inlineCard` con la URL del ítem, `https://…/browse/ACC-338`—, con la clave, el título y el estado, vivos. `RsMarkdownAdfFilter` convierte en tarjeta todo link cuyo destino es `<clave>.<tipo>.md` —su texto no viaja: la tarjeta muestra el título—, y `JiraAdfMarkdownFilter` hace la vuelta: una tarjeta, o un link común, a `<base>/browse/<clave>` de este proyecto pasa a `[<clave>](<clave>.<tipo>.md)`. El tipo lo da el proveedor —una sola búsqueda por `pull`, para todas las claves citadas—, esté o no el archivo en la vista: cómo se ve un cuerpo depende sólo de lo que dice el proveedor, y bajar otro ítem después no lo cambia, ni hace que `push` vea un cambio que nadie hizo. Un link a otro proyecto, o a cualquier otra cosa, queda como está; una clave que el proveedor no encuentra, también. Vale igual para un comentario, que pasa por los mismos dos filtros (decisión 7). Medido el 2026-09-10: de los 263 links a `/browse/` de las últimas 100 descripciones de `ACC` —los que subió worklist, como link de texto—, 229 tienen la clave como texto y 34 el título; como tarjeta, ninguno pierde nada. Y en `ACC-360` Jira guardó la tarjeta tal cual la recibió.
+
 **Canónico → se edita local y `push` lo sube sin objeción.** Es siempre el caso de un ítem que `muckpile` mismo creó —por construcción, porque todo lo que manda pasó antes por `RsMarkdownAdfFilter`—, y sigue siéndolo mientras nadie le agregue, del lado de Jira, algo que markdown no representa.
 
 **No canónico → el cuerpo local queda de sólo lectura.** Algo que el conversor sólo puede aproximar, y lo avisa como `Lossy`: una tabla con las filas numeradas, un título en un bloque de código, el pie de una imagen. `push` no sube el cuerpo aunque el archivo tenga cambios — se niega, y dice por qué. El header no pasa por esto: cambia por comando (decisión 12) y viaja sin conversión, así que no tiene de qué ser "canónico".
 
 **Y no se resuelve pidiéndole a una IA que aplique el cambio a ciegas** — eso cambia el problema por uno peor: nadie compara el resultado contra lo que se pidió. Lo que ofrece `muckpile` es un diff: convierte el borrador editado a ADF con el mismo conversor —aunque no lo vaya a subir—, lo compara contra el ADF real, y muestra la diferencia, incluida la que se perdería si se aplicara tal cual. El borrador va como se mandaría, y el ADF real en la forma canónica del conversor: las tres normalizaciones de la tabla de arriba son equivalencias, y mostrarlas —un `attrs: {}` por cada celda de cada tabla— sólo taparía la diferencia que importa. Ese diff lo aplica una persona en Jira, o una IA operando ahí, con la pérdida ya visible antes de decidir — no escondida como hoy hace el round-trip de worklist.
 
-**Avance: 8/9.**
+**Avance: 8/11.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -429,6 +431,8 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 | No canónico → `push` no sube el cuerpo y ofrece el diff | `cerrada` | `push_one` ↔ fila `push` |
 | El diff es contra el ADF real | `cerrada` | `adf_diff` ↔ esta decisión, llamado desde `push_one`: el ADF real en la forma canónica del conversor contra el borrador como se mandaría |
 | El header no pasa por esto | `cerrada` | `push_one` ↔ fila `push`: un header editado a mano choca antes de llegar a la canonicidad, y `title`/`transition` lo escriben sin conversión |
+| Un link a `<clave>.<tipo>.md` sube como tarjeta, `inlineCard` con `<base>/browse/<clave>` | `pendiente` | Hoy sube como link de texto con destino `ACC-338.task.md`, que en Jira no lleva a ningún lado |
+| Una tarjeta o un link a `<base>/browse/<clave>` del proyecto baja como `[<clave>](<clave>.<tipo>.md)`, con el tipo del proveedor | `pendiente` | Hoy una tarjeta baja como bloque ADF crudo, y un link común queda como URL |
 
 ### 11. El código va en inglés entero — identificadores y comentarios, sin cita externa
 
