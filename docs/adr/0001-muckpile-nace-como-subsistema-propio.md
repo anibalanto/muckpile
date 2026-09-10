@@ -88,7 +88,16 @@ La transformación es la misma que `concepts/sync.md` e `item.md` ya especifican
 
 Lo único que se cae es la razón original de que existiera un hook para esto: que el cliente no podía hacerlo. Ahora puede.
 
-**Avance: 3/6.**
+**Y con las dos refs de la decisión 5, el pedido resuelto queda registrado de los dos lados, en este orden:**
+
+1. El proveedor crea el ítem — `ACC-360`.
+2. La ref del proveedor recibe un commit por cada ítem creado, `new @<slug>`, con lo que el proveedor devolvió ya transformado: `ACC-360.task.md` y su ADF. Es el registro de qué `@slug` se volvió qué id, del lado que sólo va para adelante — y lo que le da al rebase algo sobre qué apoyarse. Un ítem que la búsqueda encontró en vez de crear pasa por lo mismo, con `found @<slug>`.
+3. La vista se rebasea encima. El borrador vive en `@<slug>.<tipo>.md`, un nombre que el proveedor nunca tuvo, así que no choca con nada.
+4. Recién ahí, el renombre es un commit de la vista: se borra el borrador, `@<slug>_data/` pasa a `ACC-360_data/`, y se reescriben las referencias.
+
+**El orden 3 → 4 no es un detalle.** Si la vista renombrara antes de rebasear, tendría un `ACC-360.task.md` escrito por su lado y la ref del proveedor otro, y el rebase chocaría — el mismo `add/add` de la sección "Contexto", con el mismo remedio mal ofrecido.
+
+**Avance: 3/8.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -96,6 +105,8 @@ Lo único que se cae es la razón original de que existiera un hook para esto: q
 | Se busca por título antes de crear | `cerrada` | `resolve_pending` ↔ esta decisión; la búsqueda misma es `resolve_one` |
 | Orden topológico sobre las referencias del lote | `cerrada` | `topo_order`, llamado desde `resolve_pending` — el bilink es de la función que orquesta, no de `topo_order` |
 | Renombre, `_data/` y reescritura de referencias en un solo commit | `diverge` | Por ítem sí (`rename_one`), pero un `push` que resuelve N pendientes deja 3·N commits: `new`, `rename` y `pull` por cada uno. Y `rename_one` commitea con `git add -A`, que agarra el repo entero —ediciones sin commitear de otras vistas incluidas—, cuando `commit_paths` existe justamente para no hacer eso |
+| Por cada ítem creado o encontrado, un commit `new @<slug>` o `found @<slug>` en la ref del proveedor, con lo que devolvió | `pendiente` | Hoy `fetch_and_commit` commitea `pull <id>` en la misma rama que la vista |
+| La vista se rebasea sobre ese commit antes de renombrar | `pendiente` | Hoy se renombra primero (`resolve_batch`) y se trae después |
 | Qué pasa cuando no se puede resolver un pendiente del que otro depende | `falta spec` | Lo decide el código: lo que depende no se intenta, y su archivo queda como estaba (`PushResult::ResolveFailed`) |
 | Qué recibe un ítem que se encontró en vez de crearse | `falta spec` | Lo decide el código: nunca el cuerpo ni el `parent` del borrador, que sólo viajan al crear (`resolve_one`) |
 
@@ -116,9 +127,15 @@ Git local es el registro de "qué es lo último que vi del proveedor", y lo llev
 
 **La rama del proveedor no se protege, porque nunca decide sola.** En un git local nada impide un `git update-ref`, y la única traba sería un hook — lo que la decisión 1 sacó. No hace falta: `push` le pregunta al proveedor antes de escribir, siempre. Si alguien movió la ref a mano, el `push` siguiente ve que el proveedor no coincide, registra lo que tiene de verdad, y queda una divergencia falsa que el rebase resuelve — nunca una escritura equivocada en el proveedor.
 
+**La ref del proveedor guarda también el ADF**, al lado del markdown: `.provider/<id>.adf.json`, adentro de la vista. Es lo que el proveedor devolvió, literalmente; el markdown se deriva de él. Con eso, la pregunta de `push` compara ADF contra ADF —lo que el proveedor tiene ahora contra la punta de su ref—, no markdown contra markdown, y ve también lo que el markdown no muestra: alguien numeró las filas de una tabla. Y el historial de git dice exactamente qué cambió del lado del proveedor. Es un registro, no el que decide: `push` pregunta igual antes de escribir.
+
+**Y el rebase pone dos condiciones.** Con ediciones sin commitear en la vista, `pull` y `push` se niegan —commitear o descartar primero—: reponerlas solas después del rebase puede chocar, y ese choque es más difícil de entender que uno de rebase. Y con un rebase a medias, todo comando que toque la vista se niega hasta que se termine (`git rebase --continue`).
+
+**Un ítem que sale de una vista** —lo sacaron del sprint en el proveedor— lo borra el commit del proveedor. Si la vista lo había editado, el rebase choca, borrado de un lado y editado del otro, y lo resuelve quien trabaja: lo automático no decide por nadie qué pasa con una edición.
+
 **Cada vista es un worktree de `.muckpile/`**, el git del proyecto (decisión 6), parado en la rama de la vista. `code-work/`, adentro de una vista de trabajo, queda excluido: es un worktree de otro repo.
 
-**Avance: 1/7.**
+**Avance: 1/9.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -127,6 +144,8 @@ Git local es el registro de "qué es lo último que vi del proveedor", y lo llev
 | Cuando `push` no pisa, lo que el proveedor tenía queda registrado en su rama | `pendiente` | Hoy `PushResult::Stale` lo descarta |
 | La vista se actualiza con rebase sobre la rama del proveedor, en `pull` y en un `push` que no pisó | `pendiente` | — |
 | Dos refs por vista, con el nombre de la vista, y `refs/remotes/provider/<vista>` como upstream | `pendiente` | — |
+| La ref del proveedor guarda el ADF, y `push` compara ADF contra ADF | `pendiente` | Hoy no se guarda: `push` compara el markdown de lo que trae contra el último commit |
+| Con ediciones sin commitear, o con un rebase a medias, `pull` y `push` se niegan | `pendiente` | — |
 | El registro es git local, en `.muckpile/` — uno por proyecto, y cada vista un worktree suyo | `diverge` | `.muckpile/` es un directorio vacío que sólo marca la raíz (`find_project_root`). Los commits van al `.git` que gobierne la vista —en los tests, un `git init` en la raíz del proyecto— y ningún comando crea ni uno ni otro |
 | Qué hace `push` con un ítem que la vista nunca registró | `falta spec` | Lo decide el código: se niega (`PushResult::NeverPulled`) en vez de comparar contra el proveedor sin base |
 
@@ -351,7 +370,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **`JiraAdfMarkdownFilter` va de Jira a markdown, y corre en cada `pull`: se mide, no se supone.** Un aviso `Lossy` del conversor es pérdida, y el cuerpo queda de sólo lectura. Las tres normalizaciones de la tabla son equivalencias, medidas, así que el filtro no lleva ninguna regla propia: lo que sabe de canonicidad en esta dirección lo sabe el conversor, y lo dice. `pull` lo dice en el momento en que lo baja, no cuando alguien ya lo editó.
 
-**Y `push` decide con el ADF que Jira tiene ahora, no con el que vio el `pull`.** Antes de escribir, `push` ya le pide el ítem al proveedor para la comparación de la decisión 5, y con el ítem viene su ADF actual: es ése el que pasa por `JiraAdfMarkdownFilter`, no una copia guardada del `pull`. No es sólo por no guardar estado. La comparación de la decisión 5 es sobre el markdown, y dos ADF distintos pueden dar el mismo markdown — que es justamente lo no canónico. Si después del `pull` alguien numera las filas de una tabla en Jira, el markdown no cambia y la comparación pasa: un ADF guardado en el `pull` diría que el cuerpo es canónico y la numeración se perdería; el que se acaba de traer da un aviso `Lossy`, y el cuerpo no se sube.
+**Y la canonicidad no se guarda: se calcula sobre el ADF, cada vez.** Nada anota "este cuerpo es de sólo lectura" para que otro comando lo lea después. Antes de escribir, `push` trae el ADF actual y lo compara contra el que guarda la ref del proveedor (decisión 5): si difieren, el proveedor cambió y no pisa; si coinciden, `JiraAdfMarkdownFilter` corre sobre ese mismo ADF. Y como la comparación es de ADF y no de markdown, un cambio en Jira que el markdown no muestra —alguien numeró las filas de una tabla después del `pull`— no pasa de largo: lo ve la comparación, aunque el archivo local sea idéntico.
 
 **`RsMarkdownAdfFilter` va de markdown a ADF, alrededor del conversor de Rust, y corre antes de mandar un cuerpo — al crear un `@slug` y en `push`.** Lleva las reglas de lo que el esquema de Jira no acepta tal como se escribió: una negrita o cursiva sobre un `code` se corta alrededor del `code`, porque el esquema rechaza el documento entero por un solo nodo así, y gana `code` porque dice que es un identificador. La regla no se aplica en silencio sobre el ADF: el borrador se reescribe en el archivo a su forma canónica —``**el `reach`, y el que falla**`` pasa a ``**el** `reach`**, y el que falla**``—, y la reescritura queda como un commit propio, encima del borrador de quien escribió. Los commits van para adelante y ninguno se edita: quien escribió ve en git, en markdown, qué hubo que cambiar para llegar a la forma canónica, y lo que se manda es el resultado.
 
@@ -366,7 +385,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 | Dimensión | Estado | Evidencia |
 |---|---|---|
 | `JiraAdfMarkdownFilter` mide en cada `pull`, y lo dice | `diverge` | Se calcula recién en `push`, sobre la base commiteada: quien edita no se entera hasta entonces de que el cuerpo era de sólo lectura |
-| `push` decide con el ADF recién traído, no con el del `pull` | `diverge` | Decide con el markdown de la base commiteada: un cambio en Jira que el markdown no muestra pasa sin que nadie lo vea |
+| La canonicidad se calcula sobre el ADF cada vez, no se guarda | `diverge` | Se calcula sobre el markdown de la base commiteada: un cambio en Jira que el markdown no muestra pasa sin que nadie lo vea |
 | El criterio: ADF → markdown → ADF, contra la forma canónica del conversor, como JSON | `diverge` | El código hace markdown → ADF → markdown, lo que calcula el `canonical()` de worklist. Medido: una tabla con las filas numeradas pasa como canónica, y un `push` le sacaría la numeración |
 | Un aviso `Lossy` del conversor deja el cuerpo de sólo lectura | `pendiente` | `body.rs` descarta los avisos del conversor |
 | El conversor es el fork, con el espacio al borde de una marca y las celdas combinadas | `cerrada` | `atlassian-markdown-converter` en `muckpile-core/Cargo.toml`, al commit `91407e5` del fork. `bilinker` no lee TOML: el bilink ata esta decisión a los dos tests que fallan con 0.1.0, `a_bold_run_cut_by_code_reads_back_as_bold` y `a_table_with_merged_cells_survives_the_trip_through_markdown` |
