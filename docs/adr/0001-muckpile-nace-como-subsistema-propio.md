@@ -101,15 +101,33 @@ Lo único que se cae es la razón original de que existiera un hook para esto: q
 
 ### 5. Sync por comparación local, no por compare-and-swap en un servidor
 
-Git local es el registro de "qué es lo último que vi del proveedor": un `pull` commitea lo que el proveedor devolvió; un `push` vuelve a preguntar **antes** de escribir, y si lo que el proveedor tiene ahora difiere de lo que ese último `pull` registró, no pisa — lo dice. Mismo compare-and-swap que `sync.md` describe, movido de un hook en el servidor al cliente.
+Git local es el registro de "qué es lo último que vi del proveedor", y lo lleva en dos refs por vista, con el nombre de la vista — la misma forma que git ya usa para `origin/main` y `main`:
 
-**Avance: 1/4.**
+| Ref | Qué tiene | Quién la mueve |
+|---|---|---|
+| `refs/remotes/provider/<vista>` — se ve como `provider/to-work/SGE-9876` | El estado consistente: cada commit es lo que devolvió el proveedor la vez que se le preguntó | Sólo `muckpile`, y sólo con lo que trajo la API — en un `pull`, y en la pregunta que `push` hace antes de escribir. Va siempre para adelante |
+| `<vista>` — `to-work/SGE-9876`, `backlog/sprint/22_Las_vistas` | Lo que se ve y se edita: parte de la del proveedor, y encima van las ediciones y las reescrituras de la decisión 10, cada una en su commit | Quien trabaja, y `muckpile` |
+
+**Por vista, no por proyecto:** cada vista trae ítems distintos en momentos distintos, y una sola rama del proveedor por proyecto haría que el `pull` de una vista moviera la base de todas. **Bajo `refs/remotes/`, no como rama común:** git ya la trata como el estado de otro — `checkout` la deja en HEAD suelto, un `commit` no la mueve, `git branch` no la lista. **Y `provider/`, no `jira/`:** el backend se cambia (decisión 3), y la ref sigue diciendo lo mismo. La rama de la vista la tiene como upstream, así que `git status` adentro de la vista dice solo cuánto está adelante y atrás — lo que a una vista de worklist sin upstream le faltaba para no verse limpia teniendo trabajo sin subir.
+
+**Un `pull` avanza la rama del proveedor, y la vista se actualiza con rebase sobre ella.** Lo que se editó y todavía no subió se reaplica encima de lo que el proveedor tiene ahora; si choca, el rebase para y lo resuelve quien trabaja, como cualquier rebase. Los commits del proveedor nunca se reescriben; los de la vista que todavía no subieron sí se reaplican — por eso la historia de una vista es siempre la del proveedor, con lo propio encima.
+
+**Un `push` vuelve a preguntar antes de escribir.** Si lo que el proveedor tiene ahora coincide con la punta de su rama, escribe, y la rama del proveedor avanza con lo que el proveedor tiene después de escribir: la vista queda al día. Si difiere, no pisa: registra lo que trajo como un commit nuevo en la rama del proveedor, rebasea la vista encima —igual que un `pull`— y para; quien trabaja revisa el resultado y vuelve a correr `push`. Es el mismo compare-and-swap que `sync.md` describe, movido de un hook en el servidor al cliente — con la diferencia de que lo que el proveedor tenía no se descarta: queda registrado.
+
+**La rama del proveedor no se protege, porque nunca decide sola.** En un git local nada impide un `git update-ref`, y la única traba sería un hook — lo que la decisión 1 sacó. No hace falta: `push` le pregunta al proveedor antes de escribir, siempre. Si alguien movió la ref a mano, el `push` siguiente ve que el proveedor no coincide, registra lo que tiene de verdad, y queda una divergencia falsa que el rebase resuelve — nunca una escritura equivocada en el proveedor.
+
+**Cada vista es un worktree de `.muckpile/`**, el git del proyecto (decisión 6), parado en la rama de la vista. `code-work/`, adentro de una vista de trabajo, queda excluido: es un worktree de otro repo.
+
+**Avance: 1/7.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
-| `pull` commitea lo que devolvió el proveedor | `sin bilink` | `fetch_and_commit`. El bilink de la fila `pull` captura `pull`, que la llama, y esa fila no dice que se commitee |
+| `pull` avanza la rama del proveedor con lo que devolvió | `diverge` | `fetch_and_commit` commitea en la rama en la que esté parada la vista, no en una ref del proveedor |
 | `push` vuelve a preguntar antes de escribir, y no pisa si algo cambió | `cerrada` | `push_one` ↔ fila `push` (`PushResult::Stale`) |
-| El registro es git local, en `.muckpile/` — uno por proyecto, según la decisión 6 | `diverge` | `.muckpile/` es un directorio vacío que sólo marca la raíz (`find_project_root`). Los commits van al `.git` que gobierne la vista —en los tests, un `git init` en la raíz del proyecto— y ningún comando crea ni uno ni otro |
+| Cuando `push` no pisa, lo que el proveedor tenía queda registrado en su rama | `pendiente` | Hoy `PushResult::Stale` lo descarta |
+| La vista se actualiza con rebase sobre la rama del proveedor, en `pull` y en un `push` que no pisó | `pendiente` | — |
+| Dos refs por vista, con el nombre de la vista, y `refs/remotes/provider/<vista>` como upstream | `pendiente` | — |
+| El registro es git local, en `.muckpile/` — uno por proyecto, y cada vista un worktree suyo | `diverge` | `.muckpile/` es un directorio vacío que sólo marca la raíz (`find_project_root`). Los commits van al `.git` que gobierne la vista —en los tests, un `git init` en la raíz del proyecto— y ningún comando crea ni uno ni otro |
 | Qué hace `push` con un ítem que la vista nunca registró | `falta spec` | Lo decide el código: se niega (`PushResult::NeverPulled`) en vez de comparar contra el proveedor sin base |
 
 ### 6. Multi-proyecto: una carpeta propia, y vistas que agrupan un conjunto de ítems para un contexto de desarrollo
