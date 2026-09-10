@@ -429,7 +429,9 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **Cada comando le escribe al proveedor en el momento, y después hace lo que haría un `pull` de ese ítem en la vista donde se corre:** lo que el proveedor devolvió queda registrado, y el header local al día. Sin eso, el `push` siguiente de un cuerpo editado vería el `status` nuevo como un cambio del otro lado, y no pisaría. Corrido fuera de una vista, o sobre un ítem que la vista no tiene, sólo escribe en el proveedor. Si ese `pull` se niega —ediciones sin commitear, un rebase a medias (decisión 5)—, el proveedor ya quedó escrito, y el comando dice que la vista queda atrás hasta el próximo `pull`.
 
-**Una edición a mano del header no se sube, y `push` lo dice.** Nombra el campo, el valor escrito y el comando que lo cambia —`ACC-355: status "Finalizada" editado a mano, no se sube — muckpile transition ACC-355 "Finalizada"`—, sigue con el resto, y el header vuelve a ser el del proveedor: el valor queda en el mensaje, no en un archivo que diría algo que el proveedor no tiene.
+**Un header editado a mano choca con el proveedor, y `push` no manda ese ítem** —ni el header ni el cuerpo—: el archivo queda como está, y `git diff` muestra qué se editó. `push` lo dice campo por campo, y como ayuda sugiere el comando que lo cambia —`ACC-355: status "Finalizada" no es el del proveedor ("En curso") — para cambiarlo: muckpile transition ACC-355 "Finalizada"`—, y sigue con los demás ítems. Se resuelve como cualquier choque: se corre el comando, o se descarta la edición del header, y `push` vuelve a pasar. No se manda el cuerpo solo porque lo que registra lo enviado se arma desde el proveedor, y se llevaría puesta la edición del header sin que nadie la haya visto irse.
+
+**El tipo sigue en el nombre del archivo, `<id>.<tipo>.md`, no en el header:** `ACC-338.question.md` se distingue de un vistazo, en un `ls` o en un tab del shell. No es un campo que se edite: sale del tipo del proveedor, por la tabla `item_type` (decisión 9).
 
 **Un borrador no tiene header del proveedor todavía.** Un `@slug` lleva el header que escribió `new` —el título, `--parent`, `--blocks`—, y viaja entero al crearlo, relaciones incluidas (decisión 4). Una vez creado, rige lo mismo que para cualquier ítem.
 
@@ -437,7 +439,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **El h1 es cuerpo, como cualquier otra línea.** En `ACC` casi toda descripción arranca con un h1 que repite el título —medido el 2026-09-10 sobre los últimos 100 ítems: 97 arrancan con un h1, y en 5 ya no coincide con el `summary`, porque se cambió de un lado y no del otro—. Es la convención de worklist, subida tal cual a Jira. `muckpile` no la sigue ni la limpia: el título es `summary`, un campo aparte, y lo que diga un h1 es contenido de la descripción.
 
-**Avance: 0/6.**
+**Avance: 0/7.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -445,8 +447,9 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 | `parent <id> <padre>`, y `new --parent` | `pendiente` | Nada cambia el padre de un ítem ya sincronizado; un borrador sólo lo tiene si alguien lo escribe a mano |
 | `unlink <a> <frase> <b>` | `pendiente` | — |
 | `link` y `unlink` aceptan la frase con `_` | `pendiente` | `link` compara la frase tal cual, con espacios |
-| `push` no sube nada del header, y una edición a mano lo dice | `diverge` | `push_one` manda el título editado; una edición de `status:`, `parent:` o `relation.*` se descarta sin aviso cuando el header se vuelve a armar desde el proveedor |
+| `push` no sube nada del header: un header editado a mano choca, el ítem no se manda, y `push` sugiere el comando | `diverge` | `push_one` manda el título editado; una edición de `status:`, `parent:` o `relation.*` se descarta sin aviso cuando el header se vuelve a armar desde el proveedor |
 | Después de escribir, el comando hace lo que un `pull` del ítem en la vista | `diverge` | `transition` y `link` no tocan la vista: el `push` siguiente ve lo que escribieron como un cambio del otro lado, y no pisa |
+| Qué pasa cuando el proveedor cambia el tipo de un ítem | `falta spec` | Lo decide el código: `pull` escribe `<id>.<tipo nuevo>.md` y deja el archivo viejo al lado — dos archivos para el mismo ítem |
 
 ---
 
@@ -537,4 +540,4 @@ Dieciséis comandos contra los veintitrés de hoy (once de `worklist`, doce de `
 **Lo que este ADR no decide:**
 - Si `.muckpile/` —uno por proyecto, según decisión 6— necesita algún metadato propio además de lo que git ya da.
 - Cómo el workflow del proveedor hace cumplir `blocks` en la práctica — decisión 7/8 dice que es su responsabilidad y no la de `muckpile`, pero no dice cómo se configura eso en un board real.
-- Si el formato de archivo de un ítem (`<id>.<tipo>.md`, frontmatter con `title`/`status`/`parent`/`relation.*`) se conserva tal cual — este ADR asume que sí, porque nada de lo de arriba lo obliga a cambiar. La decisión 12 fija quién cambia el header y con qué clave baja una relación, no la forma del archivo.
+- Si el formato de archivo de un ítem (`<id>.<tipo>.md`, frontmatter con `title`/`status`/`parent`/`relation.*`) se conserva tal cual — este ADR asume que sí, porque nada de lo de arriba lo obliga a cambiar. La decisión 12 fija quién cambia el header, con qué clave baja una relación, y que el tipo sigue en el nombre del archivo.
