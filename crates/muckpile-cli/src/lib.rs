@@ -206,6 +206,14 @@ fn record_item(view: &Path, id: &str, provider: &dyn Provider, config: &ProjectC
     for (path, bytes) in attachment_files(id, &item.attachments, provider)? {
         changes.push((path, Some(bytes)));
     }
+    // A comment or an attachment the provider no longer has goes too — only
+    // what its ref recorded: a draft nobody uploaded was never there.
+    let brought: HashSet<String> = changes.iter().map(|(path, _)| path.clone()).collect();
+    for path in recorded.iter().filter(|p| p.starts_with(&format!("{id}_data/thread/")) || p.starts_with(&format!("{id}_data/files/"))) {
+        if !brought.contains(path) {
+            changes.push((path.clone(), None));
+        }
+    }
 
     ledger::record(view, &changes, message)?;
     Ok(Pulled { path: view.join(filename), losses })

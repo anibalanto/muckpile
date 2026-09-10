@@ -499,3 +499,28 @@ fn a_card_to_a_question_comes_down_as_a_link_to_a_question_file() {
     let text = std::fs::read_to_string(&path).unwrap();
     assert!(text.contains("[ACC-338](ACC-338.question.md)"), "{text}");
 }
+
+/// A comment or an attachment the provider no longer has goes with the
+/// next pull — only what the provider's ref recorded: a draft nobody
+/// uploaded was never there to go.
+#[test]
+fn a_comment_or_attachment_gone_from_the_provider_goes_from_the_view() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    let config = load_project_config(root).unwrap();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-355", "Tarea", "Vistas", "Abierta", None, None);
+    provider.seed_comments("ACC-355", vec![comment("42180", "Ana", None, paragraph("hola"))]);
+    provider.seed_attachment("ACC-355", "44892", "captura.png", b"png");
+    let view = root.join("to-work/ACC-355");
+    pull(root, &view, None, &provider, &config).unwrap();
+    std::fs::write(view.join("ACC-355_data/files/borrador.md"), "mío\n").unwrap();
+
+    provider.seed_item("ACC-355", "Tarea", "Vistas", "Abierta", None, None);
+    pull(root, &view, None, &provider, &config).unwrap();
+
+    assert!(!view.join("ACC-355_data/thread/42180.md").exists());
+    assert!(!view.join("ACC-355_data/files/captura.png").exists());
+    assert_eq!(std::fs::read_to_string(view.join("ACC-355_data/files/borrador.md")).unwrap(), "mío\n");
+}
