@@ -4,6 +4,7 @@
 
 use muckpile_provider::fake::FakeProvider;
 use muckpile_provider::link::{link, Outcome};
+use muckpile_provider::provider::Provider;
 
 #[test]
 fn the_outward_phrase_links_a_toward_b_as_the_outward_issue() {
@@ -79,4 +80,25 @@ fn a_phrase_with_underscores_for_spaces_is_the_same_phrase() {
 
     assert!(matches!(outcome, Outcome::Applied { .. }));
     assert_eq!(p.links_created(), vec![("Blocks".to_string(), "ACC-229".to_string(), "ACC-338".to_string())]);
+}
+
+/// The fake's `delete_link` undoes exactly what its `create_link` did: the
+/// record, and the link on both items, each from its own side — and only in
+/// the direction it was made.
+#[test]
+fn the_fake_deletes_a_link_from_the_record_and_from_both_items() {
+    let p = FakeProvider::new();
+    p.seed_link_types(&[("Blocks", "blocks", "is blocked by")]);
+    p.seed_item("ACC-229", "Tarea", "a", "Tareas por hacer", None, None);
+    p.seed_item("ACC-338", "Tarea", "b", "Tareas por hacer", None, None);
+    p.create_link("Blocks", "ACC-229", "ACC-338").unwrap();
+
+    assert!(!p.delete_link("Blocks", "ACC-338", "ACC-229").unwrap());
+    assert_eq!(p.links_created().len(), 1);
+
+    assert!(p.delete_link("Blocks", "ACC-229", "ACC-338").unwrap());
+    assert!(p.links_created().is_empty());
+    assert!(p.item("ACC-229").unwrap().links.is_empty());
+    assert!(p.item("ACC-338").unwrap().links.is_empty());
+    assert!(!p.delete_link("Blocks", "ACC-229", "ACC-338").unwrap());
 }

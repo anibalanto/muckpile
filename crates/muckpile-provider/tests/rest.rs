@@ -18,52 +18,67 @@ struct Captured {
 /// A server that answers exactly one request with `response_body` at
 /// `status`, then hands back what it received.
 fn one_shot(status: u16, response_body: &str) -> (String, mpsc::Receiver<Captured>) {
+    sequence(&[(status, response_body)])
+}
+
+/// A server that answers one request per `(status, body)` in `responses`,
+/// in order, handing back each request as it arrives — and then stops
+/// listening, so a request past the last response can't connect.
+fn sequence(responses: &[(u16, &str)]) -> (String, mpsc::Receiver<Captured>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
     let (tx, rx) = mpsc::channel();
-    let response_body = response_body.to_string();
+    let responses: Vec<(u16, String)> = responses.iter().map(|(status, body)| (*status, body.to_string())).collect();
     std::thread::spawn(move || {
-        let (mut stream, _) = listener.accept().unwrap();
-        // ureq writes headers and body as separate socket writes, so a
-        // single `read` can land between the two: keep reading until the
-        // headers are in and the body is as long as `Content-Length` says.
-        let mut data: Vec<u8> = Vec::new();
-        let mut chunk = [0u8; 8192];
-        loop {
-            let text = String::from_utf8_lossy(&data);
-            if let Some(header_end) = text.find("\r\n\r\n") {
-                let content_length: usize = text[..header_end]
-                    .lines()
-                    .find_map(|l| l.split_once(':').filter(|(k, _)| k.eq_ignore_ascii_case("content-length")))
-                    .and_then(|(_, v)| v.trim().parse().ok())
-                    .unwrap_or(0);
-                if data.len() - (header_end + 4) >= content_length {
-                    break;
-                }
-            }
-            let n = stream.read(&mut chunk).unwrap();
-            if n == 0 {
-                break;
-            }
-            data.extend_from_slice(&chunk[..n]);
+        for (status, response_body) in responses {
+            let (mut stream, _) = listener.accept().unwrap();
+            answer(&mut stream, status, &response_body, &tx);
         }
-        let text = String::from_utf8_lossy(&data).to_string();
-        let mut lines = text.split("\r\n");
-        let request_line = lines.next().unwrap_or_default();
-        let mut parts = request_line.split(' ');
-        let method = parts.next().unwrap_or_default().to_string();
-        let path = parts.next().unwrap_or_default().to_string();
-        let body = text.split("\r\n\r\n").nth(1).unwrap_or_default().to_string();
-        tx.send(Captured { method, path, body, raw: text }).unwrap();
-
-        let resp = format!(
-            "HTTP/1.1 {status} x\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-            response_body.len(),
-            response_body
-        );
-        stream.write_all(resp.as_bytes()).unwrap();
     });
     (format!("http://{addr}"), rx)
+}
+
+/// Reads one request off `stream`, sends it down `tx`, and answers it with
+/// `response_body` at `status`.
+fn answer(stream: &mut std::net::TcpStream, status: u16, response_body: &str, tx: &mpsc::Sender<Captured>) {
+    // ureq writes headers and body as separate socket writes, so a
+    // single `read` can land between the two: keep reading until the
+    // headers are in and the body is as long as `Content-Length` says.
+    let mut data: Vec<u8> = Vec::new();
+    let mut chunk = [0u8; 8192];
+    loop {
+        let text = String::from_utf8_lossy(&data);
+        if let Some(header_end) = text.find("\r\n\r\n") {
+            let content_length: usize = text[..header_end]
+                .lines()
+                .find_map(|l| l.split_once(':').filter(|(k, _)| k.eq_ignore_ascii_case("content-length")))
+                .and_then(|(_, v)| v.trim().parse().ok())
+                .unwrap_or(0);
+            if data.len() - (header_end + 4) >= content_length {
+                break;
+            }
+        }
+        let n = stream.read(&mut chunk).unwrap();
+        if n == 0 {
+            break;
+        }
+        data.extend_from_slice(&chunk[..n]);
+    }
+    let text = String::from_utf8_lossy(&data).to_string();
+    let mut lines = text.split("\r\n");
+    let request_line = lines.next().unwrap_or_default();
+    let mut parts = request_line.split(' ');
+    let method = parts.next().unwrap_or_default().to_string();
+    let path = parts.next().unwrap_or_default().to_string();
+    let body = text.split("\r\n\r\n").nth(1).unwrap_or_default().to_string();
+    tx.send(Captured { method, path, body, raw: text }).unwrap();
+
+    let resp = format!(
+        "HTTP/1.1 {status} x\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        response_body.len(),
+        response_body
+    );
+    stream.write_all(resp.as_bytes()).unwrap();
 }
 
 #[test]
@@ -276,6 +291,47 @@ fn create_link_posts_the_issue_playing_the_outward_phrase_as_inward_issue() {
     assert_eq!(body["type"]["name"], "Blocks");
     assert_eq!(body["inwardIssue"]["key"], "ACC-338");
     assert_eq!(body["outwardIssue"]["key"], "ACC-229");
+}
+
+/// The link is found on the outward issue's own `issuelinks`, where the
+/// entry that says "blocks ACC-229" names ACC-229 as `outwardIssue` — the
+/// same shape `item` reads. Only that entry's id is deleted: not the one of
+/// another type, nor the one of the same type the other way round.
+#[test]
+fn delete_link_finds_the_link_on_the_outward_issue_s_side_and_deletes_it_by_id() {
+    let issue = r#"{"fields":{"issuelinks":[
+        {"id":"100","type":{"name":"Blocks","inward":"is blocked by","outward":"blocks"},"inwardIssue":{"key":"ACC-229"}},
+        {"id":"200","type":{"name":"Relates","inward":"relates to","outward":"relates to"},"outwardIssue":{"key":"ACC-229"}},
+        {"id":"54926","type":{"name":"Blocks","inward":"is blocked by","outward":"blocks"},"outwardIssue":{"key":"ACC-229"}}
+    ]}}"#;
+    let (base, rx) = sequence(&[(200, issue), (204, "")]);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    // ACC-338 blocks ACC-229.
+    assert!(provider.delete_link("Blocks", "ACC-338", "ACC-229").unwrap());
+
+    let read = rx.recv().unwrap();
+    assert_eq!(read.method, "GET");
+    assert!(read.path.starts_with("/rest/api/3/issue/ACC-338"), "{}", read.path);
+    assert!(read.path.contains("issuelinks"), "{}", read.path);
+    let delete = rx.recv().unwrap();
+    assert_eq!(delete.method, "DELETE");
+    assert_eq!(delete.path, "/rest/api/3/issueLink/54926");
+}
+
+/// Nothing to delete is an answer, not an error — and no second request
+/// goes out: the mock stops listening after the first.
+#[test]
+fn delete_link_is_false_when_the_outward_issue_has_no_such_link() {
+    let issue = r#"{"fields":{"issuelinks":[
+        {"id":"100","type":{"name":"Blocks","inward":"is blocked by","outward":"blocks"},"inwardIssue":{"key":"ACC-229"}}
+    ]}}"#;
+    let (base, rx) = one_shot(200, issue);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    assert!(!provider.delete_link("Blocks", "ACC-338", "ACC-229").unwrap());
+    assert_eq!(rx.recv().unwrap().method, "GET");
+    assert!(rx.recv().is_err());
 }
 
 #[test]

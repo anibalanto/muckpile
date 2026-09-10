@@ -67,6 +67,17 @@ fn link_from_own_side(entry: &serde_json::Value) -> Option<ItemLink> {
     Some(ItemLink { phrase: phrase.as_str()?.to_string(), other: other.get("key")?.as_str()?.to_string() })
 }
 
+/// The id of an entry of an issue's `issuelinks` when it is a `type_name`
+/// link on which that issue plays the outward phrase toward `other` — read
+/// from the issue's own side, as `link_from_own_side` does: the entry names
+/// `other` as its `outwardIssue`.
+fn outward_link_id(entry: &serde_json::Value, type_name: &str, other: &str) -> Option<String> {
+    if entry.get("type")?.get("name")?.as_str()? != type_name || entry.get("outwardIssue")?.get("key")?.as_str()? != other {
+        return None;
+    }
+    Some(entry.get("id")?.as_str()?.to_string())
+}
+
 /// One entry of the comments endpoint. `parentId` comes as a number, and
 /// only on a reply.
 fn comment_from(c: &serde_json::Value) -> Option<Comment> {
@@ -294,6 +305,14 @@ impl Provider for JiraRest {
         });
         self.call("POST", "/rest/api/3/issueLink", Some(body))?;
         Ok(())
+    }
+
+    fn delete_link(&self, type_name: &str, outward_key: &str, inward_key: &str) -> Result<bool> {
+        let v = self.call("GET", &format!("/rest/api/3/issue/{outward_key}?fields=issuelinks"), None)?;
+        let entries = v.get("fields").and_then(|f| f.get("issuelinks")).and_then(|l| l.as_array()).map(Vec::as_slice).unwrap_or_default();
+        let Some(id) = entries.iter().find_map(|entry| outward_link_id(entry, type_name, inward_key)) else { return Ok(false) };
+        self.call("DELETE", &format!("/rest/api/3/issueLink/{id}"), None)?;
+        Ok(true)
     }
 
     fn update_title(&self, key: &str, title: &str) -> Result<()> {

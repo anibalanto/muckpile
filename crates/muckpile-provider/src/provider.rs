@@ -124,6 +124,12 @@ pub trait Provider {
     /// `inward_key`, for `Blocks`).
     fn create_link(&self, type_name: &str, outward_key: &str, inward_key: &str) -> Result<()>;
 
+    /// Removes the link `create_link` with the same arguments makes — of
+    /// `type_name`, with `outward_key`'s issue playing the outward phrase
+    /// toward `inward_key`'s — and says whether there was one. The same
+    /// type the other way round is a different link, and stays.
+    fn delete_link(&self, type_name: &str, outward_key: &str, inward_key: &str) -> Result<bool>;
+
     /// Overwrites the item's title — the `summary` field — with exactly what
     /// was written locally, no conversion.
     fn update_title(&self, key: &str, title: &str) -> Result<()>;

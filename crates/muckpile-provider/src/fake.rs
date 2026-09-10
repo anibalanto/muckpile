@@ -296,6 +296,27 @@ impl Provider for FakeProvider {
         Ok(())
     }
 
+    /// Undoes `create_link`: the link leaves `links_created` and, when the
+    /// type was seeded, both items it joined. A link is here only when
+    /// `create_link` made it, in this same direction.
+    fn delete_link(&self, type_name: &str, outward_key: &str, inward_key: &str) -> Result<bool> {
+        let mut created = self.links_created.borrow_mut();
+        let Some(at) = created.iter().position(|(t, o, i)| t == type_name && o == outward_key && i == inward_key) else { return Ok(false) };
+        created.remove(at);
+        let Some(t) = self.link_types.borrow().iter().find(|t| t.name == type_name).cloned() else { return Ok(true) };
+        let mut items = self.items.borrow_mut();
+        let mut drop_one = |key: &str, phrase: &str, other: &str| {
+            if let Some(item) = items.get_mut(key) {
+                if let Some(at) = item.links.iter().position(|l| l.phrase == phrase && l.other == other) {
+                    item.links.remove(at);
+                }
+            }
+        };
+        drop_one(outward_key, &t.outward, inward_key);
+        drop_one(inward_key, &t.inward, outward_key);
+        Ok(true)
+    }
+
     fn update_title(&self, key: &str, title: &str) -> Result<()> {
         let mut items = self.items.borrow_mut();
         let Some(item) = items.get_mut(key) else { bail!("no such item: {key}") };
