@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture 2aea453b9f01cbfaf2ae1287f50c7a78
+    accepted:
+    - agree:
+      - anibal
+      link: capture 2aea453b9f01cbfaf2ae1287f50c7a78
+      hash: 4b09afb649609765896397523cd2e8970787a931febb938697b9e4035d705490
+    name: header-spec
+  1:
+    link: capture 5cc6359664634400a7020e93cc21c319
+    accepted:
+    - agree:
+      - anibal
+      link: capture 5cc6359664634400a7020e93cc21c319
+      hash: 48b3a218217eca7b30496f16d0d793ff76be37abd29f7561a743bbd0745b2f82
+      hash_ast: e12299f6203ec0c960da0a226734e19067a3845cc4653c0ba0c4e512ceb718b8
+      n: declined
+    name: relations
