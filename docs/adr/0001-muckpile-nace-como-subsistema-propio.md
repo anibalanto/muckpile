@@ -319,20 +319,34 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 ### 10. Editar el cuerpo local sólo si es seguro — canonicidad, no origen
 
-**En cada `pull` se mide, no se supone.** Convertir el cuerpo que bajó a markdown y de vuelta a ADF, con el mismo conversor, y compararlo byte a byte contra el original — si coincide, es canónico. No es un criterio nuevo: `worklist-core/src/body.rs` ya tiene una función, `canonical()`, que calcula exactamente esto, hoy con otro fin (distinguir un cambio real de una diferencia de formato en un push). `muckpile` la usa como puerta de edición, no sólo como comparación.
+**Un cuerpo es canónico si va de ADF a markdown y de vuelta a ADF, con el mismo conversor, y vuelve el mismo documento.** Se compara el JSON, no los bytes, y salvo por las equivalencias que declaran los dos filtros de abajo — cada uno sabe qué es canónico y qué no en su dirección de la conversión, y no hay otro lugar donde se decida. `worklist-core/src/body.rs` tiene una función, `canonical()`, que se parece a esto y no lo es: calcula markdown → ADF → markdown, el sentido inverso. Medido el 2026-09-10 contra 60 descripciones de `ACC`: con ese criterio, `ACC-325` —la única tabla editada en el editor rico de Jira, con `localId` y `layout`— pasa como canónica, y un `push` la aplanaría.
 
-**Canónico → se edita local y `push` lo sube sin objeción.** Es siempre el caso de un ítem que `muckpile` mismo creó, y sigue siéndolo mientras nadie le agregue, del lado de Jira, algo que markdown no representa.
+**`JiraAdfMarkdownFilter` va de Jira a markdown, y corre en cada `pull`: se mide, no se supone.** Antes de convertir, normaliza lo que es la misma cosa escrita de otro modo:
+
+- `attrs: {}` es lo mismo que no tener `attrs`. Jira lo guarda en cada celda de tabla y el conversor no lo emite: sin esta regla, todo ítem con una tabla —38 de las 60— sería de sólo lectura, incluidos los que `muckpile` mismo creó.
+- El espacio en el borde de un texto con marca va afuera de la marca. Una negrita cortada por un `code` deja ``**texto **``, que GFM no lee como negrita, y vuelve como asteriscos literales — 17 de las 60, todas creadas desde markdown con el mismo conversor.
+
+Con las dos, 59 de las 60 son canónicas. Lo que no es una equivalencia no se normaliza, porque es pérdida —celdas combinadas, colores, paneles, y mientras no se mida lo contrario, el `localId` que el editor rico de Jira le pone a cada bloque de `ACC-325`—: el cuerpo queda de sólo lectura, y `pull` lo dice en el momento en que lo baja, no cuando alguien ya lo editó.
+
+**Y `push` decide con el ADF que Jira tiene ahora, no con el que vio el `pull`.** Antes de escribir, `push` ya le pide el ítem al proveedor para la comparación de la decisión 5, y con el ítem viene su ADF actual: es ése el que pasa por `JiraAdfMarkdownFilter`, no una copia guardada del `pull`. No es sólo por no guardar estado. La comparación de la decisión 5 es sobre el markdown, y dos ADF distintos pueden dar el mismo markdown — que es justamente lo no canónico. Si después del `pull` alguien le pone color a una palabra en Jira, el markdown no cambia y la comparación pasa: un ADF guardado en el `pull` diría que el cuerpo es canónico y el color se perdería; el que se acaba de traer lo encuentra, y el cuerpo no se sube.
+
+**`RsMarkdownAdfFilter` va de markdown a ADF, alrededor del conversor de Rust, y corre antes de mandar un cuerpo — al crear un `@slug` y en `push`.** Lleva las reglas de lo que el esquema de Jira no acepta tal como se escribió: una negrita o cursiva sobre un `code` se corta alrededor del `code`, porque el esquema rechaza el documento entero por un solo nodo así, y gana `code` porque dice que es un identificador. La regla no se aplica en silencio sobre el ADF: el borrador se reescribe en el archivo a su forma canónica —``**el `reach`, y el que falla**`` pasa a ``**el** `reach`**, y el que falla**``—, y la reescritura queda como un commit propio, encima del borrador de quien escribió. Los commits van para adelante y ninguno se edita: quien escribió ve en git, en markdown, qué hubo que cambiar para llegar a la forma canónica, y lo que se manda es el resultado.
+
+**Canónico → se edita local y `push` lo sube sin objeción.** Es siempre el caso de un ítem que `muckpile` mismo creó —por construcción, porque todo lo que manda pasó antes por `RsMarkdownAdfFilter`—, y sigue siéndolo mientras nadie le agregue, del lado de Jira, algo que markdown no representa.
 
 **No canónico → el cuerpo local queda de sólo lectura.** Alguien escribió `code`+`strong` juntos, una tabla con celdas combinadas, cualquier cosa que sólo el editor rico de Jira produce. `push` no sube el cuerpo aunque el archivo tenga cambios — se niega, y dice por qué. Título y transición de estado no pasan por esto: viajan sin conversión, así que no tienen de qué ser "canónicos".
 
 **Y no se resuelve pidiéndole a una IA que aplique el cambio a ciegas** — eso cambia el problema por uno peor: nadie compara el resultado contra lo que se pidió. Lo que ofrece `muckpile` es un diff: convierte el borrador editado a ADF con el mismo conversor —aunque no lo vaya a subir—, lo compara contra el ADF real, y muestra la diferencia, incluida la que se perdería si se aplicara tal cual. Ese diff lo aplica una persona en Jira, o una IA operando ahí, con la pérdida ya visible antes de decidir — no escondida como hoy hace el round-trip de worklist.
 
-**Avance: 2/5.**
+**Avance: 2/8.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
-| Se mide en cada `pull` | `diverge` | Se calcula recién en `push`, sobre la base commiteada: quien edita no se entera hasta entonces de que el cuerpo era de sólo lectura |
-| El criterio: ADF → markdown → ADF, contra el ADF original | `diverge` | El código hace markdown → ADF → markdown, que es lo que calcula el `canonical()` de worklist — la función que esta decisión cita como "exactamente esto", sin serlo. Medido: una tabla con celdas combinadas, el ejemplo de esta misma decisión, pasa como canónica y su ADF no vuelve igual. Un `push` la aplanaría |
+| `JiraAdfMarkdownFilter` mide en cada `pull`, y lo dice | `diverge` | Se calcula recién en `push`, sobre la base commiteada: quien edita no se entera hasta entonces de que el cuerpo era de sólo lectura |
+| `push` decide con el ADF recién traído, no con el del `pull` | `diverge` | Decide con el markdown de la base commiteada: un cambio en Jira que el markdown no muestra pasa sin que nadie lo vea |
+| El criterio: ADF → markdown → ADF, contra el ADF original, como JSON y salvo las equivalencias | `diverge` | El código hace markdown → ADF → markdown, lo que calcula el `canonical()` de worklist. Medido: `ACC-325` pasa como canónica y su ADF no vuelve igual. Un `push` la aplanaría |
+| Las equivalencias de `JiraAdfMarkdownFilter`: `attrs: {}`, y el espacio al borde de una marca | `pendiente` | — |
+| `RsMarkdownAdfFilter` reescribe el borrador a su forma canónica, en un commit propio, y eso es lo que se manda | `diverge` | `prune_marks` corta la marca sobre el ADF, en silencio: el archivo no cambia, y el cuerpo que crea nace no canónico |
 | No canónico → `push` no sube el cuerpo y ofrece el diff | `cerrada` | `push_one` ↔ fila `push` |
 | El diff es contra el ADF real | `diverge` | Es el borrador contra su propio round-trip en markdown (`line_diff`), no contra lo que tiene el proveedor |
 | El título y la transición no pasan por esto | `cerrada` | `push_one` manda el título aparte del cuerpo ↔ fila `push` |
@@ -361,7 +375,7 @@ No es una decisión — es lo que hace falta saber antes de escribir la primera 
 
 **La conversión markdown↔ADF no es de worklist.** Vive en una librería aparte, `atlassian-markdown-converter` (crates.io, alias `amdc`), de la que worklist sólo depende. `muckpile` puede depender de la misma directamente — no hay nada que copiar para esta parte.
 
-**La poda de marks y el cálculo de canonicidad sí son de worklist, y son perfectamente reusables por lectura.** `worklist-core/src/body.rs`, 137 líneas, cero dependencia de `acli`/`jira-cli`/hooks: `prune_marks` (saca `strong`/`em` cuando conviven con `code`), `body_to_adf`/`adf_to_body`, y `canonical()` — la función que la decisión 10 necesita, ya escrita.
+**La poda de marks y el cálculo de canonicidad sí son de worklist, y son perfectamente reusables por lectura.** `worklist-core/src/body.rs`, 137 líneas, cero dependencia de `acli`/`jira-cli`/hooks: `prune_marks` (saca `strong`/`em` cuando conviven con `code`), `body_to_adf`/`adf_to_body`, y `canonical()` — que no es la que la decisión 10 necesita: calcula markdown → ADF → markdown, el sentido inverso.
 
 **El escape de título para JQL (`search_text`) y la tabla tipo↔tipo (`worklist_type`/`jira_type`), en `worklist-provider/src/board.rs`, también son funciones puras y chicas** — se leen y se portan tal cual, sin nada alrededor que arrastrar.
 
@@ -373,7 +387,7 @@ No es una decisión — es lo que hace falta saber antes de escribir la primera 
 
 **El renombre atómico y la reescritura de referencias están limpios y completos, en `worklist-core/src/lib.rs`**: `rewrite_references`, `rename_one`, `topo_order`, `resolve_batch` — sin CLI, sin hooks, sólo archivos y git. Es la pieza más directamente portable de todas para la decisión 4.
 
-**Para la decisión de duplicar y no compartir crate, esto la sostiene con matices, no de plano.** El conversor de cuerpo no hay que duplicarlo — se depende de la misma librería que ya usa worklist. `body.rs` y el renombre de `worklist-core` se leen y se reescriben casi calcando. Lo específico de Jira —crear, vincular, sprint, jerarquía— hay que escribirlo de cero contra REST, porque en worklist está entreverado con `acli`/`jira-cli` línea por línea, no separado en un módulo que alcance con extraer.
+**Para la decisión de duplicar y no compartir crate, esto la sostiene con matices, no de plano.** El conversor de cuerpo no hay que duplicarlo — se depende de la misma librería que ya usa worklist. El renombre de `worklist-core` se lee y se reescribe casi calcando; de `body.rs`, la poda y la conversión sí, `canonical()` no. Lo específico de Jira —crear, vincular, sprint, jerarquía— hay que escribirlo de cero contra REST, porque en worklist está entreverado con `acli`/`jira-cli` línea por línea, no separado en un módulo que alcance con extraer.
 
 ---
 
