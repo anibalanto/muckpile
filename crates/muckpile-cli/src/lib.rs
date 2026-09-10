@@ -6,7 +6,7 @@ use anyhow::{bail, Context, Result};
 use muckpile_core::body::adf_to_body;
 use muckpile_core::is_valid_id;
 use muckpile_core::project::{classify, require_root, Position, ProjectConfig};
-use muckpile_provider::provider::Provider;
+use muckpile_provider::provider::{Provider, Sprint};
 use std::path::{Path, PathBuf};
 
 /// Assembles a working view: `<root>/to-work/<id>/`, empty. Fetching the
@@ -87,4 +87,80 @@ fn muckpile_type_of(config: &ProjectConfig, jira_type: &str) -> Result<String> {
         .find(|(_, v)| v.as_str() == jira_type)
         .map(|(k, _)| k.clone())
         .with_context(|| format!("{jira_type}: sin tipo de item para él en muckpile.toml"))
+}
+
+/// What `sprint_fetch` did: the slugs it created, the slugs it removed
+/// (empty folders it had left, for a sprint no longer open), and how many
+/// sprints are open right now regardless of which of those were new.
+#[derive(Debug)]
+pub struct SprintFetch {
+    pub open: usize,
+    pub created: Vec<String>,
+    pub removed: Vec<String>,
+}
+
+/// One empty folder per open sprint, under `backlog/sprint/<slug>/` — never
+/// populated, only a place `pull` and the shell's tab-completion can find.
+/// Never deletes a folder with anything in it; only one it left empty whose
+/// sprint isn't open any more.
+pub fn sprint_fetch(root: &Path, provider: &dyn Provider, config: &ProjectConfig) -> Result<SprintFetch> {
+    let board_id = config.jira_board_id.with_context(|| "muckpile.toml no tiene jira_board_id".to_string())?;
+    let sprints = provider.open_sprints(board_id)?;
+    let slugs: Vec<String> = sprints.iter().map(|s| slugify(&legible_name(s))).collect();
+
+    let dir = root.join("backlog/sprint");
+    std::fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
+
+    let mut created = Vec::new();
+    for slug in &slugs {
+        let path = dir.join(slug);
+        if !path.exists() {
+            std::fs::create_dir(&path).with_context(|| format!("creating {}", path.display()))?;
+            created.push(slug.clone());
+        }
+    }
+
+    let mut removed = Vec::new();
+    for entry in std::fs::read_dir(&dir).with_context(|| format!("reading {}", dir.display()))? {
+        let entry = entry?;
+        if !entry.file_type()?.is_dir() {
+            continue;
+        }
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if slugs.contains(&name) {
+            continue;
+        }
+        if std::fs::read_dir(entry.path())?.next().is_none() {
+            std::fs::remove_dir(entry.path())?;
+            removed.push(name);
+        }
+    }
+
+    Ok(SprintFetch { open: sprints.len(), created, removed })
+}
+
+/// A sprint's own name, as the shell can name a folder with: spaces become
+/// `_`, nothing else changes — the number the project already puts in the
+/// name (`"22 Las vistas"`) travels as-is, not reinvented as an id.
+fn slugify(name: &str) -> String {
+    name.replace(' ', "_")
+}
+
+/// `sprint.name`, with a provider-side truncation made legible. Measured on
+/// the real ACC board: several open sprints have their `name` already cut
+/// to 29 characters with a trailing `…` on the provider's own record — the
+/// sprint number in front of it already tells two sprints apart, so what's
+/// missing isn't disambiguation, it's not ending a folder name in a glyph
+/// that carries nothing. The `…` is replaced by the sprint's creation date.
+fn legible_name(sprint: &Sprint) -> String {
+    match sprint.name.strip_suffix('…') {
+        Some(truncated) => format!("{truncated} {}", date_only(&sprint.created)),
+        None => sprint.name.clone(),
+    }
+}
+
+/// The date part of an ISO-8601 timestamp — Jira's `createdDate` is always
+/// ASCII up to that point, so byte slicing is safe.
+fn date_only(iso: &str) -> &str {
+    &iso[..10.min(iso.len())]
 }

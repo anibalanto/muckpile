@@ -11,7 +11,8 @@ fn main() -> Result<()> {
         [cmd, id] if cmd == "to-work" => run_to_work(id),
         [cmd] if cmd == "pull" => run_pull(None),
         [cmd, id] if cmd == "pull" => run_pull(Some(id)),
-        _ => bail!("uso: muckpile to-work <id> | muckpile pull [id]"),
+        [cmd, sub] if cmd == "sprint" && sub == "fetch" => run_sprint_fetch(),
+        _ => bail!("uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch"),
     }
 }
 
@@ -30,6 +31,23 @@ fn run_pull(id: Option<&str>) -> Result<()> {
     let path = muckpile_cli::pull(&root, &cwd, id, provider.as_ref(), &config)?;
     let rel = path.strip_prefix(&root).unwrap_or(&path);
     println!("{} traído", rel.display());
+    Ok(())
+}
+
+fn run_sprint_fetch() -> Result<()> {
+    let (root, _cwd) = standing_in_a_project()?;
+    let config = load_project_config(&root)?;
+    let provider = build_provider(&root, &config)?;
+    let result = muckpile_cli::sprint_fetch(&root, provider.as_ref(), &config)?;
+
+    let project = root.file_name().context("la raíz del proyecto no tiene nombre")?.to_string_lossy().into_owned();
+    println!("{project}: {} sprint(s) abierto(s)", result.open);
+    for slug in &result.created {
+        println!("  backlog/sprint/{slug}/       creada, vacía");
+    }
+    for slug in &result.removed {
+        println!("  backlog/sprint/{slug}/       borrada, ya no está abierto y no tenía nada adentro");
+    }
     Ok(())
 }
 
