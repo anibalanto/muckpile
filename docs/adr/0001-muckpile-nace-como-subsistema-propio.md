@@ -257,7 +257,25 @@ backlog/sprint/22_Las_vistas/  backlog/sprint/23_Las_questions/     ← no hay a
 - **`<id>_data/`, el directorio de datos del ítem**, sibling a su archivo, para cualquier tipo: `thread/` con un mensaje por archivo y el anidado en `in-reply-to`; `files/` con el borrador del artefacto que, al cerrarse la pregunta, se muda a la capa que lo gobierna. Es el mismo directorio que `ACC-334`/`ACC-335`/`ACC-336` especifican para worklist bajo el nombre `<id>/` desnudo — `muckpile` lo escribe como `<id>_data/` por la razón de la decisión 6: evitar la colisión con el nombre de la vista cuando coinciden.
 - La decisión 4 se aplica entera acá: el directorio viaja con el renombre — `@algo_data/` pasa a `ACC-231_data/` en el mismo commit que `@algo.question.md` pasa a `ACC-231.question.md`.
 
-**Avance: 5/7.**
+**`thread/` y `files/` bajan de Jira, con lo que Jira ya tiene.** Medido el 2026-09-10 en `SGE-7699`: una respuesta trae `parentId`, el id del comentario al que responde —pero sólo pidiendo los comentarios por `/issue/{key}/comment`; `/issue?fields=comment` no lo trae, y por eso los de `ACC-229` se midieron planos el 2026-09-08—, y un adjunto trae nombre, tipo, tamaño y una URL de descarga. Los dos comentarios pasan por el conversor sin un solo aviso `Lossy`: una mención, una imagen incrustada o una tarjeta de link vuelven enteras, como ADF crudo.
+
+```
+SGE-7699_data/
+  thread/
+    42180.md          ← sin in-reply-to: es una raíz
+    42224.md          ← in-reply-to: 42180
+  files/
+    captura.png       ← un adjunto, bajado
+```
+
+- **`thread/<id del comentario>.md`, un archivo por comentario.** El header lleva `author` —el nombre visible—, `author_id` —el id de la cuenta: el nombre no es único, y el email de otra cuenta Jira lo oculta; medido, sólo el de la propia se ve—, `created`, `in-reply-to` —el `parentId`, ausente en una raíz— y `ai` si lo tiene (abajo). El cuerpo es el comentario, por `JiraAdfMarkdownFilter`. El nombre es el id que pone Jira, no un uuid: el que asigna es Jira, y ya resuelve dos respuestas al mismo tiempo.
+- **`files/<nombre>`, un archivo por adjunto.** Si dos adjuntos se llaman igual, los dos llevan su id adelante: `44892-captura.png`. `files/` guarda también los borradores locales —el artefacto que la pregunta va a producir, que no está decidido mientras esté ahí—, así que `pull` sólo escribe lo que viene de Jira, y nunca borra un archivo que no escribió.
+
+**Se escriben con comandos, como el header (decisión 12).** `comment <id> <archivo>` manda un archivo markdown como comentario —por `RsMarkdownAdfFilter`, como cualquier cuerpo—, y `--reply-to <id del comentario>` lo cuelga de otro. `attach <id> <archivo>` sube un adjunto. Los dos, después de escribir, hacen lo que un `pull` del ítem en la vista. Editar a mano un archivo de `thread/` no se sube: es lo que alguien ya dijo.
+
+**`--ai <modelo>` dice que el comentario lo escribió una IA, y cuál.** `comment` lo pone como dato al principio del comentario —un primer párrafo `ai: <modelo>`, con el modelo como código—, y así lo ve cualquiera en Jira. `pull` lo reconoce y lo pasa al header del archivo, `ai: <modelo>`, fuera del cuerpo.
+
+**Avance: 5/11.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -265,9 +283,13 @@ backlog/sprint/22_Las_vistas/  backlog/sprint/23_Las_questions/     ← no hay a
 | `new question --blocks <id>` escribe `relation.blocks` | `cerrada` | `new` ↔ fila `new` |
 | `blocks` llega al proveedor | `cerrada` | `resolve_pending` ↔ esta decisión: al crear un borrador, crea cada relación que su header declara —`relation.blocks` incluida, con un `@slug` del mismo lote ya traducido a su id—; la que falla sale como `PushResult::RelationFailed`, con el `link` que la reintenta |
 | `relation.*` baja con `pull`: todos los links, en las dos puntas, con la clave de la decisión 12 | `cerrada` | `relations` ↔ decisión 12: una clave por frase, `_` por espacio, ids ordenados; `link_from_own_side` ↔ decisión 12: cada link leído desde el lado del ítem, con la forma medida en `ACC` |
-| `<id>_data/thread/` y `files/`, traídos por `pull` | `pendiente` | `show` lista `<id>_data/` si alguien lo puso a mano; nada lo crea ni lo trae |
+| `thread/` baja con `pull`: un archivo por comentario, `in-reply-to` desde el `parentId` | `pendiente` | `show` lista `<id>_data/` si alguien lo puso a mano; nada lo crea ni lo trae |
+| `files/` baja con `pull`: un archivo por adjunto, sin borrar lo que no escribió | `pendiente` | — |
+| `comment <id> <archivo>`, con `--reply-to` | `pendiente` | Que el POST de un comentario acepte `parentId` falta medirlo, con una escritura |
+| `attach <id> <archivo>` | `pendiente` | — |
+| `--ai <modelo>`: dato al principio del comentario, y `pull` lo pasa al header | `pendiente` | — |
 | `_data/` viaja con el renombre del `@slug` | `cerrada` | `rename_one` lo mueve en el mismo commit; bilink de la decisión 4 |
-| De dónde salen `thread/` y `files/` en el proveedor, y cómo se muda `files/` cuando la pregunta cierra | `falta spec` | Ni esta decisión ni la 6 dicen a qué corresponden en Jira (¿comentarios? ¿adjuntos?), y sin eso no hay qué implementar |
+| Cómo se muda `files/` cuando la pregunta cierra | `falta spec` | La pregunta que dejó `ACC-335`: quién mueve el borrador a la capa que lo gobierna, y qué pasa si la pregunta cierra y el borrador se queda |
 
 ### 8. Sin vocabulario propio de estados: el que baja es el estado del proveedor, literal
 
@@ -342,7 +364,7 @@ branch = "main"
 task = "Tarea"
 user-story = "Historia"
 epic = "Epic"
-question = "Tarea"                  # sin tipo propio en este board
+question = { type = "Tarea", label = "question" }   # sin tipo propio en este board: la etiqueta la distingue
 ```
 
 ```toml
@@ -354,6 +376,8 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **El token nunca está en ningún archivo.** Ni el compartido ni el personal lo guardan — el personal guarda sólo el nombre de la variable de entorno donde vive, la misma idea que `distribution.md` ya aplica en worklist: el email no es secreto y viaja como dato de instalación; el token sí, y sólo se lee del entorno en el momento.
 
+**Un tipo de Jira que usan dos tipos de `muckpile` se distingue por una etiqueta, declarada.** En el ejemplo, `task` y `question` son las dos `"Tarea"`: `question` declara `label = "question"`, `new question` crea la Tarea con esa etiqueta, y `pull` baja una Tarea con la etiqueta como `.question.md` y una sin ella como `.task.md`. De los tipos que comparten un tipo de Jira, uno solo puede ir sin etiqueta —es el que baja por defecto—; si la tabla deja una Tarea sin forma de saber qué es, `muckpile.toml` no se carga, y dice por qué. La etiqueta queda a la vista en Jira: quien mire el board ve que es una pregunta. Medido el 2026-09-10: `ACC` no tiene un tipo propio para una pregunta, y ninguno de sus últimos 100 ítems usa etiquetas.
+
 **Avance: 1/4.**
 
 | Dimensión | Estado | Evidencia |
@@ -361,7 +385,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 | `muckpile.toml` por proyecto, compartible | `sin bilink` | `ProjectConfig` y `load_project_config`, en `project.rs` |
 | `identity.toml` por máquina: el email y el nombre de la variable | `cerrada` | `load_identity` ↔ esta decisión |
 | El token sólo se lee del entorno, nunca de un archivo | `sin bilink` | `build_provider` |
-| La tabla `item_type` al revés: de tipo de Jira a tipo de `muckpile` | `falta spec` | La decisión la define en un solo sentido, y su propio ejemplo no es inyectivo (`task` y `question` → `"Tarea"`). El código se queda con el primero en orden alfabético. Medido: con ese ejemplo, `pull` de una Tarea común escribe `SGE-1.question.md` |
+| La tabla `item_type` al revés: de tipo de Jira a tipo de `muckpile`, con la etiqueta que distingue un tipo compartido | `diverge` | El código se queda con el primero en orden alfabético. Medido: con el ejemplo viejo, `pull` de una Tarea común escribe `SGE-1.question.md`. Ni `new` pone la etiqueta ni `pull` la lee |
 
 ### 10. Editar el cuerpo local sólo si es seguro — canonicidad, no origen
 
@@ -523,12 +547,14 @@ El choque de hoy, bajo este modelo, no es un `add/add` que exige `--force`: es u
 | `transition` | Reemplaza a `start`/`done`/`close`/`drop` — no hay vocabulario propio que darles (decisión 8). Lista las transiciones del ítem, busca la que lleva al estado pedido, la ejecuta. | `$ muckpile transition ACC-355 "Finalizada"` |
 | `link` | Declara una relación entre dos ítems, en el momento — sin vocabulario propio (decisión 8): la frase es una de las dos que el proveedor ya usa para ese tipo, de ida (`outward`) o de vuelta (`inward`), con espacios o con `_` como la muestra el header. | `$ muckpile link ACC-338 blocks ACC-229`<br>`$ muckpile link ACC-229 "is blocked by" ACC-338` |
 | `unlink` | Quita una relación, en el momento: la misma frase y las mismas dos formas que `link` (decisión 12). | `$ muckpile unlink ACC-338 blocks ACC-229` |
+| `comment` | Manda un archivo markdown como comentario, en el momento: `--reply-to <id del comentario>` lo cuelga de otro, y `--ai <modelo>` pone el modelo como dato al principio (decisión 7). | `$ muckpile comment SGE-7699 respuesta.md --reply-to 42180 --ai claude-opus-5` |
+| `attach` | Sube un adjunto, en el momento (decisión 7). | `$ muckpile attach SGE-7699 captura.png` |
 | `title` | Cambia el título de un ítem, en el momento. Es la única forma: editar `title:` en el header no se sube (decisión 12). | `$ muckpile title ACC-355 "Vistas de trabajo, con su ítem y su _data/"` |
 | `parent` | Cambia el padre de un ítem, en el momento (decisión 12). | `$ muckpile parent ACC-355 ACC-339` |
 
-**Avance de la tabla: trece de las dieciséis filas tienen bilink aceptado** (`show` tiene dos, uno por camino); `init`, `unlink` y `parent` todavía no tienen código. Que la fila esté atada no quiere decir que el comando esté completo: `pull` y `push` son parciales —lo que les falta está en las decisiones 5, 6, 7, 8 y 10—, y `to-work` diverge de su propia fila (decisión 6).
+**Avance de la tabla: trece de las dieciocho filas tienen bilink aceptado** (`show` tiene dos, uno por camino); `init`, `unlink`, `parent`, `comment` y `attach` todavía no tienen código. Que la fila esté atada no quiere decir que el comando esté completo: `pull` y `push` son parciales —lo que les falta está en las decisiones 5, 6, 7, 8 y 10—, y `to-work` diverge de su propia fila (decisión 6).
 
-Dieciséis comandos contra los veintitrés de hoy (once de `worklist`, doce de `worklist-server`). Lo que no está en la tabla — `install-hooks`, `check-push`, `assign-keys`, `bootstrap`, `reconcile`, `removes`, `push-states`, `create-or-find`, `provider set-status`, `window-open`, `propagate`, `adopt` — no falta: era la maquinaria de la asimetría que la decisión 1 saca. `bootstrap`/`reconcile`/`adopt` sí tienen equivalente, pero no como comando aparte: son `pull` con una consulta que trae de a muchos — `muckpile pull backlog --query "project = ACC AND sprint is empty"`.
+Dieciocho comandos contra los veintitrés de hoy (once de `worklist`, doce de `worklist-server`). Lo que no está en la tabla — `install-hooks`, `check-push`, `assign-keys`, `bootstrap`, `reconcile`, `removes`, `push-states`, `create-or-find`, `provider set-status`, `window-open`, `propagate`, `adopt` — no falta: era la maquinaria de la asimetría que la decisión 1 saca. `bootstrap`/`reconcile`/`adopt` sí tienen equivalente, pero no como comando aparte: son `pull` con una consulta que trae de a muchos — `muckpile pull backlog --query "project = ACC AND sprint is empty"`.
 
 ---
 
