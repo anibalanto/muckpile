@@ -1,7 +1,7 @@
 //! Reading back what `pull` writes — `<id>.<type>.md`, frontmatter only,
 //! for `list` to filter without asking the provider again.
 
-use muckpile_core::item::{list_summaries, read_summary, ItemSummary};
+use muckpile_core::item::{list_summaries, read_full, read_summary, FullItem, ItemSummary};
 use std::path::Path;
 
 fn write(dir: &Path, name: &str, text: &str) {
@@ -68,4 +68,45 @@ fn list_summaries_skips_a_slug_that_has_not_synced_yet() {
 
     let ids: Vec<&str> = summaries.iter().map(|s| s.id.as_str()).collect();
     assert_eq!(ids, vec!["ACC-355"]);
+}
+
+#[test]
+fn read_full_carries_the_body_and_a_present_status() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "ACC-355.task.md", "---\ntitle: x\nstatus: En curso\nparent: ACC-100\n---\nun parrafo\n\notro parrafo\n");
+
+    let full = read_full(&dir.path().join("ACC-355.task.md")).unwrap();
+
+    assert_eq!(
+        full,
+        FullItem {
+            id: "ACC-355".into(),
+            item_type: "task".into(),
+            title: "x".into(),
+            status: Some("En curso".into()),
+            parent: Some("ACC-100".into()),
+            body: "un parrafo\n\notro parrafo".into(),
+        }
+    );
+}
+
+/// A draft `new` wrote has no status yet — `show --local` still has
+/// something to show.
+#[test]
+fn read_full_tolerates_a_draft_with_no_status() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "@un-borrador.task.md", "---\ntitle: un borrador\n---\n");
+
+    let full = read_full(&dir.path().join("@un-borrador.task.md")).unwrap();
+
+    assert_eq!(full.status, None);
+    assert_eq!(full.title, "un borrador");
+}
+
+#[test]
+fn read_full_still_requires_a_title() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "ACC-355.task.md", "---\nstatus: Abierta\n---\ncuerpo\n");
+
+    assert!(read_full(&dir.path().join("ACC-355.task.md")).is_err());
 }

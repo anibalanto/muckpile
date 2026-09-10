@@ -4,10 +4,10 @@
 
 use anyhow::{bail, Context, Result};
 use muckpile_core::body::adf_to_body;
-use muckpile_core::item::{list_summaries, ItemSummary};
-use muckpile_core::{is_valid_id, slugify_title, MARKER, TYPES};
+use muckpile_core::item::{list_summaries, read_full, ItemSummary};
 use muckpile_core::project::{classify, require_root, Position, ProjectConfig};
 use muckpile_core::states::write_states_cache;
+use muckpile_core::{find_file, is_valid_id, slugify_title, MARKER, TYPES};
 use muckpile_provider::link::{link as provider_link, Outcome as LinkOutcome};
 use muckpile_provider::provider::{Provider, Sprint};
 use muckpile_provider::transition::{transition as provider_transition, Outcome};
@@ -299,4 +299,54 @@ pub fn status(view: &Path, provider: &dyn Provider) -> Result<Vec<ItemStatus>> {
             })
         })
         .collect()
+}
+
+/// What `show` prints — frontmatter plus body, live or local, and the
+/// `<id>_data/` listing (decision 7) alongside either, since that directory
+/// is local filesystem state regardless of where the rest came from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Show {
+    pub title: String,
+    pub status: Option<String>,
+    pub parent: Option<String>,
+    pub body: String,
+    pub data_files: Vec<String>,
+}
+
+/// `show`'s live path: the provider's current fields, body converted from
+/// ADF the same way `pull` does.
+pub fn show_live(dir: &Path, id: &str, provider: &dyn Provider) -> Result<Show> {
+    if !is_valid_id(id) {
+        bail!("{id}: no es un id válido");
+    }
+    let item = provider.item(id)?;
+    let body = match &item.body_adf {
+        Some(adf) => adf_to_body(adf)?,
+        None => String::new(),
+    };
+    Ok(Show { title: item.title, status: Some(item.status), parent: item.parent, body, data_files: data_files(dir, id)? })
+}
+
+/// `show --local`: whatever's already on disk — a pulled item, or a draft
+/// `new` wrote that hasn't synced — without asking the provider.
+pub fn show_local(dir: &Path, id: &str) -> Result<Show> {
+    let (path, _item_type) = find_file(dir, id)?;
+    let full = read_full(&path)?;
+    Ok(Show { title: full.title, status: full.status, parent: full.parent, body: full.body, data_files: data_files(dir, id)? })
+}
+
+/// The names under `<dir>/<id>_data/`, or empty when there's no such
+/// directory — nothing writes into it yet (decision 7's `thread`/`files`
+/// aren't implemented), so this only ever reports what a person put there.
+fn data_files(dir: &Path, id: &str) -> Result<Vec<String>> {
+    let data_dir = dir.join(format!("{id}_data"));
+    if !data_dir.is_dir() {
+        return Ok(Vec::new());
+    }
+    let mut names: Vec<String> = std::fs::read_dir(&data_dir)
+        .with_context(|| format!("reading {}", data_dir.display()))?
+        .map(|e| Ok(e?.file_name().to_string_lossy().into_owned()))
+        .collect::<Result<_>>()?;
+    names.sort();
+    Ok(names)
 }

@@ -23,8 +23,10 @@ fn main() -> Result<()> {
         [cmd, view] if cmd == "status" => run_status(view),
         [cmd, a, phrase, b] if cmd == "link" => run_link(a, phrase, b),
         [cmd, item_type, title, rest @ ..] if cmd == "new" => run_new(item_type, title, rest),
+        [cmd, id] if cmd == "show" => run_show(id, false),
+        [cmd, id, flag] if cmd == "show" && flag == "--local" => run_show(id, true),
         _ => bail!(
-            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile link <a> <frase> <b> | muckpile new <tipo> <título> [--blocks <id>]"
+            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile link <a> <frase> <b> | muckpile new <tipo> <título> [--blocks <id>] | muckpile show <id> [--local]"
         ),
     }
 }
@@ -194,6 +196,32 @@ fn run_new(item_type: &str, title: &str, flags: &[String]) -> Result<()> {
     let path = muckpile_cli::new(&cwd, item_type, title, blocks)?;
     let name = path.file_name().context("el path creado no tiene nombre")?.to_string_lossy();
     println!("{name} creado");
+    Ok(())
+}
+
+fn run_show(id: &str, local: bool) -> Result<()> {
+    let show = if local {
+        let cwd = std::env::current_dir()?;
+        muckpile_cli::show_local(&cwd, id)?
+    } else {
+        let (root, cwd) = standing_in_a_project()?;
+        let config = load_project_config(&root)?;
+        let provider = build_provider(&root, &config)?;
+        muckpile_cli::show_live(&cwd, id, provider.as_ref())?
+    };
+
+    println!("title: {}", show.title);
+    if let Some(status) = &show.status {
+        println!("status: {status}");
+    }
+    if let Some(parent) = &show.parent {
+        println!("parent: {parent}");
+    }
+    if !show.data_files.is_empty() {
+        println!("{id}_data/: {}", show.data_files.join(", "));
+    }
+    println!();
+    println!("{}", show.body);
     Ok(())
 }
 
