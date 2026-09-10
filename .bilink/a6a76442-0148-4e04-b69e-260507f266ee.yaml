@@ -9,12 +9,12 @@ endpoint:
       hash: 62185ffbf691d4db4f8c8717156e9db6cb66f5d20ce4021ac120212e0636d89b
     name: ledger-spec
   1:
-    link: capture eccabdbfcf7a99c9e15cf0c63e88299c
+    link: capture cce10a819a7026de43e01d5e25e46ab3
     accepted:
     - agree:
       - anibal
-      link: capture eccabdbfcf7a99c9e15cf0c63e88299c
-      hash: 5696b34863df9538e87b852aa28dbd6b017d36a61549b6c738f6f34709899f87
-      hash_ast: 847a0936c1758ffe3552b6693ca7554888a67b0f825ecf9555e53de8dcfe250a
+      link: capture cce10a819a7026de43e01d5e25e46ab3
+      hash: 3dfca15c55f9aafabcf39066ca33b3091450beb41b2b299760a7608aeb672a53
+      hash_ast: a5cf0e6dfab0cfdf77ba6996c1cde635fbe61ce6249a13a222b1fd2c7fc473d1
       n: declined
-    name: open-view
+    name: ledger-record

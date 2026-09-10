@@ -9,12 +9,12 @@ endpoint:
       hash: 86fc84ad9dd5cb65d4f206269a154e25fdd5c233fe95f64c4d1693b18b0b02cc
     name: canonicity-spec
   1:
-    link: capture 31535b5f714d57ffb8fdbab35db097b9
+    link: capture 22dcdda7b37c27ab0ef1eceff9496535
     accepted:
     - agree:
       - anibal
-      link: capture 31535b5f714d57ffb8fdbab35db097b9
-      hash: 773f93cb507911b92ec9724f2cee251dc1e4f9c496c092851d030b6f9bceb811
-      hash_ast: 96f9738415b2f66dad0b45a224a900f5b3c093f8ee1e78ba36a78434572ba16a
+      link: capture 22dcdda7b37c27ab0ef1eceff9496535
+      hash: 9ff4fe09e2711bf4f116443c50a182469ba8aeb9a8d91b1b48d7ffba3aee5b54
+      hash_ast: 7b321984acb4042149a6e482a8c691faefbeba686d335d4dc90b3a530406b9cc
       n: declined
-    name: push_one
+    name: settle-canonical

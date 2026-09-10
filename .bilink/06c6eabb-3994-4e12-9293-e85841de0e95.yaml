@@ -6,15 +6,15 @@ endpoint:
     - agree:
       - anibal
       link: capture 0e9ac65784eabd4db2586d947d9293bb
-      hash: 7b10bddeb102eeb8806209c87e2e6a911273dd8ae9a94c85d898c392ea4a0205
+      hash: 6869b7b3963a16eb9f19705d59d522ca0c1aefe385f3410c88b94ea45be35e82
     name: question-spec
   1:
-    link: capture 322238c807195be931492b07675676e1
+    link: capture d77ca9c73f5bda0bcbffbb13205a07c6
     accepted:
     - agree:
       - anibal
-      link: capture 322238c807195be931492b07675676e1
-      hash: 205aff593c4d24b93b3376245c6d761c3f7a7ad149a84f9419dabb1d3e9c68b3
-      hash_ast: d0034dbf02ec5e02848e6aa6ba13d804f513e2c561fcb1e653ee19f7e114034d
+      link: capture d77ca9c73f5bda0bcbffbb13205a07c6
+      hash: be17fe0cbd5b928b83df229827e06e654f4b31e7ee28c57f176cef24877a9c80
+      hash_ast: 83827dbcacb97943faa75c7c2f4308fe19a6eb6af8af3225109e0ab5f141d3d0
       n: declined
     name: write-files

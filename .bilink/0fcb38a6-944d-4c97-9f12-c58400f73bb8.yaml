@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 0e9ac65784eabd4db2586d947d9293bb
-      hash: 7b10bddeb102eeb8806209c87e2e6a911273dd8ae9a94c85d898c392ea4a0205
+      hash: 6869b7b3963a16eb9f19705d59d522ca0c1aefe385f3410c88b94ea45be35e82
     name: question-spec
   1:
     link: capture b01de01c0bda8b49a571fbb9a2411747
@@ -14,7 +14,7 @@ endpoint:
     - agree:
       - anibal
       link: capture b01de01c0bda8b49a571fbb9a2411747
-      hash: d34907a48d3d69834f90703b4b471547eb399cd11cf34dd840c878dc3ab89246
-      hash_ast: fb9d1c6f19cb9eebc60f5ed837eba6111f26fb2e3c6a22bcce6c7b261534ffd9
+      hash: 72869391056bfffa14235c1a00dd8c2cb69e1f88a822a75c32755bc760286e5e
+      hash_ast: 803182e06ae7e36d7b063f7e7ae7e303bd494766169e35bcbb9ad846e69ac8a4
       n: declined
     name: resolve_pending

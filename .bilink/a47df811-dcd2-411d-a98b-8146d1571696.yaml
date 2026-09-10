@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 6248115ab3c7bff8bec2420bba676a03
-      hash: 1edc85878c6f48e5c99817eb4c00958fbafce439fb366d22e2f6ff23ff3e94b1
+      hash: b94fa586c50fcbf89aee9c00b102531bd85748c73031d32a8f131bd0eb5a9f8c
     name: slug-resolution
   1:
     link: capture a130e7e866b7e4ef41e8d2ae17b173f4

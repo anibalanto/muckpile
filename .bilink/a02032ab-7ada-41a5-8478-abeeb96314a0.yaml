@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture e86ee0f210f359b43560be57566fb77e
-      hash: 680ceed4f8d58c782972a560a0f61b47ebb1d3b1b6ecff05424b7267d24a7f73
+      hash: 86fc84ad9dd5cb65d4f206269a154e25fdd5c233fe95f64c4d1693b18b0b02cc
     name: canonicity-spec
   1:
     link: capture 73fab8cba40f730226c9f01314621671

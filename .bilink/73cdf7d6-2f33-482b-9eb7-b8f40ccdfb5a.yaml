@@ -6,15 +6,15 @@ endpoint:
     - agree:
       - anibal
       link: capture 2aea453b9f01cbfaf2ae1287f50c7a78
-      hash: d51d08280fffb9365796a37c102bf3af48ee594b1d7b94d16a88d50165d51b7d
+      hash: e518c9d2b6cfbef96789f5c5f275e0ec3c863a58eb40239e59c42fca5e3b243a
     name: header-spec
   1:
-    link: capture 8febcd66d773e2d48b1c2d4abb55d182
+    link: capture 98bf20691a91baa7b0e7dc6881c65e16
     accepted:
     - agree:
       - anibal
-      link: capture 8febcd66d773e2d48b1c2d4abb55d182
-      hash: 42b14ac91284638c138c0e802e7ce5a799555afc826fad3c2d160b4466232085
-      hash_ast: 3dfdd4d66063c7c7cd718b8c2a55b35f5f0164abf3811958086ad825c8de9634
+      link: capture 98bf20691a91baa7b0e7dc6881c65e16
+      hash: 0db524f8773ec87ea7220345cbe94b08dc84916bd8bbe8fcfa30a2ba9e048d80
+      hash_ast: 1796e002c9e9a20d0008ef8679137739a2910d9f1b1325e2e63709f01dda97db
       n: declined
     name: retype
