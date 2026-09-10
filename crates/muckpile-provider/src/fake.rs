@@ -13,6 +13,7 @@ pub struct FakeProvider {
     sprints: RefCell<Vec<Sprint>>,
     statuses: RefCell<Vec<Status>>,
     link_types: RefCell<Vec<LinkType>>,
+    sprint_items: RefCell<HashMap<u64, Vec<String>>>,
     links_created: RefCell<Vec<(String, String, String)>>,
     next_keys: RefCell<VecDeque<(String, String)>>,
     next_id: RefCell<u64>,
@@ -40,6 +41,7 @@ impl FakeProvider {
             sprints: RefCell::new(Vec::new()),
             statuses: RefCell::new(Vec::new()),
             link_types: RefCell::new(Vec::new()),
+            sprint_items: RefCell::new(HashMap::new()),
             links_created: RefCell::new(Vec::new()),
             next_keys: RefCell::new(VecDeque::new()),
             next_id: RefCell::new(1),
@@ -77,10 +79,18 @@ impl FakeProvider {
     }
 
     /// Seeds the board's open sprints as `(name, created)` pairs, ignoring
-    /// which board id asks.
+    /// which board id asks. Their ids are their positions, from 1.
     pub fn seed_sprints(&self, sprints: &[(&str, &str)]) {
-        *self.sprints.borrow_mut() =
-            sprints.iter().map(|(name, created)| Sprint { name: name.to_string(), created: created.to_string() }).collect();
+        *self.sprints.borrow_mut() = sprints
+            .iter()
+            .enumerate()
+            .map(|(i, (name, created))| Sprint { id: i as u64 + 1, name: name.to_string(), created: created.to_string() })
+            .collect();
+    }
+
+    /// Seeds the keys a sprint holds.
+    pub fn seed_sprint_items(&self, sprint_id: u64, keys: &[&str]) {
+        self.sprint_items.borrow_mut().insert(sprint_id, keys.iter().map(|k| k.to_string()).collect());
     }
 
     /// Seeds an item at `status`, with `transitions` reachable from it.
@@ -266,6 +276,10 @@ impl Provider for FakeProvider {
             .find(|(a, _)| a.id == attachment_id)
             .map(|(_, bytes)| bytes.clone())
             .with_context(|| format!("no such attachment: {attachment_id}"))
+    }
+
+    fn sprint_items(&self, sprint_id: u64) -> Result<Vec<String>> {
+        Ok(self.sprint_items.borrow().get(&sprint_id).cloned().unwrap_or_default())
     }
 
     fn open_sprints(&self, _board_id: u64) -> Result<Vec<Sprint>> {

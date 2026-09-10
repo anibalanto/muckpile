@@ -16,7 +16,7 @@ fn main() -> Result<()> {
     match args.as_slice() {
         [cmd, id] if cmd == "to-work" => run_to_work(id),
         [cmd] if cmd == "pull" => run_pull(None),
-        [cmd, id] if cmd == "pull" => run_pull(Some(id)),
+        [cmd, target] if cmd == "pull" => run_pull(Some(target)),
         [cmd, sub] if cmd == "sprint" && sub == "fetch" => run_sprint_fetch(),
         [cmd, id, status] if cmd == "transition" => run_transition(id, status),
         [cmd, sub] if cmd == "states" && sub == "discover" => run_states_discover(),
@@ -35,7 +35,7 @@ fn main() -> Result<()> {
         [cmd, id, flag] if cmd == "show" && flag == "--local" => run_show(id, true),
         [cmd, sub, repo, rest @ ..] if cmd == "code-work" && sub == "add" => run_code_work_add(repo, rest),
         _ => bail!(
-            "uso: muckpile init <proyecto> | muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile push <vista> | muckpile link <a> <frase> <b> | muckpile unlink <a> <frase> <b> | muckpile title <id> <título> | muckpile parent <id> <padre> | muckpile comment <id> <archivo> [--reply-to <id>] (--ai <modelo> | --i-human) | muckpile attach <id> <archivo> | muckpile new <tipo> <título> [--parent <id>] [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
+            "uso: muckpile init <proyecto> | muckpile to-work <id> | muckpile pull [id | backlog/sprint/<sprint>] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile push <vista> | muckpile link <a> <frase> <b> | muckpile unlink <a> <frase> <b> | muckpile title <id> <título> | muckpile parent <id> <padre> | muckpile comment <id> <archivo> [--reply-to <id>] (--ai <modelo> | --i-human) | muckpile attach <id> <archivo> | muckpile new <tipo> <título> [--parent <id>] [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
         ),
     }
 }
@@ -48,18 +48,39 @@ fn run_to_work(id: &str) -> Result<()> {
     Ok(())
 }
 
-fn run_pull(id: Option<&str>) -> Result<()> {
+fn run_pull(target: Option<&str>) -> Result<()> {
     let (root, cwd) = standing_in_a_project()?;
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
-    let pulled = muckpile_cli::pull(&root, &cwd, id, provider.as_ref(), &config)?;
-    let rel = pulled.path.strip_prefix(&root).unwrap_or(&pulled.path);
+    if let Some(view) = muckpile_cli::sprint_view_of(&root, &cwd, target) {
+        let pulled = muckpile_cli::pull_sprint(&root, &view, provider.as_ref(), &config)?;
+        let name = view.strip_prefix(&root).unwrap_or(&view).display().to_string();
+        println!("{name}/: {} ítem(s) traído(s)", pulled.items.len());
+        for item in &pulled.items {
+            print_pulled(&root, item);
+        }
+        for id in &pulled.gone {
+            println!("  {id}: salió del sprint — sacado de la vista");
+        }
+        return Ok(());
+    }
+    let pulled = muckpile_cli::pull(&root, &cwd, target, provider.as_ref(), &config)?;
+    print_pulled(&root, &pulled);
+    Ok(())
+}
+
+/// One item `pull` brought: where it landed, whether its body is read-only,
+/// and which other views on this machine already hold it.
+fn print_pulled(root: &Path, pulled: &muckpile_cli::Pulled) {
+    let rel = pulled.path.strip_prefix(root).unwrap_or(&pulled.path);
     if pulled.losses.is_empty() {
         println!("{} traído", rel.display());
     } else {
         println!("{} traído — el cuerpo es de sólo lectura: {}", rel.display(), describe_losses(&pulled.losses));
     }
-    Ok(())
+    if !pulled.also_in.is_empty() {
+        println!("  también en {}", pulled.also_in.join(", "));
+    }
 }
 
 /// One header edit `push` won't send, and the command that makes it — as help:

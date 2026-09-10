@@ -249,11 +249,32 @@ impl Provider for JiraRest {
             .iter()
             .filter_map(|s| {
                 Some(Sprint {
+                    id: s.get("id")?.as_u64()?,
                     name: s.get("name")?.as_str()?.to_string(),
                     created: s.get("createdDate")?.as_str()?.to_string(),
                 })
             })
             .collect())
+    }
+
+    /// `sprint = <id>`, a page at a time — measured on ACC's board: the
+    /// sprint's items come back in one search.
+    fn sprint_items(&self, sprint_id: u64) -> Result<Vec<String>> {
+        let mut keys = Vec::new();
+        let mut token: Option<String> = None;
+        loop {
+            let mut path = format!("/rest/api/3/search/jql?jql={}&fields=summary&maxResults=100", url_encode(&format!("sprint = {sprint_id}")));
+            if let Some(token) = &token {
+                path.push_str(&format!("&nextPageToken={}", url_encode(token)));
+            }
+            let v = self.call("GET", &path, None)?;
+            let issues = v.get("issues").and_then(|i| i.as_array()).ok_or_else(|| anyhow!("no `issues` in the search response"))?;
+            keys.extend(issues.iter().filter_map(|i| i.get("key")?.as_str().map(str::to_string)));
+            token = v.get("nextPageToken").and_then(|t| t.as_str()).map(str::to_string);
+            if token.is_none() || v.get("isLast").and_then(|l| l.as_bool()).unwrap_or(true) {
+                return Ok(keys);
+            }
+        }
     }
 
     fn project_statuses(&self, project_key: &str) -> Result<Vec<Status>> {

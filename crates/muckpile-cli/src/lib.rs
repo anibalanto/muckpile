@@ -116,6 +116,9 @@ pub fn new(dir: &Path, item_type: &str, title: &str, parent: Option<&str>, block
 pub struct Pulled {
     pub path: PathBuf,
     pub losses: Vec<Loss>,
+    /// The other views of the project, on this machine, that already hold
+    /// the item — asked of the disk right here, never of a shared record.
+    pub also_in: Vec<String>,
 }
 
 /// Fetches one item and writes it as `<id>.<type>.md` into the `to-work/`
@@ -135,9 +138,99 @@ pub fn pull(root: &Path, cwd: &Path, id: Option<&str>, provider: &dyn Provider, 
         None => own_id,
     };
     ready_to_sync(cwd)?;
-    let pulled = record_item(cwd, &id, provider, config, &format!("pull {id}"))?;
+    let mut pulled = record_item(cwd, &id, provider, config, &format!("pull {id}"))?;
     rebase_or_explain(cwd)?;
+    pulled.also_in = other_views_holding(root, cwd, &id)?;
     Ok(pulled)
+}
+
+/// What `pull` of a sprint's view brought: every item the sprint holds, and
+/// the ids of the ones that went — taken out of the sprint on the provider.
+#[derive(Debug)]
+pub struct SprintPull {
+    pub items: Vec<Pulled>,
+    pub gone: Vec<String>,
+}
+
+/// Brings a sprint's view — `backlog/sprint/<slug>/` — to exactly what the
+/// provider says the sprint holds, in one record on its provider ref: every
+/// item in the sprint comes, and one taken out of it goes. The sprint is
+/// the open one whose folder is `<slug>`, as `sprint fetch` names it.
+pub fn pull_sprint(root: &Path, view: &Path, provider: &dyn Provider, config: &ProjectConfig) -> Result<SprintPull> {
+    if classify(root, view) != Position::SprintView {
+        bail!("{}: no es la vista de un sprint", view.display());
+    }
+    let slug = view.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let board_id = config.jira_board_id.with_context(|| "muckpile.toml no tiene jira_board_id".to_string())?;
+    let sprint = provider
+        .open_sprints(board_id)?
+        .into_iter()
+        .find(|s| slugify(&legible_name(s)) == slug)
+        .with_context(|| format!("{slug}: no es un sprint abierto del board — sprint fetch lista los que hay"))?;
+    ready_to_sync(view)?;
+
+    let keys = provider.sprint_items(sprint.id)?;
+    let recorded = ledger::provider_paths(view)?;
+    let mut changes = Vec::new();
+    let mut items = Vec::new();
+    for key in &keys {
+        let (item_changes, pulled) = item_changes(view, key, provider, config, &recorded)?;
+        changes.extend(item_changes);
+        items.push(pulled);
+    }
+    // What the sprint no longer holds goes, with everything recorded for it.
+    let mut gone = Vec::new();
+    for path in &recorded {
+        let Some((id, _)) = path.strip_suffix(".md").and_then(|stem| stem.split_once('.')) else { continue };
+        if path.contains('/') || keys.iter().any(|k| k == id) {
+            continue;
+        }
+        gone.push(id.to_string());
+        let owned = |p: &String| p == path || *p == format!(".provider/{id}.adf.json") || p.starts_with(&format!("{id}_data/"));
+        changes.extend(recorded.iter().filter(|p| owned(p)).map(|p| (p.clone(), None)));
+    }
+
+    let name = view.strip_prefix(root).unwrap_or(view).to_string_lossy().into_owned();
+    ledger::record(view, &changes, &format!("pull {name}"))?;
+    rebase_or_explain(view)?;
+    for pulled in &mut items {
+        let id = pulled.path.file_name().and_then(|n| n.to_str()).and_then(|n| n.split('.').next()).unwrap_or_default().to_string();
+        pulled.also_in = other_views_holding(root, view, &id)?;
+    }
+    Ok(SprintPull { items, gone })
+}
+
+/// The sprint view `pull` means: the one named, from the project's root —
+/// `backlog/sprint/<slug>` — or, with nothing named, the one `cwd` stands
+/// in. `None` otherwise: an id, or a work view, is `pull`'s own business.
+pub fn sprint_view_of(root: &Path, cwd: &Path, target: Option<&str>) -> Option<PathBuf> {
+    let view = match target {
+        Some(target) => cwd.join(target),
+        None => cwd.to_path_buf(),
+    };
+    let rel = view.strip_prefix(root).ok()?;
+    let parts: Vec<_> = rel.components().collect();
+    (parts.len() == 3 && classify(root, &view) == Position::SprintView && view.is_dir()).then_some(view)
+}
+
+/// The views of the project, other than `view`, whose folder already holds
+/// `<id>.<type>.md` — on this machine, right now.
+fn other_views_holding(root: &Path, view: &Path, id: &str) -> Result<Vec<String>> {
+    let mut out = Vec::new();
+    for container in ["to-work", "backlog/sprint"] {
+        let Ok(entries) = std::fs::read_dir(root.join(container)) else { continue };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path == view || !path.is_dir() {
+                continue;
+            }
+            if find_file(&path, id).is_ok() {
+                out.push(format!("{container}/{}", entry.file_name().to_string_lossy()));
+            }
+        }
+    }
+    out.sort();
+    Ok(out)
 }
 
 /// Refuses a view in the middle of a rebase, or with uncommitted edits to
@@ -172,6 +265,19 @@ fn rebase_or_explain(view: &Path) -> Result<()> {
 /// and a `push` that just wrote all leave, so a view's history is always
 /// what the provider said.
 fn record_item(view: &Path, id: &str, provider: &dyn Provider, config: &ProjectConfig, message: &str) -> Result<Pulled> {
+    let recorded = ledger::provider_paths(view)?;
+    let (changes, pulled) = item_changes(view, id, provider, config, &recorded)?;
+    ledger::record(view, &changes, message)?;
+    Ok(pulled)
+}
+
+/// One path of a view's provider ref, set to its bytes or — `None` — gone.
+type Change = (String, Option<Vec<u8>>);
+
+/// What recording `id` would change on `view`'s provider ref — every path
+/// set or gone — given what the ref already holds, and what `pull` reports
+/// for it.
+fn item_changes(view: &Path, id: &str, provider: &dyn Provider, config: &ProjectConfig, recorded: &[String]) -> Result<(Vec<Change>, Pulled)> {
     let item = provider.item(id)?;
     let item_type = config
         .muckpile_type_of(&item.jira_type, &item.labels)
@@ -179,11 +285,10 @@ fn record_item(view: &Path, id: &str, provider: &dyn Provider, config: &ProjectC
     let (text, losses) = render_pulled_text(&item, provider, config)?;
     let filename = format!("{id}.{item_type}.md");
 
-    let mut changes: Vec<(String, Option<Vec<u8>>)> = Vec::new();
+    let mut changes: Vec<Change> = Vec::new();
     // The provider may have changed the item's type since the last pull:
     // its file follows under the new name, every link to the old one
     // rewritten, in this same commit — never two files for the same item.
-    let recorded = ledger::provider_paths(view)?;
     for old_type in TYPES.iter().filter(|t| **t != item_type) {
         let old_name = format!("{id}.{old_type}.md");
         if !recorded.contains(&old_name) {
@@ -214,9 +319,7 @@ fn record_item(view: &Path, id: &str, provider: &dyn Provider, config: &ProjectC
             changes.push((path.clone(), None));
         }
     }
-
-    ledger::record(view, &changes, message)?;
-    Ok(Pulled { path: view.join(filename), losses })
+    Ok((changes, Pulled { path: view.join(filename), losses, also_in: Vec::new() }))
 }
 /// Each of the item's comments as `<id>_data/thread/<comment id>.md`, and
 /// its text.

@@ -104,6 +104,9 @@ pub trait Provider {
     /// provider doesn't have is simply missing from the answer.
     fn types_of(&self, keys: &[String]) -> Result<BTreeMap<String, (String, Vec<String>)>>;
 
+    /// The keys of the items a sprint holds, as the provider says now.
+    fn sprint_items(&self, sprint_id: u64) -> Result<Vec<String>>;
+
     /// The board's currently open sprints.
     fn open_sprints(&self, board_id: u64) -> Result<Vec<Sprint>>;
 
@@ -190,6 +193,8 @@ pub struct Status {
 /// invent an id for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Sprint {
+    /// The provider's id for the sprint — what asks for its items.
+    pub id: u64,
     pub name: String,
     /// When the provider created the sprint, ISO-8601. Read only when
     /// `name` is provider-truncated — see `sprint_fetch`.

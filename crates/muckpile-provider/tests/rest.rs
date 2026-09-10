@@ -201,8 +201,8 @@ fn open_sprints_hits_the_board_s_sprint_endpoint_and_lists_names_and_dates_verba
     assert_eq!(
         sprints,
         vec![
-            Sprint { name: "22 Las vistas".into(), created: "2026-08-01T00:00:00.000Z".into() },
-            Sprint { name: "23 Las questions".into(), created: "2026-08-05T00:00:00.000Z".into() },
+            Sprint { id: 1, name: "22 Las vistas".into(), created: "2026-08-01T00:00:00.000Z".into() },
+            Sprint { id: 2, name: "23 Las questions".into(), created: "2026-08-05T00:00:00.000Z".into() },
         ]
     );
 
@@ -622,4 +622,18 @@ fn types_of_asks_for_every_key_in_one_search() {
     let captured = rx.recv().unwrap();
     assert!(captured.path.starts_with("/rest/api/3/search/jql?jql="), "{}", captured.path);
     assert!(captured.path.contains("ACC-99999"), "{}", captured.path);
+}
+
+/// Measured on ACC's board on 2026-09-10: `sprint = 6522` lists the
+/// sprint's six items in one page.
+#[test]
+fn sprint_items_lists_the_keys_the_sprint_holds() {
+    let (base, rx) = one_shot(200, r#"{"issues":[{"key":"ACC-269","fields":{"summary":"a"}},{"key":"ACC-252","fields":{"summary":"b"}}],"isLast":true}"#);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    let keys = provider.sprint_items(6522).unwrap();
+
+    assert_eq!(keys, vec!["ACC-269".to_string(), "ACC-252".to_string()]);
+    let path = rx.recv().unwrap().path;
+    assert!(path.starts_with("/rest/api/3/search/jql?jql=") && path.contains("6522"), "{path}");
 }
