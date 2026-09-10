@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `fc7ec2b`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `2445a6c`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -329,7 +329,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 | El espacio en el borde de una negrita, cursiva o tachado, movido afuera de la marca | 142 | Una negrita cortada por un `code` dejaba ``**texto **``, que GFM no lee como negrita: 17 de las 60 volvían con asteriscos literales, sin aviso |
 | El `localId` de párrafos y títulos, descartado | 18 | Todos de `ACC-325`, la única editada en el editor rico de Jira. El autor del conversor lo trata como atributo conocido e ignorable |
 
-**Las dos primeras, y que una tabla con celdas combinadas se guarde entera, no están en el conversor tal como se publicó.** Están arregladas en un fork, `github.com/anibalanto/atlassian-markdown-converter`, que parte del paquete 0.1.0 sin tocar —el repo que el paquete declara no es público, así que no hay a dónde mandar el arreglo—. Con el fork, las 60 vuelven por markdown iguales a la forma canónica del conversor, y ninguna da un aviso `Lossy`.
+**La segunda, y que una tabla con celdas combinadas se guarde entera, no están en el conversor tal como se publicó** — la primera sí: 0.1.0 ya descarta `attrs: {}` al leer. Están arregladas en un fork, `github.com/anibalanto/atlassian-markdown-converter`, que parte del paquete 0.1.0 sin tocar —el repo que el paquete declara no es público, así que no hay a dónde mandar el arreglo—. Con el fork, las 60 vuelven por markdown iguales a la forma canónica del conversor, y ninguna da un aviso `Lossy`.
 
 **`JiraAdfMarkdownFilter` va de Jira a markdown, y corre en cada `pull`: se mide, no se supone.** Un aviso `Lossy` del conversor es pérdida, y el cuerpo queda de sólo lectura. Y lleva una sola regla propia, porque el conversor la normaliza sin que nadie haya medido si es una equivalencia: un `localId` en un párrafo o en un título es pérdida, mientras no se mida lo contrario. `pull` lo dice en el momento en que lo baja, no cuando alguien ya lo editó.
 
@@ -343,7 +343,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **Y no se resuelve pidiéndole a una IA que aplique el cambio a ciegas** — eso cambia el problema por uno peor: nadie compara el resultado contra lo que se pidió. Lo que ofrece `muckpile` es un diff: convierte el borrador editado a ADF con el mismo conversor —aunque no lo vaya a subir—, lo compara contra el ADF real, y muestra la diferencia, incluida la que se perdería si se aplicara tal cual. Ese diff lo aplica una persona en Jira, o una IA operando ahí, con la pérdida ya visible antes de decidir — no escondida como hoy hace el round-trip de worklist.
 
-**Avance: 2/9.**
+**Avance: 3/9.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -351,7 +351,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 | `push` decide con el ADF recién traído, no con el del `pull` | `diverge` | Decide con el markdown de la base commiteada: un cambio en Jira que el markdown no muestra pasa sin que nadie lo vea |
 | El criterio: ADF → markdown → ADF, contra la forma canónica del conversor, como JSON | `diverge` | El código hace markdown → ADF → markdown, lo que calcula el `canonical()` de worklist. Medido: `ACC-325` pasa como canónica y su ADF no vuelve igual. Un `push` la aplanaría |
 | Un aviso `Lossy`, o un `localId` de párrafo o título, deja el cuerpo de sólo lectura | `pendiente` | `body.rs` descarta los avisos del conversor |
-| El conversor es el fork, con `attrs: {}`, el espacio al borde de una marca y las celdas combinadas | `pendiente` | Arreglado en el fork (`332d9db`, `91407e5`); `muckpile` todavía depende de 0.1.0 de crates.io |
+| El conversor es el fork, con el espacio al borde de una marca y las celdas combinadas | `cerrada` | `atlassian-markdown-converter` en `muckpile-core/Cargo.toml`, al commit `91407e5` del fork. `bilinker` no lee TOML: el bilink ata esta decisión a los dos tests que fallan con 0.1.0, `a_bold_run_cut_by_code_reads_back_as_bold` y `a_table_with_merged_cells_survives_the_trip_through_markdown` |
 | `RsMarkdownAdfFilter` reescribe el borrador a su forma canónica, en un commit propio, y eso es lo que se manda | `diverge` | `prune_marks` corta la marca sobre el ADF, en silencio: el archivo no cambia, y el cuerpo que crea nace no canónico |
 | No canónico → `push` no sube el cuerpo y ofrece el diff | `cerrada` | `push_one` ↔ fila `push` |
 | El diff es contra el ADF real | `diverge` | Es el borrador contra su propio round-trip en markdown (`line_diff`), no contra lo que tiene el proveedor |
