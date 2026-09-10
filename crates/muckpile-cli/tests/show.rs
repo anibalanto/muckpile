@@ -2,8 +2,25 @@
 //! exists — live from the provider, or from the local copy with `--local`.
 
 use muckpile_cli::{show_live, show_local};
+use muckpile_core::project::ProjectConfig;
 use muckpile_provider::fake::FakeProvider;
+use muckpile_provider::provider::Provider;
+use std::collections::BTreeMap;
 use std::path::Path;
+
+fn config() -> ProjectConfig {
+    let mut item_type = BTreeMap::new();
+    item_type.insert("task".to_string(), "Tarea".into());
+    ProjectConfig {
+        provider: "jira-rest".into(),
+        jira_base_url: "https://x.atlassian.net".into(),
+        jira_project_key: "ACC".into(),
+        jira_board_id: None,
+        commit_prefix: "acc".into(),
+        repos: BTreeMap::new(),
+        item_type,
+    }
+}
 
 fn write(dir: &Path, name: &str, text: &str) {
     std::fs::write(dir.join(name), text).unwrap();
@@ -16,7 +33,7 @@ fn live_reads_the_provider_and_converts_the_body() {
     let adf = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"hola"}]}]}"#;
     provider.seed_item("ACC-355", "Tarea", "Vistas de trabajo", "En curso", Some("ACC-100"), Some(adf));
 
-    let show = show_live(dir.path(), "ACC-355", &provider).unwrap();
+    let show = show_live(dir.path(), "ACC-355", &provider, &config()).unwrap();
 
     assert_eq!(show.title, "Vistas de trabajo");
     assert_eq!(show.status.as_deref(), Some("En curso"));
@@ -31,7 +48,7 @@ fn live_leaves_the_body_empty_when_the_item_has_none() {
     let provider = FakeProvider::new();
     provider.seed_item("ACC-355", "Tarea", "x", "Abierta", None, None);
 
-    let show = show_live(dir.path(), "ACC-355", &provider).unwrap();
+    let show = show_live(dir.path(), "ACC-355", &provider, &config()).unwrap();
 
     assert_eq!(show.body, "");
 }
@@ -40,7 +57,7 @@ fn live_leaves_the_body_empty_when_the_item_has_none() {
 fn live_refuses_an_id_with_characters_a_path_cannot_carry() {
     let dir = tempfile::tempdir().unwrap();
     let provider = FakeProvider::new();
-    assert!(show_live(dir.path(), "../escape", &provider).is_err());
+    assert!(show_live(dir.path(), "../escape", &provider, &config()).is_err());
 }
 
 #[test]
@@ -82,4 +99,19 @@ fn local_lists_the_data_directory_when_it_exists() {
 fn local_refuses_an_id_with_no_matching_file() {
     let dir = tempfile::tempdir().unwrap();
     assert!(show_local(dir.path(), "ACC-999").is_err());
+}
+
+/// Shown the same way `pull` would write it: a card to another item as a
+/// link to its file.
+#[test]
+fn live_shows_a_card_to_an_item_as_a_link_to_its_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-100", "Tarea", "La madre", "Abierta", None, None);
+    let adf = format!(r#"{{"version":1,"type":"doc","content":[{{"type":"paragraph","content":[{{"type":"inlineCard","attrs":{{"url":"{}"}}}}]}}]}}"#, provider.item_url("ACC-100"));
+    provider.seed_item("ACC-355", "Tarea", "Vistas", "Abierta", None, Some(&adf));
+
+    let show = show_live(dir.path(), "ACC-355", &provider, &config()).unwrap();
+
+    assert!(show.body.contains("[ACC-100](ACC-100.task.md)"), "{}", show.body);
 }

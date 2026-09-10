@@ -3,7 +3,7 @@
 //! rule that needs a test lives here instead.
 
 use anyhow::{bail, Context, Result};
-use muckpile_core::body::{self, adf_to_body, body_to_adf, cards_to_file_links, cited_keys, file_links_to_cards, Filtered, JiraAdfMarkdownFilter, Loss};
+use muckpile_core::body::{self, body_to_adf, cards_to_file_links, cited_keys, file_links_to_cards, Filtered, JiraAdfMarkdownFilter, Loss};
 use muckpile_core::codework::{add_worktree, derive_branch, ensure_cloned};
 use muckpile_core::item::{self, list_summaries, parse_full, read_full, ItemSummary};
 use muckpile_core::project::{classify, require_root, ItemType, Position, ProjectConfig};
@@ -952,14 +952,15 @@ pub struct Show {
 }
 
 /// `show`'s live path: the provider's current fields, body converted from
-/// ADF the same way `pull` does.
-pub fn show_live(dir: &Path, id: &str, provider: &dyn Provider) -> Result<Show> {
+/// ADF the same way `pull` does — cards to items as links to their files
+/// included.
+pub fn show_live(dir: &Path, id: &str, provider: &dyn Provider, config: &ProjectConfig) -> Result<Show> {
     if !is_valid_id(id) {
         bail!("{id}: no es un id válido");
     }
     let item = provider.item(id)?;
     let body = match &item.body_adf {
-        Some(adf) => adf_to_body(adf)?,
+        Some(adf) => to_markdown(adf, provider, config)?.markdown,
         None => String::new(),
     };
     Ok(Show { title: item.title, status: Some(item.status), parent: item.parent, body, data_files: data_files(dir, id)? })

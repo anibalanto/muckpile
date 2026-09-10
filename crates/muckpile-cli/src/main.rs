@@ -371,7 +371,7 @@ fn run_show(id: &str, local: bool) -> Result<()> {
         let (root, cwd) = standing_in_a_project()?;
         let config = load_project_config(&root)?;
         let provider = build_provider(&root, &config)?;
-        muckpile_cli::show_live(&cwd, id, provider.as_ref())?
+        muckpile_cli::show_live(&cwd, id, provider.as_ref(), &config)?
     };
 
     println!("title: {}", show.title);
