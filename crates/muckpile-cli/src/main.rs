@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use muckpile_core::identity::load_identity;
 use muckpile_core::project::{find_project_root, load_project_config, ProjectConfig};
 use muckpile_core::states::read_states_cache;
-use muckpile_cli::ListFilter;
+use muckpile_cli::{ListFilter, PushResult};
 use muckpile_provider::link::Outcome as LinkOutcome;
 use muckpile_provider::provider::Provider;
 use muckpile_provider::rest::{Credentials, JiraRest};
@@ -21,13 +21,14 @@ fn main() -> Result<()> {
         [cmd, sub] if cmd == "states" && sub == "discover" => run_states_discover(),
         [cmd, rest @ ..] if cmd == "list" => run_list(rest),
         [cmd, view] if cmd == "status" => run_status(view),
+        [cmd, view] if cmd == "push" => run_push(view),
         [cmd, a, phrase, b] if cmd == "link" => run_link(a, phrase, b),
         [cmd, item_type, title, rest @ ..] if cmd == "new" => run_new(item_type, title, rest),
         [cmd, id] if cmd == "show" => run_show(id, false),
         [cmd, id, flag] if cmd == "show" && flag == "--local" => run_show(id, true),
         [cmd, sub, repo, rest @ ..] if cmd == "code-work" && sub == "add" => run_code_work_add(repo, rest),
         _ => bail!(
-            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile link <a> <frase> <b> | muckpile new <tipo> <título> [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
+            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile push <vista> | muckpile link <a> <frase> <b> | muckpile new <tipo> <título> [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
         ),
     }
 }
@@ -165,6 +166,41 @@ fn run_status(view_arg: &str) -> Result<()> {
 
 fn display_parent(parent: &Option<String>) -> &str {
     parent.as_deref().unwrap_or("(ninguno)")
+}
+
+fn run_push(view_arg: &str) -> Result<()> {
+    let (root, cwd) = standing_in_a_project()?;
+    let config = load_project_config(&root)?;
+    let provider = build_provider(&root, &config)?;
+    let view = cwd.join(view_arg);
+
+    for outcome in muckpile_cli::push(&view, provider.as_ref())? {
+        match outcome.result {
+            PushResult::Unchanged => println!("{}: sin cambios", outcome.id),
+            PushResult::NeverPulled => println!("{}: nunca se hizo pull acá — nada para comparar", outcome.id),
+            PushResult::Stale => println!("{}: cambió del otro lado desde tu último pull — no se escribió nada", outcome.id),
+            PushResult::Written { title, body, body_refused } => {
+                let mut sent = Vec::new();
+                if title {
+                    sent.push("title".to_string());
+                }
+                if body {
+                    sent.push("body".to_string());
+                }
+                if sent.is_empty() && body_refused.is_none() {
+                    println!("{}: sin cambios para enviar", outcome.id);
+                    continue;
+                }
+                if !sent.is_empty() {
+                    println!("{}: {} enviado(s)", outcome.id, sent.join(", "));
+                }
+                if let Some(diff) = body_refused {
+                    println!("{}: el cuerpo no es canónico — no se sube. Diff:\n{diff}", outcome.id);
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn run_link(a: &str, phrase: &str, b: &str) -> Result<()> {

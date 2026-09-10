@@ -3,14 +3,14 @@
 //! rule that needs a test lives here instead.
 
 use anyhow::{bail, Context, Result};
-use muckpile_core::body::adf_to_body;
+use muckpile_core::body::{self, adf_to_body, body_to_adf};
 use muckpile_core::codework::{add_worktree, derive_branch, ensure_cloned};
-use muckpile_core::item::{list_summaries, read_full, ItemSummary};
+use muckpile_core::item::{list_summaries, parse_full, read_full, ItemSummary};
 use muckpile_core::project::{classify, require_root, Position, ProjectConfig};
 use muckpile_core::states::write_states_cache;
-use muckpile_core::{find_file, is_valid_id, slugify_title, MARKER, TYPES};
+use muckpile_core::{commit_paths, find_file, head_text, is_valid_id, slugify_title, MARKER, TYPES};
 use muckpile_provider::link::{link as provider_link, Outcome as LinkOutcome};
-use muckpile_provider::provider::{Provider, Sprint};
+use muckpile_provider::provider::{Item, Provider, Sprint};
 use muckpile_provider::transition::{transition as provider_transition, Outcome};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -79,7 +79,23 @@ pub fn pull(root: &Path, cwd: &Path, id: Option<&str>, provider: &dyn Provider, 
     };
     let item = provider.item(&id)?;
     let item_type = muckpile_type_of(config, &item.jira_type)?;
+    let text = render_pulled_text(&item)?;
 
+    let filename = format!("{id}.{item_type}.md");
+    let path = cwd.join(&filename);
+    std::fs::write(&path, &text).with_context(|| format!("writing {}", path.display()))?;
+
+    // The commit is what lets `push` later ask "did the provider change
+    // since I last asked?" without a state file of its own — see
+    // `commit_paths`.
+    commit_paths(cwd, &[&filename], &format!("pull {id}"))?;
+    Ok(path)
+}
+
+/// The exact text `pull` writes for a fetched item — also what `push` uses
+/// to re-derive "what a fresh pull would say right now", to compare against
+/// the last one it actually committed.
+fn render_pulled_text(item: &Item) -> Result<String> {
     let mut text = String::from("---\n");
     text.push_str(&format!("title: {}\n", item.title));
     text.push_str(&format!("status: {}\n", item.status));
@@ -90,10 +106,7 @@ pub fn pull(root: &Path, cwd: &Path, id: Option<&str>, provider: &dyn Provider, 
     if let Some(adf) = &item.body_adf {
         text.push_str(&adf_to_body(adf)?);
     }
-
-    let path = cwd.join(format!("{id}.{item_type}.md"));
-    std::fs::write(&path, text).with_context(|| format!("writing {}", path.display()))?;
-    Ok(path)
+    Ok(text)
 }
 
 /// The id of the `to-work/<id>/` view `cwd` stands exactly in, not one it's
@@ -336,6 +349,121 @@ pub fn status(view: &Path, provider: &dyn Provider) -> Result<Vec<ItemStatus>> {
             })
         })
         .collect()
+}
+
+/// What `push` did with one item.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PushOutcome {
+    pub id: String,
+    pub result: PushResult,
+}
+
+/// What `push` found for one item, resolved down to a single case. An item
+/// still waiting on its first sync never reaches this at all —
+/// `list_summaries` already leaves it out, since there's no prior state yet
+/// to compare it against.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PushResult {
+    /// The file matches the last `pull` this view recorded for it — nothing
+    /// to send.
+    Unchanged,
+    /// No commit exists for this item in this view yet, so there's nothing
+    /// to compare the provider's current state against — refused rather
+    /// than guessed.
+    NeverPulled,
+    /// The provider moved since the last `pull` this view recorded —
+    /// refused rather than overwritten.
+    Stale,
+    /// The compare-and-swap cleared; what was actually sent. `body_refused`
+    /// carries a diff when the body changed locally but wasn't safe to
+    /// send — title is judged on its own and can be `true` independently.
+    Written { title: bool, body: bool, body_refused: Option<String> },
+}
+
+/// Sends every item under `view` whose title or body changed since the last
+/// `pull`, refusing anything the provider moved on since then. Status and
+/// parent never travel this way — nothing here writes a status directly,
+/// and nothing re-parents an item that already has a key — so a commit this
+/// makes always re-renders those two straight from the provider, discarding
+/// any local edit to a field this function never reads in the first place.
+pub fn push(view: &Path, provider: &dyn Provider) -> Result<Vec<PushOutcome>> {
+    let mut outcomes = Vec::new();
+    for local in list_summaries(view)? {
+        outcomes.push(push_one(view, &local, provider)?);
+    }
+    Ok(outcomes)
+}
+
+fn push_one(view: &Path, local: &ItemSummary, provider: &dyn Provider) -> Result<PushOutcome> {
+    let filename = format!("{}.{}.md", local.id, local.item_type);
+    let outcome = |result| PushOutcome { id: local.id.clone(), result };
+
+    let Some(head) = head_text(view, &filename)? else {
+        return Ok(outcome(PushResult::NeverPulled));
+    };
+
+    let working_path = view.join(&filename);
+    let working = std::fs::read_to_string(&working_path).with_context(|| format!("reading {}", working_path.display()))?;
+    if working == head {
+        return Ok(outcome(PushResult::Unchanged));
+    }
+
+    // Ask again before writing: what the provider has *right now*, rendered
+    // the same way a fresh `pull` would, has to still match the last
+    // commit — not the working copy, which is expected to differ by
+    // exactly the edit this call is trying to send.
+    let remote = provider.item(&local.id)?;
+    if render_pulled_text(&remote)? != head {
+        return Ok(outcome(PushResult::Stale));
+    }
+
+    let head_title = parse_full(local.id.clone(), local.item_type.clone(), &head)?.title;
+    let (_, head_body) = body::split_frontmatter(&head);
+    let (_, working_body) = body::split_frontmatter(&working);
+
+    let title_changed = local.title != head_title;
+    let body_changed = working_body != head_body;
+
+    if title_changed {
+        provider.update_title(&local.id, &local.title)?;
+    }
+
+    let mut body_sent = false;
+    let mut body_refused = None;
+    let mut sent_adf = None;
+    if body_changed {
+        // Canonicity is a property of the *pulled* body, not of whatever
+        // draft is sitting in the working copy: it was true or false the
+        // moment this body was last fetched, and that's what decides
+        // whether editing it locally was ever safe to begin with.
+        if body::canonical(&head)? == head {
+            let adf = body_to_adf(working_body)?;
+            provider.update_body(&local.id, &adf)?;
+            body_sent = true;
+            sent_adf = Some(adf);
+        } else {
+            let round_tripped = body::canonical(&working)?;
+            let (_, round_tripped_body) = body::split_frontmatter(&round_tripped);
+            body_refused = Some(body::line_diff(working_body, round_tripped_body));
+        }
+    }
+
+    // The new baseline is rendered fresh from the provider's own fields —
+    // status and parent as they really are, title/body swapped in only for
+    // what was actually confirmed sent. A refused body edit, or a hand-edit
+    // to a field `push` doesn't manage, never gets to look committed.
+    let committed = Item {
+        jira_type: remote.jira_type.clone(),
+        title: if title_changed { local.title.clone() } else { remote.title.clone() },
+        status: remote.status.clone(),
+        parent: remote.parent.clone(),
+        body_adf: if body_sent { sent_adf } else { remote.body_adf.clone() },
+    };
+    let new_text = render_pulled_text(&committed)?;
+    std::fs::write(&working_path, &new_text).with_context(|| format!("writing {}", working_path.display()))?;
+    commit_paths(view, &[&filename], &format!("push {}", local.id))?;
+
+    Ok(outcome(PushResult::Written { title: title_changed, body: body_sent, body_refused }))
 }
 
 /// What `show` prints — frontmatter plus body, live or local, and the

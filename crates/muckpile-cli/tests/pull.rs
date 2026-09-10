@@ -7,6 +7,7 @@ use muckpile_cli::pull;
 use muckpile_core::project::load_project_config;
 use muckpile_provider::fake::FakeProvider;
 use std::path::Path;
+use std::process::Command;
 
 fn scaffold(root: &Path) {
     std::fs::create_dir_all(root.join(".muckpile")).unwrap();
@@ -18,6 +19,22 @@ fn scaffold(root: &Path) {
         "provider = \"jira-rest\"\njira_base_url = \"https://x.atlassian.net\"\njira_project_key = \"ACC\"\ncommit_prefix = \"acc\"\n\n[item_type]\ntask = \"Tarea\"\n",
     )
     .unwrap();
+    git(root, &["init", "-q"]);
+    git(root, &["config", "user.email", "test@test"]);
+    git(root, &["config", "user.name", "test"]);
+}
+
+fn git(repo: &Path, args: &[&str]) {
+    let status = Command::new("git").arg("-C").arg(repo).args(args).status().unwrap();
+    assert!(status.success(), "git {:?} failed", args);
+}
+
+fn head_count(repo: &Path) -> usize {
+    let out = Command::new("git").arg("-C").arg(repo).args(["rev-list", "--count", "HEAD"]).output().unwrap();
+    if !out.status.success() {
+        return 0;
+    }
+    String::from_utf8(out.stdout).unwrap().trim().parse().unwrap()
 }
 
 #[test]
@@ -35,6 +52,39 @@ fn writes_the_view_s_own_item_with_no_argument() {
     assert_eq!(path, view.join("ACC-355.task.md"));
     let text = std::fs::read_to_string(&path).unwrap();
     assert!(text.starts_with("---\ntitle: Vistas de trabajo\nstatus: En curso\n---\n"), "{text}");
+}
+
+#[test]
+fn leaves_a_git_record_of_what_was_pulled() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    let config = load_project_config(root).unwrap();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-355", "Tarea", "Vistas de trabajo", "En curso", None, None);
+
+    let view = root.join("to-work/ACC-355");
+    let path = pull(root, &view, None, &provider, &config).unwrap();
+
+    assert_eq!(head_count(&view), 1, "the fetched item should land as its own commit");
+    let committed = muckpile_core::head_text(&view, "ACC-355.task.md").unwrap();
+    assert_eq!(committed, Some(std::fs::read_to_string(&path).unwrap()));
+}
+
+#[test]
+fn pulling_the_same_state_again_does_not_add_an_empty_commit() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    let config = load_project_config(root).unwrap();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-355", "Tarea", "Vistas de trabajo", "En curso", None, None);
+
+    let view = root.join("to-work/ACC-355");
+    pull(root, &view, None, &provider, &config).unwrap();
+    pull(root, &view, None, &provider, &config).unwrap();
+
+    assert_eq!(head_count(&view), 1, "nothing changed on the second pull");
 }
 
 #[test]
