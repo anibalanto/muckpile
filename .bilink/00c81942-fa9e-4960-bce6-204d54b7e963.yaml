@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 2aea453b9f01cbfaf2ae1287f50c7a78
-      hash: 58634a138c18fe20ffcaef5377bd0fbfb3f397abc3a19848b87bb5ec14acdbf8
+      hash: d51d08280fffb9365796a37c102bf3af48ee594b1d7b94d16a88d50165d51b7d
     name: header-spec
   1:
     link: capture 1846ede27c095f0e7e0a45eb199e9879
@@ -14,7 +14,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 1846ede27c095f0e7e0a45eb199e9879
-      hash: 7922cd587c61188df55660b0e6064210a454c26ec6435aa474592ae8a9becf80
-      hash_ast: dd50a50bd18e5611337ab64c0d4a351e610c7bf15e5ec209123e59a758f018a1
+      hash: 40f38796bc778b8d2f70cb51c401691ddeca8af866491a2d2de3d7d234d102dc
+      hash_ast: 572c975a30c0750dc71d6e736a1b2ba5a149a583c4a4d82f643312bf4d906f57
       n: declined
     name: link-edge
