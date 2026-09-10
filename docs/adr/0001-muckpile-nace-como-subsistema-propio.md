@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `2962d0c`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `796d18a`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -275,7 +275,7 @@ SGE-7699_data/
 
 **Todo comentario dice quién lo escribió: `--ai <modelo>` o `--i-human`, uno de los dos, siempre.** Sin ninguno, `comment` se niega. `--ai` pone el modelo como dato al principio del comentario —un primer párrafo `ai: <modelo>`, con el modelo como código—, y así lo ve cualquiera en Jira; `pull` lo reconoce y lo pasa al header del archivo, `ai: <modelo>`, fuera del cuerpo. `--i-human` no agrega nada: es quien corre el comando declarando que lo escribió una persona. Así, un comentario sin `ai:` no es uno al que se le olvidó ponerlo.
 
-**Avance: 7/11.**
+**Avance: 10/11.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -285,9 +285,9 @@ SGE-7699_data/
 | `relation.*` baja con `pull`: todos los links, en las dos puntas, con la clave de la decisión 12 | `cerrada` | `relations` ↔ decisión 12: una clave por frase, `_` por espacio, ids ordenados; `link_from_own_side` ↔ decisión 12: cada link leído desde el lado del ítem, con la forma medida en `ACC` |
 | `thread/` baja con `pull`: un archivo por comentario, `in-reply-to` desde el `parentId` | `cerrada` | `render_comment` ↔ esta decisión: el header y el cuerpo de cada comentario; `JiraRest::comments` ↔ esta decisión: el endpoint propio, de a páginas, con el `parentId` como número. Probado el 2026-09-10 con el binario contra `SGE-7699`: `42180.md`, y `42224.md` con `in-reply-to: 42180`, en el mismo commit que el ítem |
 | `files/` baja con `pull`: un archivo por adjunto, sin borrar lo que no escribió | `cerrada` | `write_files` ↔ esta decisión; `JiraRest::attachment_content` pide `redirect=false`, medido: sin él, un 303 hacia otro host. Probado contra `SGE-7699`: el PNG bajó con sus 34828 bytes. Un borde: un comentario o un adjunto borrado en Jira deja su archivo, porque `pull` todavía no borra nada — lo resuelve la ref del proveedor (decisión 5) |
-| `comment <id> <archivo>`, con `--reply-to` | `pendiente` | Medido en `ACC-360`: el POST acepta `parentId`. Falta el comando |
-| `attach <id> <archivo>` | `pendiente` | — |
-| `--ai <modelo>` o `--i-human`, siempre uno de los dos: el modelo como dato al principio del comentario, y `pull` lo pasa al header | `pendiente` | `pull` ya lo pasa al header (`split_ai`, en `render_comment`); falta `comment`, que lo escribe y que se niega sin ninguno de los dos |
+| `comment <id> <archivo>`, con `--reply-to` | `cerrada` | `comment` ↔ fila `comment`; `JiraRest::add_comment` ↔ esta decisión, con `parentId` como número. Probado el 2026-09-10 con el binario en `ACC-360`: la respuesta quedó colgada del comentario que nombró |
+| `attach <id> <archivo>` | `cerrada` | `attach` ↔ fila `attach`; `JiraRest::add_attachment` ↔ esta decisión: multipart, con `X-Atlassian-Token: no-check`. Probado en `ACC-360`: subió, y el `pull` siguiente lo bajó a `files/` |
+| `--ai <modelo>` o `--i-human`, siempre uno de los dos: el modelo como dato al principio del comentario, y `pull` lo pasa al header | `cerrada` | `comment` ↔ esta decisión: sin ninguno se niega, y `--ai` antepone `ai: <modelo>` con el modelo como código; `render_comment` lo lee de vuelta (`split_ai`). Probado en `ACC-360`: el `pull` bajó `ai: claude-opus-5` al header y lo sacó del cuerpo |
 | `_data/` viaja con el renombre del `@slug` | `cerrada` | `rename_one` lo mueve en el mismo commit; bilink de la decisión 4 |
 | Cómo se muda `files/` cuando la pregunta cierra | `falta spec` | La pregunta que dejó `ACC-335`: quién mueve el borrador a la capa que lo gobierna, y qué pasa si la pregunta cierra y el borrador se queda |
 
@@ -552,7 +552,7 @@ El choque de hoy, bajo este modelo, no es un `add/add` que exige `--force`: es u
 | `title` | Cambia el título de un ítem, en el momento. Es la única forma: editar `title:` en el header no se sube (decisión 12). | `$ muckpile title ACC-355 "Vistas de trabajo, con su ítem y su _data/"` |
 | `parent` | Cambia el padre de un ítem, en el momento (decisión 12). | `$ muckpile parent ACC-355 ACC-339` |
 
-**Avance de la tabla: trece de las dieciocho filas tienen bilink aceptado** (`show` tiene dos, uno por camino); `init`, `unlink`, `parent`, `comment` y `attach` todavía no tienen código. Que la fila esté atada no quiere decir que el comando esté completo: `pull` y `push` son parciales —lo que les falta está en las decisiones 5, 6, 7, 8 y 10—, y `to-work` diverge de su propia fila (decisión 6).
+**Avance de la tabla: quince de las dieciocho filas tienen bilink aceptado** (`show` tiene dos, uno por camino); `init`, `unlink` y `parent` todavía no tienen código. Que la fila esté atada no quiere decir que el comando esté completo: `pull` y `push` son parciales —lo que les falta está en las decisiones 5, 6, 7, 8 y 10—, y `to-work` diverge de su propia fila (decisión 6).
 
 Dieciocho comandos contra los veintitrés de hoy (once de `worklist`, doce de `worklist-server`). Lo que no está en la tabla — `install-hooks`, `check-push`, `assign-keys`, `bootstrap`, `reconcile`, `removes`, `push-states`, `create-or-find`, `provider set-status`, `window-open`, `propagate`, `adopt` — no falta: era la maquinaria de la asimetría que la decisión 1 saca. `bootstrap`/`reconcile`/`adopt` sí tienen equivalente, pero no como comando aparte: son `pull` con una consulta que trae de a muchos — `muckpile pull backlog --query "project = ACC AND sprint is empty"`.
 
