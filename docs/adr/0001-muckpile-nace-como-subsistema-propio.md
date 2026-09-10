@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `796d18a`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `b11a915`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -277,7 +277,7 @@ SGE-7699_data/
 
 **Y `--i-human` lo tiene que confirmar alguien frente a una terminal.** `comment` muestra una frase de dos palabras cortas, distinta cada vez —`faro-azul`, `puma-veloz`, como los nombres que Docker les pone a los contenedores—, y pide que se la escriba de vuelta. La lee de la terminal misma —`/dev/tty` en Linux y Mac, la consola en Windows—, nunca de la entrada estándar, así que no se le puede pasar con un pipe; sin terminal, se niega. Medido el 2026-09-10: el shell desde el que un agente como Claude Code corre comandos no tiene terminal —`tty` dice `not a tty`, y `/dev/tty` no se puede abrir—. Frena a un agente que agrega `--i-human` por comodidad; no frena a uno que se arme una terminal a propósito para leer la frase y tipearla, ni a uno que postee directo contra la API con el token. Eso ya no es usar mal un flag, y lo que lo cierra no es local: que la IA tenga su propia cuenta en el proveedor, y que `author_id` diga quién escribió. No se guarda nada: no hay frase que recordar, ni hash en ningún archivo.
 
-**Avance: 10/12.**
+**Avance: 11/12.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -290,7 +290,7 @@ SGE-7699_data/
 | `comment <id> <archivo>`, con `--reply-to` | `cerrada` | `comment` ↔ fila `comment`; `JiraRest::add_comment` ↔ esta decisión, con `parentId` como número. Probado el 2026-09-10 con el binario en `ACC-360`: la respuesta quedó colgada del comentario que nombró |
 | `attach <id> <archivo>` | `cerrada` | `attach` ↔ fila `attach`; `JiraRest::add_attachment` ↔ esta decisión: multipart, con `X-Atlassian-Token: no-check`. Probado en `ACC-360`: subió, y el `pull` siguiente lo bajó a `files/` |
 | `--ai <modelo>` o `--i-human`, siempre uno de los dos: el modelo como dato al principio del comentario, y `pull` lo pasa al header | `cerrada` | `comment` ↔ esta decisión: sin ninguno se niega, y `--ai` antepone `ai: <modelo>` con el modelo como código; `render_comment` lo lee de vuelta (`split_ai`). Probado en `ACC-360`: el `pull` bajó `ai: claude-opus-5` al header y lo sacó del cuerpo |
-| `--i-human` pide en la terminal una frase distinta cada vez, y sin terminal se niega | `pendiente` | Hoy `--i-human` es un flag que cualquiera puede pasar |
+| `--i-human` pide en la terminal una frase distinta cada vez, y sin terminal se niega | `cerrada` | `confirm_human` ↔ esta decisión: sólo con esa prueba existe un `Author::Human`. La frase la arma `random_phrase`, y `main.rs` la pregunta en `/dev/tty` o en la consola de Windows. Probado el 2026-09-10 con el binario desde el shell de un agente: se niega sin terminal, y también con la respuesta por un pipe |
 | `_data/` viaja con el renombre del `@slug` | `cerrada` | `rename_one` lo mueve en el mismo commit; bilink de la decisión 4 |
 | Cómo se muda `files/` cuando la pregunta cierra | `falta spec` | La pregunta que dejó `ACC-335`: quién mueve el borrador a la capa que lo gobierna, y qué pasa si la pregunta cierra y el borrador se queda |
 
@@ -550,7 +550,7 @@ El choque de hoy, bajo este modelo, no es un `add/add` que exige `--force`: es u
 | `transition` | Reemplaza a `start`/`done`/`close`/`drop` — no hay vocabulario propio que darles (decisión 8). Lista las transiciones del ítem, busca la que lleva al estado pedido, la ejecuta. | `$ muckpile transition ACC-355 "Finalizada"` |
 | `link` | Declara una relación entre dos ítems, en el momento — sin vocabulario propio (decisión 8): la frase es una de las dos que el proveedor ya usa para ese tipo, de ida (`outward`) o de vuelta (`inward`), con espacios o con `_` como la muestra el header. | `$ muckpile link ACC-338 blocks ACC-229`<br>`$ muckpile link ACC-229 "is blocked by" ACC-338` |
 | `unlink` | Quita una relación, en el momento: la misma frase y las mismas dos formas que `link` (decisión 12). | `$ muckpile unlink ACC-338 blocks ACC-229` |
-| `comment` | Manda un archivo markdown como comentario, en el momento: `--reply-to <id del comentario>` lo cuelga de otro. Dice siempre quién lo escribió: `--ai <modelo>` pone el modelo como dato al principio, `--i-human` declara que fue una persona, y sin ninguno se niega (decisión 7). | `$ muckpile comment SGE-7699 respuesta.md --reply-to 42180 --ai claude-opus-5`<br>`$ muckpile comment SGE-7699 nota.md --i-human` |
+| `comment` | Manda un archivo markdown como comentario, en el momento: `--reply-to <id del comentario>` lo cuelga de otro. Dice siempre quién lo escribió: `--ai <modelo>` pone el modelo como dato al principio, `--i-human` lo confirma una persona escribiendo en la terminal una frase distinta cada vez, y sin ninguno se niega (decisión 7). | `$ muckpile comment SGE-7699 respuesta.md --reply-to 42180 --ai claude-opus-5`<br>`$ muckpile comment SGE-7699 nota.md --i-human` |
 | `attach` | Sube un adjunto, en el momento (decisión 7). | `$ muckpile attach SGE-7699 captura.png` |
 | `title` | Cambia el título de un ítem, en el momento. Es la única forma: editar `title:` en el header no se sube (decisión 12). | `$ muckpile title ACC-355 "Vistas de trabajo, con su ítem y su _data/"` |
 | `parent` | Cambia el padre de un ítem, en el momento (decisión 12). | `$ muckpile parent ACC-355 ACC-339` |
