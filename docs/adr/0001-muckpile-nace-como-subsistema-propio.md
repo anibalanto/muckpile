@@ -433,6 +433,8 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **El tipo sigue en el nombre del archivo, `<id>.<tipo>.md`, no en el header:** `ACC-338.question.md` se distingue de un vistazo, en un `ls` o en un tab del shell. No es un campo que se edite: sale del tipo del proveedor, por la tabla `item_type` (decisión 9).
 
+**Si el proveedor cambia el tipo de un ítem, `pull` lo renombra, como a un `@slug` (decisión 4):** `ACC-355.task.md` pasa a `ACC-355.user-story.md`, y en el mismo commit se reescribe cada link que nombraba el archivo viejo. `<id>_data/` no se mueve —su nombre no lleva el tipo—, y `parent`, `relation.*` y los ids en prosa tampoco cambian: nombran el id, que es el mismo. Nunca quedan dos archivos para el mismo ítem.
+
 **Un borrador no tiene header del proveedor todavía.** Un `@slug` lleva el header que escribió `new` —el título, `--parent`, `--blocks`—, y viaja entero al crearlo, relaciones incluidas (decisión 4). Una vez creado, rige lo mismo que para cualquier ítem.
 
 **Las relaciones bajan todas, en las dos puntas, con la frase del proveedor.** Cada ítem lista cada link en el que está, con la frase de su lado: `ACC-338.question.md` trae `relation.blocks: [ACC-229]`, y `ACC-229.task.md` trae `relation.is_blocked_by: [ACC-338]`. La clave es la frase tal cual con los espacios cambiados por `_` —la misma regla que el nombre de un sprint (decisión 6)—, y nada más cambia: mayúsculas y acentos quedan. Los ids de una misma frase van en una sola lista, ordenados. `link` y `unlink` aceptan la frase de las dos formas: con espacios, o como la muestra el header.
@@ -449,7 +451,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 | `link` y `unlink` aceptan la frase con `_` | `pendiente` | `link` compara la frase tal cual, con espacios |
 | `push` no sube nada del header: un header editado a mano choca, el ítem no se manda, y `push` sugiere el comando | `diverge` | `push_one` manda el título editado; una edición de `status:`, `parent:` o `relation.*` se descarta sin aviso cuando el header se vuelve a armar desde el proveedor |
 | Después de escribir, el comando hace lo que un `pull` del ítem en la vista | `diverge` | `transition` y `link` no tocan la vista: el `push` siguiente ve lo que escribieron como un cambio del otro lado, y no pisa |
-| Qué pasa cuando el proveedor cambia el tipo de un ítem | `falta spec` | Lo decide el código: `pull` escribe `<id>.<tipo nuevo>.md` y deja el archivo viejo al lado — dos archivos para el mismo ítem |
+| Si el proveedor cambia el tipo de un ítem, `pull` renombra el archivo y reescribe los links al nombre viejo | `pendiente` | Hoy `pull` escribe `<id>.<tipo nuevo>.md` y deja el archivo viejo al lado — dos archivos para el mismo ítem |
 
 ---
 
