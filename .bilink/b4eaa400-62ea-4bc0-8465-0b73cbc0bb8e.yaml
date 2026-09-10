@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture e86ee0f210f359b43560be57566fb77e
-      hash: 8531f18b20a34592644dffaddb28c4a840148e65cf109ef29b8d290132e0bda6
+      hash: 6ed98b39ecc27937ee98fd8a0b847f4b7a4b545df4f9e5df7bd885a43c4fbe12
     name: converter-fork-spec
   1:
     link: capture c4a18e4f30c1d0002bce4eb078f955d2
