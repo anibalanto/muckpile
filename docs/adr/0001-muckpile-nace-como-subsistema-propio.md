@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `2445a6c`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `9e8d766`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -384,18 +384,18 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **Y no se resuelve pidiéndole a una IA que aplique el cambio a ciegas** — eso cambia el problema por uno peor: nadie compara el resultado contra lo que se pidió. Lo que ofrece `muckpile` es un diff: convierte el borrador editado a ADF con el mismo conversor —aunque no lo vaya a subir—, lo compara contra el ADF real, y muestra la diferencia, incluida la que se perdería si se aplicara tal cual. El borrador va como se mandaría, y el ADF real en la forma canónica del conversor: las tres normalizaciones de la tabla de arriba son equivalencias, y mostrarlas —un `attrs: {}` por cada celda de cada tabla— sólo taparía la diferencia que importa. Ese diff lo aplica una persona en Jira, o una IA operando ahí, con la pérdida ya visible antes de decidir — no escondida como hoy hace el round-trip de worklist.
 
-**Avance: 3/9.**
+**Avance: 8/9.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
-| `JiraAdfMarkdownFilter` mide en cada `pull`, y lo dice | `diverge` | Se calcula recién en `push`, sobre la base commiteada: quien edita no se entera hasta entonces de que el cuerpo era de sólo lectura |
-| La canonicidad se calcula sobre el ADF cada vez, no se guarda | `diverge` | Se calcula sobre el markdown de la base commiteada: un cambio en Jira que el markdown no muestra pasa sin que nadie lo vea |
-| El criterio: ADF → markdown → ADF, contra la forma canónica del conversor, como JSON | `diverge` | El código hace markdown → ADF → markdown, lo que calcula el `canonical()` de worklist. Medido: una tabla con las filas numeradas pasa como canónica, y un `push` le sacaría la numeración |
-| Un aviso `Lossy` del conversor deja el cuerpo de sólo lectura | `pendiente` | `body.rs` descarta los avisos del conversor |
+| `JiraAdfMarkdownFilter` mide en cada `pull`, y lo dice | `cerrada` | `fetch_and_commit` ↔ esta decisión: devuelve las pérdidas del cuerpo junto con el archivo (`Pulled`), y `pull` las imprime al traerlo |
+| La canonicidad se calcula sobre el ADF cada vez, no se guarda | `cerrada` | `push_one` ↔ esta decisión: corre `JiraAdfMarkdownFilter` sobre el ADF que el proveedor tiene en ese momento. Que antes lo compare contra el ADF de la ref del proveedor es de la decisión 5, `pendiente` |
+| El criterio: ADF → markdown → ADF, contra la forma canónica del conversor, como JSON | `cerrada` | `impl JiraAdfMarkdownFilter` ↔ esta decisión. El test de la tabla con las filas numeradas, `a_table_with_numbered_rows_is_not_canonical`, es el caso medido que el criterio viejo dejaba pasar |
+| Un aviso `Lossy` del conversor deja el cuerpo de sólo lectura | `cerrada` | `impl JiraAdfMarkdownFilter` ↔ esta decisión: un `Lossy` de cualquiera de las dos conversiones es un `Loss::Lossy` |
 | El conversor es el fork, con el espacio al borde de una marca y las celdas combinadas | `cerrada` | `atlassian-markdown-converter` en `muckpile-core/Cargo.toml`, al commit `91407e5` del fork. `bilinker` no lee TOML: el bilink ata esta decisión a los dos tests que fallan con 0.1.0, `a_bold_run_cut_by_code_reads_back_as_bold` y `a_table_with_merged_cells_survives_the_trip_through_markdown` |
 | `RsMarkdownAdfFilter` reescribe el borrador a su forma canónica, en un commit propio, y eso es lo que se manda | `diverge` | `prune_marks` corta la marca sobre el ADF, en silencio: el archivo no cambia, y el cuerpo que crea nace no canónico |
 | No canónico → `push` no sube el cuerpo y ofrece el diff | `cerrada` | `push_one` ↔ fila `push` |
-| El diff es contra el ADF real | `diverge` | Es el borrador contra su propio round-trip en markdown (`line_diff`), no contra lo que tiene el proveedor |
+| El diff es contra el ADF real | `cerrada` | `adf_diff` ↔ esta decisión, llamado desde `push_one`: el ADF real en la forma canónica del conversor contra el borrador como se mandaría |
 | El título y la transición no pasan por esto | `cerrada` | `push_one` manda el título aparte del cuerpo ↔ fila `push` |
 
 ### 11. El código va en inglés entero — identificadores y comentarios, sin cita externa
