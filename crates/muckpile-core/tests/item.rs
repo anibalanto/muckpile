@@ -1,7 +1,7 @@
 //! Reading back what `pull` writes — `<id>.<type>.md`, frontmatter only,
 //! for `list` to filter without asking the provider again.
 
-use muckpile_core::item::{list_summaries, read_full, read_summary, FullItem, ItemSummary};
+use muckpile_core::item::{list_pending, list_summaries, read_full, read_summary, FullItem, ItemSummary, PendingItem};
 use std::path::Path;
 
 fn write(dir: &Path, name: &str, text: &str) {
@@ -101,6 +101,36 @@ fn read_full_tolerates_a_draft_with_no_status() {
 
     assert_eq!(full.status, None);
     assert_eq!(full.title, "un borrador");
+}
+
+#[test]
+fn list_pending_finds_only_unassigned_slugs_at_the_top_level() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(root, "ACC-355.task.md", "---\ntitle: a\nstatus: Abierta\n---\n");
+    write(root, "@un-borrador.task.md", "---\ntitle: un borrador\n---\n");
+    write(root, "@otro.question.md", "---\ntitle: otra pregunta\nparent: @un-borrador\n---\n");
+    std::fs::create_dir(root.join("code-work")).unwrap();
+    write(&root.join("code-work"), "@no-nested.task.md", "---\ntitle: no\n---\n");
+
+    let pending = list_pending(root).unwrap();
+
+    let slugs: Vec<&str> = pending.iter().map(|p| p.slug.as_str()).collect();
+    assert_eq!(slugs, vec!["@otro", "@un-borrador"], "sorted, and never recursing into code-work");
+}
+
+#[test]
+fn list_pending_carries_title_type_and_parent() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    write(root, "@un-borrador.task.md", "---\ntitle: un borrador\nparent: ACC-100\n---\n");
+
+    let pending = list_pending(root).unwrap();
+
+    assert_eq!(
+        pending,
+        vec![PendingItem { slug: "@un-borrador".into(), item_type: "task".into(), title: "un borrador".into(), parent: Some("ACC-100".into()) }]
+    );
 }
 
 #[test]

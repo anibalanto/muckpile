@@ -111,6 +111,49 @@ fn id_and_type(path: &Path) -> Result<(String, String)> {
     Ok((id.to_string(), item_type.to_string()))
 }
 
+/// A local item still waiting on its first sync — as `new` wrote it, with no
+/// `status` because nothing has ever fetched one for it. `parent`, if
+/// present, may itself name another slug in the same batch rather than a
+/// real provider key.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingItem {
+    pub slug: String,
+    pub item_type: String,
+    pub title: String,
+    pub parent: Option<String>,
+}
+
+/// Every `@slug.<type>.md` directly inside `view` — the mirror image of
+/// `list_summaries`, which leaves these out for the opposite reason: there's
+/// no `status` yet to compare against the provider with, but there's a
+/// title to search or create with.
+pub fn list_pending(view: &Path) -> Result<Vec<PendingItem>> {
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(view).with_context(|| format!("reading {}", view.display()))? {
+        let entry = entry?;
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else { continue };
+        let Some(slug) = TYPES.iter().find_map(|t| name.strip_suffix(&format!(".{t}.md"))) else { continue };
+        if !is_unassigned(slug) {
+            continue;
+        }
+        let (id, item_type) = id_and_type(&path)?;
+        let text = std::fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
+        let parsed = parse_frontmatter(&text).with_context(|| format!("{}: no empieza con frontmatter", path.display()))?;
+        out.push(PendingItem {
+            slug: id,
+            item_type,
+            title: parsed.title.with_context(|| format!("{}: sin title en el frontmatter", path.display()))?,
+            parent: parsed.parent,
+        });
+    }
+    out.sort_by(|a, b| a.slug.cmp(&b.slug));
+    Ok(out)
+}
+
 /// Every `<id>.<type>.md` directly inside `view` that has actually synced —
 /// never recursing, so a worktree under `code-work/` or a question's
 /// `_data/` never leaks in as an item, and never a `@slug` still waiting on
