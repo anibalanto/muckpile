@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `f0f5b6b`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `79fea89`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -104,7 +104,7 @@ Lo único que se cae es la razón original de que existiera un hook para esto: q
 | Dimensión | Estado | Evidencia |
 |---|---|---|
 | `new` escribe `@slug` local, sin red | `cerrada` | `new` ↔ fila `new` de la interfaz |
-| Se busca por título antes de crear | `cerrada` | `resolve_pending` ↔ esta decisión; la búsqueda misma es `resolve_one` |
+| Se busca por título antes de crear | `cerrada` | `resolve_pending` ↔ esta decisión; la búsqueda misma es `resolve_one`, y el transporte `JiraRest::find_by_title` ↔ esta decisión. Medido el 2026-09-10: buscaba en `/rest/api/3/search`, que el proveedor retiró —responde 410—, así que contra Jira real todo `@slug` fallaba al resolverse; ahora busca en `/search/jql`. Los demás endpoints que lee el transporte responden 200 |
 | Orden topológico sobre las referencias del lote | `cerrada` | `topo_order`, llamado desde `resolve_pending` — el bilink es de la función que orquesta, no de `topo_order` |
 | Renombre, `_data/` y reescritura de referencias en un solo commit | `diverge` | Por ítem sí (`rename_one`), pero un `push` que resuelve N pendientes deja 3·N commits: `new`, `rename` y `pull` por cada uno. Y `rename_one` commitea con `git add -A`, que agarra el repo entero —ediciones sin commitear de otras vistas incluidas—, cuando `commit_paths` existe justamente para no hacer eso |
 | Por cada ítem creado o encontrado, un commit `new @<slug>` o `found @<slug>` en la ref del proveedor, con lo que devolvió | `pendiente` | Hoy `fetch_and_commit` commitea `pull <id>` en la misma rama que la vista |
