@@ -129,6 +129,8 @@ Git local es el registro de "qué es lo último que vi del proveedor", y lo llev
 
 **La rama del proveedor no se protege, porque nunca decide sola.** En un git local nada impide un `git update-ref`, y la única traba sería un hook — lo que la decisión 1 sacó. No hace falta: `push` le pregunta al proveedor antes de escribir, siempre. Si alguien movió la ref a mano, el `push` siguiente ve que el proveedor no coincide, registra lo que tiene de verdad, y queda una divergencia falsa que el rebase resuelve — nunca una escritura equivocada en el proveedor.
 
+**Y lo mismo vale para todo lo que está en git: romperlo a mano no escribe nada mal en el proveedor.** Lo que `muckpile` guarda —la ref del proveedor, el ADF— se vuelve a sacar del proveedor con un `pull`. Lo único que no está en el proveedor es lo editado que no se subió, y eso lo cuida git: `git reflog`, o `git reset --hard @{u}` para volver a lo que tiene el proveedor. No hay un comando de recuperación aparte, salvo para un caso: `.muckpile/` borrado con vistas todavía en disco, que es de `init` (decisión 6).
+
 **Y nada de esto hace `git push`, así que el rebase nunca obliga a un `push --force`.** Al proveedor se le habla por la API; la ref del proveedor y las ramas de las vistas viven sólo en `.muckpile/`, en la máquina de quien trabaja, y lo que el rebase reescribe son commits que nadie más tiene. Si algún día `.muckpile/` tiene un remoto git —un respaldo—, las refs del proveedor viajan sin forzar, porque sólo avanzan; lo único que pediría forzar son las ramas de las vistas, y eso se decide ese día.
 
 **La ref del proveedor guarda también el ADF**, al lado del markdown: `.provider/<id>.adf.json`, adentro de la vista. Es lo que el proveedor devolvió, literalmente; el markdown se deriva de él. Con eso, la pregunta de `push` compara ADF contra ADF —lo que el proveedor tiene ahora contra la punta de su ref—, no markdown contra markdown, y ve también lo que el markdown no muestra: alguien numeró las filas de una tabla. Y el historial de git dice exactamente qué cambió del lado del proveedor. Es un registro, no el que decide: `push` pregunta igual antes de escribir.
@@ -232,7 +234,7 @@ backlog/sprint/22_Las_vistas/  backlog/sprint/23_Las_questions/     ← no hay a
 
 **Un proyecto lo crea `init`, y ningún otro comando.** Corrido en `multitask/`, `muckpile init <proyecto>` deja `<proyecto>/.muckpile/` —el git del proyecto, sin worktree propio: el registro de la decisión 5—, un `muckpile.toml` para completar (decisión 9), y las tres carpetas reservadas. Cada vista la crea después el comando que la necesita —`to-work` una de trabajo, `sprint fetch` una por sprint—, como un worktree de `.muckpile/` parado en su rama. Fuera de un proyecto iniciado, los demás comandos se niegan: ninguno arma un `.muckpile/` de paso.
 
-**Avance: 3/8.**
+**Avance: 3/9.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -244,6 +246,7 @@ backlog/sprint/22_Las_vistas/  backlog/sprint/23_Las_questions/     ← no hay a
 | `pull` con una consulta — lo que reemplaza a `bootstrap`/`reconcile`/`adopt` | `pendiente` | — |
 | El chequeo local: "¿ya tengo este ítem en otra vista, en esta máquina?" | `pendiente` | — |
 | `init` crea el proyecto —`.muckpile/`, `muckpile.toml`, las tres carpetas—, y las vistas nacen como worktrees suyos | `pendiente` | Hoy se arma a mano, y `to-work`/`sprint fetch` crean carpetas comunes |
+| `init` que recupera un proyecto: `.muckpile/` borrado con vistas todavía en disco | `falta spec` | Esta decisión sólo dice que `init` crea un proyecto nuevo. Con qué parámetros se recupera uno, y qué pasa con lo que cada vista no subió, queda para el final: es fino |
 
 ### 7. `question` desde el día uno: tipo, la relación `blocks`, y el directorio de datos del ítem
 
