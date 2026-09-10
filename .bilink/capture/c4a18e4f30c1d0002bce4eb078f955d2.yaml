@@ -1,0 +1,4 @@
+file: crates/muckpile-core/tests/body.rs
+query: |-
+  (function_item
+    name: (identifier) @n0 (#eq? @n0 "a_table_with_merged_cells_survives_the_trip_through_markdown")) @target
