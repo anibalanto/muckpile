@@ -3,7 +3,7 @@
 //! decided on the provider's ADF, by whether it survives the trip through
 //! markdown and back.
 
-use muckpile_core::body::{adf_diff, line_diff, prune_marks, split_frontmatter, JiraAdfMarkdownFilter, Loss};
+use muckpile_core::body::{adf_diff, adf_to_body, body_to_adf, cards_to_file_links, cited_keys, file_links_to_cards, line_diff, prune_marks, split_frontmatter, JiraAdfMarkdownFilter, Loss};
 
 const ITEM: &str = "---\ntitle: With structure\nstatus: Open\n---\n\n# Title\n\nWith *italic*, **bold** and `SNAKE_CASE` inside a code span.\n\n| Field | Owner |\n|---|---|\n| `status` | provider |\n\n> A blockquote.\n\n- a list\n- with two items\n";
 
@@ -93,7 +93,7 @@ fn a_document_that_comes_back_different_is_not_canonical_even_without_a_warning(
 fn the_diff_against_the_real_adf_shows_what_writing_the_draft_would_lose() {
     let real = doc(NUMBERED_TABLE);
     let draft = JiraAdfMarkdownFilter::filter(&real).unwrap().markdown;
-    let diff = adf_diff(&real, &draft).unwrap();
+    let diff = adf_diff(&real, &body_to_adf(&draft).unwrap()).unwrap();
     assert!(diff.lines().any(|l| l.starts_with('-') && l.contains("isNumberColumnEnabled")), "{diff}");
 }
 
@@ -105,7 +105,7 @@ fn the_diff_against_the_real_adf_leaves_out_what_the_converter_normalizes() {
         {"type":"tableRow","content":[{"type":"tableHeader","attrs":{},"content":[{"type":"paragraph","content":[{"type":"text","text":"field"}]}]}]},
         {"type":"tableRow","content":[{"type":"tableCell","attrs":{},"content":[{"type":"paragraph","content":[{"type":"text","text":"status"}]}]}]}]}"#);
     let draft = JiraAdfMarkdownFilter::filter(&real).unwrap().markdown;
-    let diff = adf_diff(&real, &draft).unwrap();
+    let diff = adf_diff(&real, &body_to_adf(&draft).unwrap()).unwrap();
     assert!(!diff.lines().any(|l| l.starts_with('-') || l.starts_with('+')), "{diff}");
 }
 
@@ -223,4 +223,67 @@ fn a_table_with_merged_cells_survives_the_trip_through_markdown() {
     let md = muckpile_core::body::adf_to_body(adf).unwrap();
     let back = muckpile_core::body::body_to_adf(&md).unwrap();
     assert!(back.contains("\"colspan\":2"), "the span was lost:\n{md}");
+}
+
+fn url_of(key: &str) -> String {
+    format!("https://x.atlassian.net/browse/{key}")
+}
+
+/// Only this project's items: another project's card stays a card.
+fn key_of(url: &str) -> Option<String> {
+    url.strip_prefix("https://x.atlassian.net/browse/").filter(|k| k.starts_with("ACC-")).map(str::to_string)
+}
+
+fn file_of(key: &str) -> Option<String> {
+    match key {
+        "ACC-338" => Some("ACC-338.task.md".into()),
+        "ACC-346" => Some("ACC-346.epic.md".into()),
+        _ => None,
+    }
+}
+
+/// In Jira a link to an item's file leads nowhere; a card shows its key,
+/// title and status. The link's text doesn't travel — the card shows the
+/// title.
+#[test]
+fn a_link_to_an_item_file_goes_up_as_a_card() {
+    let adf = body_to_adf("See [ACC-338](ACC-338.task.md), [the story](../ACC-339.user-story.md) and [docs](https://example.com).\n").unwrap();
+    let out = file_links_to_cards(&adf, url_of).unwrap();
+    assert!(out.contains(r#""type":"inlineCard""#), "{out}");
+    assert!(out.contains("https://x.atlassian.net/browse/ACC-338") && out.contains("https://x.atlassian.net/browse/ACC-339"), "{out}");
+    assert!(!out.contains("the story"), "the text doesn't travel: {out}");
+    assert!(out.contains("https://example.com"), "any other link stays: {out}");
+}
+
+const CITING: &str = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[
+    {"type":"inlineCard","attrs":{"url":"https://x.atlassian.net/browse/ACC-338"}},
+    {"type":"text","text":" and "},
+    {"type":"text","text":"ACC-346 The ","marks":[{"type":"link","attrs":{"href":"https://x.atlassian.net/browse/ACC-346"}}]},
+    {"type":"text","text":"title","marks":[{"type":"code"},{"type":"link","attrs":{"href":"https://x.atlassian.net/browse/ACC-346"}}]},
+    {"type":"text","text":" and "},
+    {"type":"inlineCard","attrs":{"url":"https://x.atlassian.net/browse/SGE-1"}}]}]}"#;
+
+#[test]
+fn the_keys_a_body_cites_are_this_project_s_cards_and_links() {
+    let keys: Vec<String> = cited_keys(CITING, key_of).unwrap().into_iter().collect();
+    assert_eq!(keys, vec!["ACC-338".to_string(), "ACC-346".to_string()]);
+}
+
+/// A card, or an ordinary link — worklist left those, split in several text
+/// runs when the title has code in it — comes down as one link to the
+/// item's file, with the key as its text.
+#[test]
+fn a_card_or_a_link_to_an_item_comes_down_as_a_link_to_its_file() {
+    let out = cards_to_file_links(CITING, key_of, file_of).unwrap();
+    let markdown = adf_to_body(&out).unwrap();
+    assert!(markdown.contains("[ACC-338](ACC-338.task.md)"), "{markdown}");
+    assert!(markdown.contains("[ACC-346](ACC-346.epic.md)"), "one link, not one per run: {markdown}");
+    assert!(markdown.contains("SGE-1"), "another project's card stays: {markdown}");
+}
+
+#[test]
+fn down_and_up_again_gives_back_the_cards() {
+    let down = adf_to_body(&cards_to_file_links(CITING, key_of, file_of).unwrap()).unwrap();
+    let up = file_links_to_cards(&body_to_adf(&down).unwrap(), url_of).unwrap();
+    assert_eq!(up.matches(r#""type":"inlineCard""#).count(), 3, "{up}");
 }

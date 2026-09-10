@@ -7,7 +7,7 @@
 use muckpile_cli::pull;
 use muckpile_core::project::load_project_config;
 use muckpile_provider::fake::FakeProvider;
-use muckpile_provider::provider::Comment;
+use muckpile_provider::provider::{Comment, Provider};
 use std::path::Path;
 use std::process::Command;
 
@@ -406,4 +406,46 @@ fn a_type_changed_on_the_provider_renames_the_file() {
     assert_eq!(head_count(&view), before + 1, "one pull commit");
     let status = std::process::Command::new("git").arg("-C").arg(&view).args(["status", "--porcelain", "--", "."]).output().unwrap();
     assert_eq!(String::from_utf8_lossy(&status.stdout), "", "nothing in the view left out of the commit");
+}
+
+/// A card to another item comes down as a link to its file, whether or not
+/// that file is in the view — so pulling it later doesn't change this body.
+#[test]
+fn a_card_to_another_item_comes_down_as_a_link_to_its_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    let config = load_project_config(root).unwrap();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-100", "Tarea", "La madre", "Abierta", None, None);
+    let body = format!(r#"{{"version":1,"type":"doc","content":[{{"type":"paragraph","content":[{{"type":"text","text":"Cuelga de "}},{{"type":"inlineCard","attrs":{{"url":"{}"}}}}]}}]}}"#, provider.item_url("ACC-100"));
+    provider.seed_item("ACC-355", "Tarea", "Vistas", "Abierta", None, Some(&body));
+
+    let view = root.join("to-work/ACC-355");
+    let path = pull(root, &view, None, &provider, &config).unwrap().path;
+
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(text.contains("Cuelga de [ACC-100](ACC-100.task.md)"), "{text}");
+}
+
+/// The type of a cited item is the provider's type and labels, through the
+/// same table: a card to a Tarea labeled as a question points at a
+/// `.question.md`.
+#[test]
+fn a_card_to_a_question_comes_down_as_a_link_to_a_question_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    let config = load_project_config(root).unwrap();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-338", "Tarea", "¿se hereda?", "Abierta", None, None);
+    provider.seed_labels("ACC-338", &["question"]);
+    let body = format!(r#"{{"version":1,"type":"doc","content":[{{"type":"paragraph","content":[{{"type":"text","text":"Bloqueada por "}},{{"type":"inlineCard","attrs":{{"url":"{}"}}}}]}}]}}"#, provider.item_url("ACC-338"));
+    provider.seed_item("ACC-355", "Tarea", "Vistas", "Abierta", None, Some(&body));
+
+    let view = root.join("to-work/ACC-355");
+    let path = pull(root, &view, None, &provider, &config).unwrap().path;
+
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(text.contains("[ACC-338](ACC-338.question.md)"), "{text}");
 }

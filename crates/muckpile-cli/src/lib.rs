@@ -3,7 +3,7 @@
 //! rule that needs a test lives here instead.
 
 use anyhow::{bail, Context, Result};
-use muckpile_core::body::{self, adf_to_body, body_to_adf, Filtered, JiraAdfMarkdownFilter, Loss};
+use muckpile_core::body::{self, adf_to_body, body_to_adf, cards_to_file_links, cited_keys, file_links_to_cards, Filtered, JiraAdfMarkdownFilter, Loss};
 use muckpile_core::codework::{add_worktree, derive_branch, ensure_cloned};
 use muckpile_core::item::{self, list_summaries, parse_full, read_full, ItemSummary};
 use muckpile_core::project::{classify, require_root, ItemType, Position, ProjectConfig};
@@ -101,7 +101,7 @@ fn fetch_and_commit(dir: &Path, id: &str, provider: &dyn Provider, config: &Proj
     let item_type = config
         .muckpile_type_of(&item.jira_type, &item.labels)
         .with_context(|| format!("{}: sin tipo de item para él en muckpile.toml", item.jira_type))?;
-    let (text, losses) = render_pulled_text(&item)?;
+    let (text, losses) = render_pulled_text(&item, provider, config)?;
 
     // The provider may have changed the item's type since the last pull:
     // the file follows, renamed in this same commit, and never stays behind
@@ -117,7 +117,7 @@ fn fetch_and_commit(dir: &Path, id: &str, provider: &dyn Provider, config: &Proj
     let path = dir.join(&filename);
     std::fs::write(&path, &text).with_context(|| format!("writing {}", path.display()))?;
     written.push(filename);
-    written.extend(write_thread(dir, id, provider)?);
+    written.extend(write_thread(dir, id, provider, config)?);
     written.extend(write_files(dir, id, &item.attachments, provider)?);
 
     // The commit is what lets `push` later ask "did the provider change
@@ -130,11 +130,11 @@ fn fetch_and_commit(dir: &Path, id: &str, provider: &dyn Provider, config: &Proj
 
 /// Writes each of the item's comments as `<id>_data/thread/<comment id>.md`
 /// and returns the paths written, relative to `dir`.
-fn write_thread(dir: &Path, id: &str, provider: &dyn Provider) -> Result<Vec<String>> {
+fn write_thread(dir: &Path, id: &str, provider: &dyn Provider, config: &ProjectConfig) -> Result<Vec<String>> {
     let mut written = Vec::new();
     for comment in provider.comments(id)? {
         let rel = format!("{id}_data/thread/{}.md", comment.id);
-        write_under(dir, &rel, render_comment(&comment)?.as_bytes())?;
+        write_under(dir, &rel, render_comment(&comment, provider, config)?.as_bytes())?;
         written.push(rel);
     }
     Ok(written)
@@ -143,8 +143,8 @@ fn write_thread(dir: &Path, id: &str, provider: &dyn Provider) -> Result<Vec<Str
 /// A comment as a thread file: who wrote it and when, the comment it
 /// replies to, and — when it opens with `ai: <model>`, the model as code —
 /// that model, taken out of the body and into the header.
-fn render_comment(comment: &Comment) -> Result<String> {
-    let markdown = JiraAdfMarkdownFilter::filter(&comment.body_adf)?.markdown;
+fn render_comment(comment: &Comment, provider: &dyn Provider, config: &ProjectConfig) -> Result<String> {
+    let markdown = to_markdown(&comment.body_adf, provider, config)?.markdown;
     let (ai, body) = split_ai(&markdown);
 
     let mut text = format!("---\nauthor: {}\nauthor_id: {}\ncreated: {}\n", comment.author, comment.author_id, comment.created);
@@ -202,7 +202,7 @@ fn write_under(dir: &Path, rel: &str, bytes: &[u8]) -> Result<()> {
 /// be edited locally — also what `push` uses to re-derive "what a fresh pull
 /// would say right now", to compare against the last one it actually
 /// committed.
-fn render_pulled_text(item: &Item) -> Result<(String, Vec<Loss>)> {
+fn render_pulled_text(item: &Item, provider: &dyn Provider, config: &ProjectConfig) -> Result<(String, Vec<Loss>)> {
     let mut text = String::from("---\n");
     text.push_str(&format!("title: {}\n", item.title));
     text.push_str(&format!("status: {}\n", item.status));
@@ -214,7 +214,7 @@ fn render_pulled_text(item: &Item) -> Result<(String, Vec<Loss>)> {
     }
     text.push_str("---\n");
     let body = match &item.body_adf {
-        Some(adf) => JiraAdfMarkdownFilter::filter(adf)?,
+        Some(adf) => to_markdown(adf, provider, config)?,
         None => Filtered::default(),
     };
     text.push_str(&body.markdown);
@@ -233,6 +233,33 @@ fn relations(links: &[ItemLink]) -> BTreeMap<String, Vec<String>> {
         ids.sort();
     }
     by_key
+}
+
+/// A body or a comment from the provider, as markdown. First, each card —
+/// or ordinary link — to one of this project's items becomes a link to its
+/// file, with the type the provider gives, labels included, so it doesn't
+/// depend on what the view holds; then `JiraAdfMarkdownFilter`.
+fn to_markdown(adf: &str, provider: &dyn Provider, config: &ProjectConfig) -> Result<Filtered> {
+    let prefix = format!("{}-", config.jira_project_key);
+    let key_of = |url: &str| provider.key_of_url(url).filter(|k| k.starts_with(&prefix));
+    let keys: Vec<String> = cited_keys(adf, key_of)?.into_iter().collect();
+    let files: BTreeMap<String, String> = if keys.is_empty() {
+        BTreeMap::new()
+    } else {
+        provider
+            .types_of(&keys)?
+            .into_iter()
+            .filter_map(|(key, (jira_type, labels))| config.muckpile_type_of(&jira_type, &labels).map(|t| (key.clone(), format!("{key}.{t}.md"))))
+            .collect()
+    };
+    let translated = cards_to_file_links(adf, key_of, |key| files.get(key).cloned())?;
+    JiraAdfMarkdownFilter::filter(&translated)
+}
+
+/// Markdown on its way to the provider: the converter, and then every link
+/// to an item's file as a card to that item.
+fn to_adf(markdown: &str, provider: &dyn Provider) -> Result<String> {
+    file_links_to_cards(&body_to_adf(markdown)?, |key| provider.item_url(key))
 }
 
 /// The id of the `to-work/<id>/` view `cwd` stands exactly in, not one it's
@@ -553,7 +580,7 @@ pub fn push(view: &Path, provider: &dyn Provider, config: &ProjectConfig) -> Res
             // could have edited yet.
             continue;
         }
-        outcomes.push(push_one(view, &local, provider)?);
+        outcomes.push(push_one(view, &local, provider, config)?);
     }
     Ok(outcomes)
 }
@@ -666,12 +693,12 @@ fn resolve_one(
     if let Some(id) = provider.find_by_title(&config.jira_project_key, jira_type, label, &pending.title)? {
         return Ok((id, false));
     }
-    let body_adf = if pending.body.trim().is_empty() { None } else { Some(body_to_adf(&pending.body)?) };
+    let body_adf = if pending.body.trim().is_empty() { None } else { Some(to_adf(&pending.body, provider)?) };
     let id = provider.create_item(&config.jira_project_key, jira_type, label, &pending.title, real_parent, body_adf.as_deref())?;
     Ok((id, true))
 }
 
-fn push_one(view: &Path, local: &ItemSummary, provider: &dyn Provider) -> Result<PushOutcome> {
+fn push_one(view: &Path, local: &ItemSummary, provider: &dyn Provider, config: &ProjectConfig) -> Result<PushOutcome> {
     let filename = format!("{}.{}.md", local.id, local.item_type);
     let outcome = |result| PushOutcome { id: local.id.clone(), result };
 
@@ -690,7 +717,7 @@ fn push_one(view: &Path, local: &ItemSummary, provider: &dyn Provider) -> Result
     // commit — not the working copy, which is expected to differ by
     // exactly the edit this call is trying to send.
     let remote = provider.item(&local.id)?;
-    let (remote_text, losses) = render_pulled_text(&remote)?;
+    let (remote_text, losses) = render_pulled_text(&remote, provider, config)?;
     if remote_text != head {
         return Ok(outcome(PushResult::Stale));
     }
@@ -717,9 +744,9 @@ fn push_one(view: &Path, local: &ItemSummary, provider: &dyn Provider) -> Result
         // unchanged while the ADF behind it doesn't. Only a body read from
         // some ADF can have losses.
         if let Some(real) = remote.body_adf.as_deref().filter(|_| !losses.is_empty()) {
-            body_refused = Some(BodyRefused { losses, diff: body::adf_diff(real, working_body)? });
+            body_refused = Some(BodyRefused { losses, diff: body::adf_diff(real, &to_adf(working_body, provider)?)? });
         } else {
-            let adf = body_to_adf(working_body)?;
+            let adf = to_adf(working_body, provider)?;
             provider.update_body(&local.id, &adf)?;
             body_sent = true;
             sent_adf = Some(adf);
@@ -739,7 +766,7 @@ fn push_one(view: &Path, local: &ItemSummary, provider: &dyn Provider) -> Result
         labels: remote.labels.clone(),
         attachments: remote.attachments.clone(),
     };
-    let (new_text, _) = render_pulled_text(&committed)?;
+    let (new_text, _) = render_pulled_text(&committed, provider, config)?;
     std::fs::write(&working_path, &new_text).with_context(|| format!("writing {}", working_path.display()))?;
     commit_paths(view, &[&filename], &format!("push {}", local.id))?;
 
@@ -865,7 +892,7 @@ pub fn comment(id: &str, file: &Path, reply_to: Option<&str>, author: Option<Aut
         }
         Author::Human(_) => text,
     };
-    provider.add_comment(id, &body_to_adf(&markdown)?, reply_to)
+    provider.add_comment(id, &to_adf(&markdown, provider)?, reply_to)
 }
 
 /// Uploads `file` as an attachment of `id`, under its own name.

@@ -6,7 +6,7 @@
 use crate::provider::{self, Attachment, Comment, ItemLink, LinkType, Provider, Sprint, Status, Transition};
 use anyhow::{bail, Context, Result};
 use std::cell::RefCell;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 
 pub struct FakeProvider {
     items: RefCell<HashMap<String, Entry>>,
@@ -216,6 +216,19 @@ impl Provider for FakeProvider {
         let items = self.items.borrow();
         let Some(i) = items.get(key) else { bail!("no such item: {key}") };
         Ok(i.comments.clone())
+    }
+
+    fn item_url(&self, key: &str) -> String {
+        format!("https://fake.example/browse/{key}")
+    }
+
+    fn key_of_url(&self, url: &str) -> Option<String> {
+        url.strip_prefix("https://fake.example/browse/").map(str::to_string)
+    }
+
+    fn types_of(&self, keys: &[String]) -> Result<BTreeMap<String, (String, Vec<String>)>> {
+        let items = self.items.borrow();
+        Ok(keys.iter().filter_map(|k| items.get(k).map(|i| (k.clone(), (i.jira_type.clone(), i.labels.clone())))).collect())
     }
 
     fn add_comment(&self, key: &str, body_adf: &str, parent: Option<&str>) -> Result<String> {

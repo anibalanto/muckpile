@@ -3,6 +3,9 @@
 
 use amdc::{convert, format::Options, Format, WarningKind};
 use anyhow::{Context, Result};
+use regex::Regex;
+use serde_json::{json, Value};
+use std::collections::BTreeSet;
 
 /// Frontmatter and body. The frontmatter never passes through the converter:
 /// it isn't markdown, and it doesn't live in the provider's description.
@@ -134,14 +137,14 @@ fn as_json(adf: &str) -> Result<serde_json::Value> {
     serde_json::from_str(adf).with_context(|| format!("the ADF the converter produced isn't JSON: {adf}"))
 }
 
-/// What sending `draft` would do to the provider's body: a line diff of the
-/// provider's ADF against the draft as it would be sent, both as indented
-/// JSON. The provider's side is in the converter's canonical form, so what
-/// the converter normalizes on reading — an empty `attrs` on every table
-/// cell — doesn't bury the difference that matters.
-pub fn adf_diff(real_adf: &str, draft: &str) -> Result<String> {
+/// What sending a draft would do to the provider's body: a line diff of the
+/// provider's ADF against `sent_adf` — the draft exactly as it would be
+/// sent — both as indented JSON. The provider's side is in the converter's
+/// canonical form, so what the converter normalizes on reading — an empty
+/// `attrs` on every table cell — doesn't bury the difference that matters.
+pub fn adf_diff(real_adf: &str, sent_adf: &str) -> Result<String> {
     let real = serde_json::to_string_pretty(&converter_canonical(real_adf)?)?;
-    let sent = serde_json::to_string_pretty(&as_json(&body_to_adf(draft)?)?)?;
+    let sent = serde_json::to_string_pretty(&as_json(sent_adf)?)?;
     Ok(line_diff(&real, &sent))
 }
 
@@ -186,4 +189,90 @@ pub fn line_diff(before: &str, after: &str) -> String {
         out.push(format!("+ {line}"));
     }
     out.join("\n")
+}
+
+/// Every item key a document points at — by a card, or by an ordinary link —
+/// that `key_of` recognizes, so the provider can be asked all their types at
+/// once.
+pub fn cited_keys(adf: &str, key_of: impl Fn(&str) -> Option<String>) -> Result<BTreeSet<String>> {
+    fn walk(node: &Value, key_of: &dyn Fn(&str) -> Option<String>, out: &mut BTreeSet<String>) {
+        if let Some(key) = card_url(node).or_else(|| link_href(node)).and_then(|u| key_of(&u)) {
+            out.insert(key);
+        }
+        for child in node.get("content").and_then(|c| c.as_array()).into_iter().flatten() {
+            walk(child, key_of, out);
+        }
+    }
+    let mut out = BTreeSet::new();
+    walk(&as_json(adf)?, &key_of, &mut out);
+    Ok(out)
+}
+
+/// The way down: a card to an item `key_of` recognizes, or a run of text
+/// linking to it, becomes one link to the item's file — `[ACC-338](ACC-338.task.md)`,
+/// the key as its text — whenever `file_of` knows the file. Anything else
+/// stays as it is.
+pub fn cards_to_file_links(adf: &str, key_of: impl Fn(&str) -> Option<String>, file_of: impl Fn(&str) -> Option<String>) -> Result<String> {
+    let mut doc = as_json(adf)?;
+    rewrite_runs(&mut doc, &|node| {
+        let key = card_url(node).or_else(|| link_href(node)).and_then(|u| key_of(&u))?;
+        let file = file_of(&key)?;
+        Some((key.clone(), json!({ "type": "text", "text": key, "marks": [{ "type": "link", "attrs": { "href": file } }] })))
+    });
+    Ok(serde_json::to_string(&doc)?)
+}
+
+/// The way up: a run of text linking to an item's file — `<key>.<type>.md`,
+/// with any `../` in front — becomes one card to the item, at `url_of(key)`.
+/// The link's text doesn't travel: the card shows the item's title.
+pub fn file_links_to_cards(adf: &str, url_of: impl Fn(&str) -> String) -> Result<String> {
+    let types = crate::TYPES.join("|");
+    let file_re = Regex::new(&format!(r"^(?:\.\./)*([A-Z][A-Z0-9_]*-[0-9]+)\.(?:{types})\.md$")).unwrap();
+    let mut doc = as_json(adf)?;
+    rewrite_runs(&mut doc, &|node| {
+        let href = link_href(node)?;
+        let key = file_re.captures(&href)?[1].to_string();
+        Some((href, json!({ "type": "inlineCard", "attrs": { "url": url_of(&key) } })))
+    });
+    Ok(serde_json::to_string(&doc)?)
+}
+
+/// In every `content` list, each run of consecutive nodes for which
+/// `replace` gives the same key is replaced by the one node it gives — a
+/// link whose text a code span cut in pieces is still one link.
+fn rewrite_runs(node: &mut Value, replace: &dyn Fn(&Value) -> Option<(String, Value)>) {
+    let Some(content) = node.get_mut("content").and_then(|c| c.as_array_mut()) else { return };
+    let mut out: Vec<Value> = Vec::with_capacity(content.len());
+    let mut last_key: Option<String> = None;
+    for mut child in std::mem::take(content) {
+        match replace(&child) {
+            Some((key, with)) => {
+                if last_key.as_deref() != Some(key.as_str()) {
+                    out.push(with);
+                }
+                last_key = Some(key);
+            }
+            None => {
+                rewrite_runs(&mut child, replace);
+                out.push(child);
+                last_key = None;
+            }
+        }
+    }
+    *content = out;
+}
+
+fn card_url(node: &Value) -> Option<String> {
+    (node.get("type")?.as_str()? == "inlineCard").then(|| node.get("attrs")?.get("url")?.as_str().map(str::to_string))?
+}
+
+fn link_href(node: &Value) -> Option<String> {
+    node.get("marks")?
+        .as_array()?
+        .iter()
+        .find(|m| m.get("type").and_then(|t| t.as_str()) == Some("link"))?
+        .get("attrs")?
+        .get("href")?
+        .as_str()
+        .map(str::to_string)
 }

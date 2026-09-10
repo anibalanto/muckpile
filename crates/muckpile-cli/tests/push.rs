@@ -6,6 +6,7 @@
 use muckpile_cli::{push, HeaderEdit, PushOutcome, PushResult};
 use muckpile_core::project::{ItemType, ProjectConfig};
 use muckpile_provider::fake::FakeProvider;
+use muckpile_provider::provider::Provider;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::Command;
@@ -553,4 +554,26 @@ fn a_pending_question_is_not_found_as_a_task_with_the_same_title() {
     let outcomes = push(view, &provider, &config()).unwrap();
 
     assert_eq!(outcomes[0].result, PushResult::Resolved { id: "ACC-403".into(), created: true });
+}
+
+/// What goes up is a card; the body that comes back reads the same, so the
+/// next push doesn't see a change nobody made.
+#[test]
+fn a_link_to_an_item_file_goes_up_as_a_card() {
+    let dir = git_view();
+    let view = dir.path();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-100", "Tarea", "La madre", "Abierta", None, None);
+    let adf = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"original"}]}]}"#;
+    provider.seed_item("ACC-1", "Tarea", "x", "Abierta", None, Some(adf));
+    seed_pulled(view, "ACC-1", "Abierta", "x", "original\n");
+    edit_file(view, "ACC-1", "Abierta", "x", "Cuelga de [ACC-100](ACC-100.task.md).\n");
+
+    let outcomes = push(view, &provider, &config()).unwrap();
+
+    assert_eq!(outcomes[0].result, PushResult::Written { body: true, body_refused: None });
+    let sent = provider.body_adf_of("ACC-1").unwrap();
+    assert!(sent.contains(r#""type":"inlineCard""#) && sent.contains(&provider.item_url("ACC-100")), "{sent}");
+    let again = push(view, &provider, &config()).unwrap();
+    assert_eq!(again[0].result, PushResult::Unchanged, "{again:?}");
 }

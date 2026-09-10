@@ -159,6 +159,38 @@ impl Provider for JiraRest {
         }
     }
 
+    fn item_url(&self, key: &str) -> String {
+        format!("{}/browse/{key}", self.base)
+    }
+
+    fn key_of_url(&self, url: &str) -> Option<String> {
+        let key = url.strip_prefix(&format!("{}/browse/", self.base))?;
+        let (project, number) = key.split_once('-')?;
+        let well_formed = !project.is_empty()
+            && project.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+            && !number.is_empty()
+            && number.chars().all(|c| c.is_ascii_digit());
+        well_formed.then(|| key.to_string())
+    }
+
+    /// `key in (…)`, a hundred at a time — measured: a key that doesn't exist
+    /// doesn't fail the search, it's only missing from the answer.
+    fn types_of(&self, keys: &[String]) -> Result<BTreeMap<String, (String, Vec<String>)>> {
+        let mut out = BTreeMap::new();
+        for chunk in keys.chunks(100) {
+            let jql = format!("key in ({})", chunk.join(", "));
+            let path = format!("/rest/api/3/search/jql?jql={}&fields=issuetype,labels&maxResults=100", url_encode(&jql));
+            let v = self.call("GET", &path, None)?;
+            for issue in v.get("issues").and_then(|i| i.as_array()).ok_or_else(|| anyhow!("no `issues` in the search response"))? {
+                let (Some(key), Some(fields)) = (issue.get("key").and_then(|k| k.as_str()), issue.get("fields")) else { continue };
+                let Some(jira_type) = fields.get("issuetype").and_then(|t| t.get("name")).and_then(|n| n.as_str()) else { continue };
+                let labels = fields.get("labels").and_then(|l| l.as_array()).map(|l| l.iter().filter_map(|l| l.as_str().map(str::to_string)).collect()).unwrap_or_default();
+                out.insert(key.to_string(), (jira_type.to_string(), labels));
+            }
+        }
+        Ok(out)
+    }
+
     /// `parentId` goes as the number the comments endpoint hands back.
     fn add_comment(&self, key: &str, body_adf: &str, parent: Option<&str>) -> Result<String> {
         let body: serde_json::Value = serde_json::from_str(body_adf).context("the comment to send isn't JSON")?;

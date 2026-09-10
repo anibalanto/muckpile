@@ -3,6 +3,7 @@
 //! which one is behind it.
 
 use anyhow::Result;
+use std::collections::BTreeMap;
 
 /// A workflow transition, exactly as the provider offers it.
 ///
@@ -92,6 +93,16 @@ pub trait Provider {
 
     /// Attaches a file to the item, under `filename`.
     fn add_attachment(&self, key: &str, filename: &str, bytes: &[u8]) -> Result<Attachment>;
+
+    /// The page of an item on the provider — what a card to it points at.
+    fn item_url(&self, key: &str) -> String;
+
+    /// The item a URL is the page of, when it is one of this provider's.
+    fn key_of_url(&self, url: &str) -> Option<String>;
+
+    /// Each key's provider type and labels, in one question — a key the
+    /// provider doesn't have is simply missing from the answer.
+    fn types_of(&self, keys: &[String]) -> Result<BTreeMap<String, (String, Vec<String>)>>;
 
     /// The board's currently open sprints.
     fn open_sprints(&self, board_id: u64) -> Result<Vec<Sprint>>;

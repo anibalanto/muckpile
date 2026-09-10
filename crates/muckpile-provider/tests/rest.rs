@@ -527,3 +527,29 @@ fn add_attachment_uploads_the_file_as_multipart() {
     assert!(captured.raw.contains("filename=\"prueba.txt\""), "{}", captured.raw);
     assert!(captured.raw.contains("hola\n"), "{}", captured.raw);
 }
+
+#[test]
+fn an_item_s_url_is_its_browse_page_and_back() {
+    let provider = JiraRest::new("https://x.atlassian.net/", Credentials::new("a@b.com", "tok"));
+    assert_eq!(provider.item_url("ACC-338"), "https://x.atlassian.net/browse/ACC-338");
+    assert_eq!(provider.key_of_url("https://x.atlassian.net/browse/ACC-338").as_deref(), Some("ACC-338"));
+    assert_eq!(provider.key_of_url("https://x.atlassian.net/browse/ACC-338?focused=1"), None);
+    assert_eq!(provider.key_of_url("https://example.com/browse/ACC-338"), None);
+}
+
+/// Measured on 2026-09-10: a key that doesn't exist doesn't fail the
+/// search — the ones that do exist come back.
+#[test]
+fn types_of_asks_for_every_key_in_one_search() {
+    let response = r#"{"issues":[{"key":"ACC-356","fields":{"issuetype":{"name":"Tarea"},"labels":["question"]}}]}"#;
+    let (base, rx) = one_shot(200, response);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    let types = provider.types_of(&["ACC-356".to_string(), "ACC-99999".to_string()]).unwrap();
+
+    assert_eq!(types.len(), 1);
+    assert_eq!(types["ACC-356"], ("Tarea".to_string(), vec!["question".to_string()]));
+    let captured = rx.recv().unwrap();
+    assert!(captured.path.starts_with("/rest/api/3/search/jql?jql="), "{}", captured.path);
+    assert!(captured.path.contains("ACC-99999"), "{}", captured.path);
+}

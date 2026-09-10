@@ -134,3 +134,15 @@ fn the_phrase_is_not_always_the_same() {
     let phrases: std::collections::BTreeSet<String> = (0..20).map(|_| random_phrase()).collect();
     assert!(phrases.len() > 1, "{phrases:?}");
 }
+
+#[test]
+fn a_link_to_an_item_file_in_a_comment_goes_up_as_a_card() {
+    let dir = tempfile::tempdir().unwrap();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-360", "Tarea", "x", "Abierta", None, None);
+
+    let id = comment("ACC-360", &draft(dir.path(), "Mirá [ACC-356](ACC-356.task.md).\n"), None, Some(Author::Human(person())), &provider).unwrap();
+
+    let sent = provider.comments("ACC-360").unwrap().into_iter().find(|c| c.id == id).unwrap();
+    assert!(sent.body_adf.contains(r#""type":"inlineCard""#), "{}", sent.body_adf);
+}
