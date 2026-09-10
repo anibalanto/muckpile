@@ -31,6 +31,31 @@ pub fn link(provider: &dyn Provider, a: &str, phrase: &str, b: &str) -> Result<O
     Ok(Outcome::Applied { type_name: edge.type_name })
 }
 
+pub enum UnlinkOutcome {
+    /// The link was removed. `type_name` is the provider's name for the
+    /// relationship, as in `Outcome::Applied`.
+    Removed { type_name: String },
+    /// No type the provider offers uses this phrase, from either direction.
+    NoSuchPhrase { available: Vec<String> },
+    /// The phrase names a `type_name` edge the provider doesn't have — not
+    /// a transport error, and nothing was removed.
+    NoSuchLink { type_name: String },
+}
+
+/// Removes the link `link` with the same `a phrase b` creates: the same
+/// type, the same direction, the same two ways to write the phrase.
+pub fn unlink(provider: &dyn Provider, a: &str, phrase: &str, b: &str) -> Result<UnlinkOutcome> {
+    let types = provider.link_types()?;
+    let Some(edge) = edge(&types, a, phrase, b) else {
+        return Ok(UnlinkOutcome::NoSuchPhrase { available: phrases(&types) });
+    };
+    if provider.delete_link(&edge.type_name, edge.outward_key, edge.inward_key)? {
+        Ok(UnlinkOutcome::Removed { type_name: edge.type_name })
+    } else {
+        Ok(UnlinkOutcome::NoSuchLink { type_name: edge.type_name })
+    }
+}
+
 /// The edge `a phrase b` names, in the provider's terms: which type, and
 /// which of the two keys plays its outward phrase.
 struct Edge<'k> {
