@@ -2,7 +2,7 @@
 //! body — against a local, in-process mock. Never touches the real
 //! provider: this is exactly what the automated suite is allowed to touch.
 
-use muckpile_provider::provider::{LinkType, Provider, Sprint, Status, Transition};
+use muckpile_provider::provider::{ItemLink, LinkType, Provider, Sprint, Status, Transition};
 use muckpile_provider::rest::{Credentials, JiraRest};
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -143,6 +143,34 @@ fn item_hits_the_issue_endpoint_and_parses_every_field() {
     let captured = rx.recv().unwrap();
     assert_eq!(captured.method, "GET");
     assert!(captured.path.starts_with("/rest/api/3/issue/ACC-355"), "{}", captured.path);
+}
+
+/// Shape measured against ACC on 2026-09-10: on ACC-338, the link that
+/// ACC-340 blocks comes as `inwardIssue: ACC-340` — read from ACC-338's side,
+/// "is blocked by ACC-340". On ACC-340 the same link comes as
+/// `outwardIssue: ACC-338`, "blocks ACC-338".
+#[test]
+fn item_reads_each_link_from_the_item_s_own_side() {
+    let response = r#"{"fields":{
+        "summary":"x","status":{"name":"En curso"},"issuetype":{"name":"Tarea"},
+        "issuelinks":[
+          {"id":"54926","type":{"name":"Blocks","inward":"is blocked by","outward":"blocks"},"inwardIssue":{"key":"ACC-340"}},
+          {"id":"55080","type":{"name":"Blocks","inward":"is blocked by","outward":"blocks"},"outwardIssue":{"key":"ACC-335"}}
+        ]
+    }}"#;
+    let (base, rx) = one_shot(200, response);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    let item = provider.item("ACC-338").unwrap();
+    assert_eq!(
+        item.links,
+        vec![
+            ItemLink { phrase: "is blocked by".into(), other: "ACC-340".into() },
+            ItemLink { phrase: "blocks".into(), other: "ACC-335".into() },
+        ]
+    );
+    let captured = rx.recv().unwrap();
+    assert!(captured.path.contains("issuelinks"), "{}", captured.path);
 }
 
 #[test]

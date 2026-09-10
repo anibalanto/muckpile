@@ -2,7 +2,7 @@
 //! three transports each covering for what the other two can't do.
 
 use crate::jql::search_text;
-use crate::provider::{Item, LinkType, Provider, Sprint, Status, Transition};
+use crate::provider::{Item, ItemLink, LinkType, Provider, Sprint, Status, Transition};
 use anyhow::{anyhow, bail, Context, Result};
 use std::collections::BTreeMap;
 
@@ -50,6 +50,22 @@ impl JiraRest {
     }
 }
 
+/// One entry of an issue's `issuelinks`, read from that issue's side. The
+/// entry names only the other end: `outwardIssue` when this issue plays the
+/// type's outward phrase toward it (`blocks`), `inwardIssue` when it plays
+/// the inward one (`is blocked by`) — measured on ACC, where the same link
+/// reads `outwardIssue: ACC-338` on ACC-340 and `inwardIssue: ACC-340` on
+/// ACC-338.
+fn link_from_own_side(entry: &serde_json::Value) -> Option<ItemLink> {
+    let link_type = entry.get("type")?;
+    let (phrase, other) = match (entry.get("outwardIssue"), entry.get("inwardIssue")) {
+        (Some(other), _) => (link_type.get("outward")?, other),
+        (None, Some(other)) => (link_type.get("inward")?, other),
+        (None, None) => return None,
+    };
+    Some(ItemLink { phrase: phrase.as_str()?.to_string(), other: other.get("key")?.as_str()?.to_string() })
+}
+
 impl Provider for JiraRest {
     fn transitions(&self, key: &str) -> Result<Vec<Transition>> {
         let v = self.call("GET", &format!("/rest/api/3/issue/{key}/transitions"), None)?;
@@ -76,7 +92,7 @@ impl Provider for JiraRest {
     }
 
     fn item(&self, key: &str) -> Result<Item> {
-        let v = self.call("GET", &format!("/rest/api/3/issue/{key}?fields=summary,status,issuetype,parent,description"), None)?;
+        let v = self.call("GET", &format!("/rest/api/3/issue/{key}?fields=summary,status,issuetype,parent,description,issuelinks"), None)?;
         let fields = v.get("fields").ok_or_else(|| anyhow!("the response for {key} carries no `fields`"))?;
         let title = fields.get("summary").and_then(|s| s.as_str()).unwrap_or_default().to_string();
         let status = fields
@@ -93,7 +109,8 @@ impl Provider for JiraRest {
             .to_string();
         let parent = fields.get("parent").and_then(|p| p.get("key")).and_then(|k| k.as_str()).map(str::to_string);
         let body_adf = fields.get("description").filter(|d| !d.is_null()).map(|d| d.to_string());
-        Ok(Item { jira_type, title, status, parent, body_adf })
+        let links = fields.get("issuelinks").and_then(|l| l.as_array()).map(|l| l.iter().filter_map(link_from_own_side).collect()).unwrap_or_default();
+        Ok(Item { jira_type, title, status, parent, body_adf, links })
     }
 
     fn open_sprints(&self, board_id: u64) -> Result<Vec<Sprint>> {

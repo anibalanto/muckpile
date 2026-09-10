@@ -161,6 +161,26 @@ fn says_when_the_body_it_brought_is_read_only() {
 }
 
 #[test]
+fn writes_every_link_with_the_phrase_from_its_own_side_and_underscores_for_spaces() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    let config = load_project_config(root).unwrap();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-355", "Tarea", "Vistas de trabajo", "En curso", None, None);
+    provider.seed_links("ACC-355", &[("is blocked by", "ACC-341"), ("blocks", "ACC-229"), ("is blocked by", "ACC-340")]);
+
+    let view = root.join("to-work/ACC-355");
+    let path = pull(root, &view, None, &provider, &config).unwrap().path;
+
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(
+        text.starts_with("---\ntitle: Vistas de trabajo\nstatus: En curso\nrelation.blocks: [ACC-229]\nrelation.is_blocked_by: [ACC-340, ACC-341]\n---\n"),
+        "{text}"
+    );
+}
+
+#[test]
 fn refuses_outside_a_work_view() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();

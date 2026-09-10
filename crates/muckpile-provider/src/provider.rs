@@ -27,6 +27,18 @@ pub struct Item {
     pub parent: Option<String>,
     /// The description, as ADF, serialized. `None` when the item has none.
     pub body_adf: Option<String>,
+    /// Every link the item is on, each read from the item's own side.
+    pub links: Vec<ItemLink>,
+}
+
+/// One link, seen from the item that carries it: the phrase from its own
+/// side, and the item at the other end. A `Blocks` link between ACC-340 and
+/// ACC-338 is `blocks ACC-338` on ACC-340, and `is blocked by ACC-340` on
+/// ACC-338 — the same edge, told from each end.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ItemLink {
+    pub phrase: String,
+    pub other: String,
 }
 
 pub trait Provider {

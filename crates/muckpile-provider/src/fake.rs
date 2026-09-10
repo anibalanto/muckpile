@@ -3,7 +3,7 @@
 //! has its place, exploratory and by hand, never inside a suite that runs on
 //! every `cargo test`.
 
-use crate::provider::{self, LinkType, Provider, Sprint, Status, Transition};
+use crate::provider::{self, ItemLink, LinkType, Provider, Sprint, Status, Transition};
 use anyhow::{bail, Context, Result};
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
@@ -26,6 +26,7 @@ struct Entry {
     title: String,
     parent: Option<String>,
     body_adf: Option<String>,
+    links: Vec<ItemLink>,
 }
 
 impl FakeProvider {
@@ -81,7 +82,15 @@ impl FakeProvider {
     pub fn seed(&self, key: &str, status: &str, transitions: Vec<Transition>) {
         self.items.borrow_mut().insert(
             key.to_string(),
-            Entry { status: status.to_string(), transitions, jira_type: String::new(), title: String::new(), parent: None, body_adf: None },
+            Entry {
+                status: status.to_string(),
+                transitions,
+                jira_type: String::new(),
+                title: String::new(),
+                parent: None,
+                body_adf: None,
+                links: Vec::new(),
+            },
         );
     }
 
@@ -97,8 +106,17 @@ impl FakeProvider {
                 title: title.to_string(),
                 parent: parent.map(|s| s.to_string()),
                 body_adf: body_adf.map(|s| s.to_string()),
+                links: Vec::new(),
             },
         );
+    }
+
+    /// Seeds the links an already-seeded item is on, as `(phrase, other)`
+    /// pairs read from its own side — `("is blocked by", "ACC-340")`.
+    pub fn seed_links(&self, key: &str, links: &[(&str, &str)]) {
+        let mut items = self.items.borrow_mut();
+        let item = items.get_mut(key).unwrap_or_else(|| panic!("FakeProvider: seed {key} before its links"));
+        item.links = links.iter().map(|(phrase, other)| ItemLink { phrase: phrase.to_string(), other: other.to_string() }).collect();
     }
 
     pub fn status_of(&self, key: &str) -> Option<String> {
@@ -146,6 +164,7 @@ impl Provider for FakeProvider {
             status: i.status.clone(),
             parent: i.parent.clone(),
             body_adf: i.body_adf.clone(),
+            links: i.links.clone(),
         })
     }
 
@@ -206,6 +225,7 @@ impl Provider for FakeProvider {
                 title: title.to_string(),
                 parent: parent.map(str::to_string),
                 body_adf: body_adf.map(str::to_string),
+                links: Vec::new(),
             },
         );
         Ok(key)

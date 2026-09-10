@@ -12,7 +12,7 @@ use muckpile_core::{
     commit_paths, find_file, head_text, is_valid_id, read_frontmatter_refs, resolve_batch, slugify_title, topo_order, MARKER, TYPES,
 };
 use muckpile_provider::link::{link as provider_link, Outcome as LinkOutcome};
-use muckpile_provider::provider::{Item, Provider, Sprint};
+use muckpile_provider::provider::{Item, ItemLink, Provider, Sprint};
 use muckpile_provider::transition::{transition as provider_transition, Outcome};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -123,6 +123,9 @@ fn render_pulled_text(item: &Item) -> Result<(String, Vec<Loss>)> {
     if let Some(parent) = &item.parent {
         text.push_str(&format!("parent: {parent}\n"));
     }
+    for (key, ids) in relations(&item.links) {
+        text.push_str(&format!("relation.{key}: [{}]\n", ids.join(", ")));
+    }
     text.push_str("---\n");
     let body = match &item.body_adf {
         Some(adf) => JiraAdfMarkdownFilter::filter(adf)?,
@@ -130,6 +133,20 @@ fn render_pulled_text(item: &Item) -> Result<(String, Vec<Loss>)> {
     };
     text.push_str(&body.markdown);
     Ok((text, body.losses))
+}
+
+/// An item's links as `relation.*` fields: one key per phrase — the
+/// provider's own, with `_` for each space and nothing else changed — and
+/// the ids at the other end, sorted, keys sorted too.
+fn relations(links: &[ItemLink]) -> BTreeMap<String, Vec<String>> {
+    let mut by_key: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for link in links {
+        by_key.entry(link.phrase.replace(' ', "_")).or_default().push(link.other.clone());
+    }
+    for ids in by_key.values_mut() {
+        ids.sort();
+    }
+    by_key
 }
 
 /// The id of the `to-work/<id>/` view `cwd` stands exactly in, not one it's
@@ -600,6 +617,7 @@ fn push_one(view: &Path, local: &ItemSummary, provider: &dyn Provider) -> Result
         status: remote.status.clone(),
         parent: remote.parent.clone(),
         body_adf: if body_sent { sent_adf } else { remote.body_adf.clone() },
+        links: remote.links.clone(),
     };
     let (new_text, _) = render_pulled_text(&committed)?;
     std::fs::write(&working_path, &new_text).with_context(|| format!("writing {}", working_path.display()))?;
