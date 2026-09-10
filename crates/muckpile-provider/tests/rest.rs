@@ -256,20 +256,26 @@ fn link_types_hits_the_instance_wide_endpoint_and_parses_both_phrases() {
     assert_eq!(captured.path, "/rest/api/3/issueLinkType");
 }
 
+/// Measured against ACC on 2026-09-10, with two throwaway items: a `Blocks`
+/// link posted with `outwardIssue: ACC-358, inwardIssue: ACC-359` came back
+/// as "ACC-359 blocks ACC-358". The issue that plays the outward phrase goes
+/// in `inwardIssue` — the names say which end of the link object each field
+/// is, not which phrase its issue says.
 #[test]
-fn create_link_posts_the_type_name_and_both_keys_by_direction() {
+fn create_link_posts_the_issue_playing_the_outward_phrase_as_inward_issue() {
     let (base, rx) = one_shot(201, "");
     let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
 
-    provider.create_link("Blocks", "ACC-229", "ACC-338").unwrap();
+    // ACC-338 blocks ACC-229.
+    provider.create_link("Blocks", "ACC-338", "ACC-229").unwrap();
 
     let captured = rx.recv().unwrap();
     assert_eq!(captured.method, "POST");
     assert_eq!(captured.path, "/rest/api/3/issueLink");
     let body: serde_json::Value = serde_json::from_str(&captured.body).unwrap();
     assert_eq!(body["type"]["name"], "Blocks");
-    assert_eq!(body["outwardIssue"]["key"], "ACC-229");
     assert_eq!(body["inwardIssue"]["key"], "ACC-338");
+    assert_eq!(body["outwardIssue"]["key"], "ACC-229");
 }
 
 #[test]

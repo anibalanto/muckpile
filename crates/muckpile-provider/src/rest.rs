@@ -166,10 +166,13 @@ impl Provider for JiraRest {
     }
 
     fn create_link(&self, type_name: &str, outward_key: &str, inward_key: &str) -> Result<()> {
+        // The fields name the ends of the link object, not the phrase each
+        // issue says: the one that "blocks" is the link's inward issue —
+        // measured, a link posted the other way round comes back reversed.
         let body = serde_json::json!({
             "type": { "name": type_name },
-            "outwardIssue": { "key": outward_key },
-            "inwardIssue": { "key": inward_key },
+            "inwardIssue": { "key": outward_key },
+            "outwardIssue": { "key": inward_key },
         });
         self.call("POST", "/rest/api/3/issueLink", Some(body))?;
         Ok(())
