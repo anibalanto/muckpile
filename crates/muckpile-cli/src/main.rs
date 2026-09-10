@@ -1,4 +1,5 @@
 use anyhow::{bail, Context, Result};
+use muckpile_core::body::Loss;
 use muckpile_core::identity::load_identity;
 use muckpile_core::project::{find_project_root, load_project_config, ProjectConfig};
 use muckpile_core::states::read_states_cache;
@@ -45,10 +46,26 @@ fn run_pull(id: Option<&str>) -> Result<()> {
     let (root, cwd) = standing_in_a_project()?;
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
-    let path = muckpile_cli::pull(&root, &cwd, id, provider.as_ref(), &config)?;
-    let rel = path.strip_prefix(&root).unwrap_or(&path);
-    println!("{} traído", rel.display());
+    let pulled = muckpile_cli::pull(&root, &cwd, id, provider.as_ref(), &config)?;
+    let rel = pulled.path.strip_prefix(&root).unwrap_or(&pulled.path);
+    if pulled.losses.is_empty() {
+        println!("{} traído", rel.display());
+    } else {
+        println!("{} traído — el cuerpo es de sólo lectura: {}", rel.display(), describe_losses(&pulled.losses));
+    }
     Ok(())
+}
+
+/// Every reason a body can't be edited locally, on one line.
+fn describe_losses(losses: &[Loss]) -> String {
+    losses
+        .iter()
+        .map(|loss| match loss {
+            Loss::Lossy(construct) => format!("el conversor sólo puede aproximar {construct}"),
+            Loss::Differs => "no vuelve igual por markdown".to_string(),
+        })
+        .collect::<Vec<_>>()
+        .join("; ")
 }
 
 fn run_sprint_fetch() -> Result<()> {

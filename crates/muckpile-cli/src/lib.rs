@@ -3,7 +3,7 @@
 //! rule that needs a test lives here instead.
 
 use anyhow::{bail, Context, Result};
-use muckpile_core::body::{self, adf_to_body, body_to_adf};
+use muckpile_core::body::{self, adf_to_body, body_to_adf, Filtered, JiraAdfMarkdownFilter, Loss};
 use muckpile_core::codework::{add_worktree, derive_branch, ensure_cloned};
 use muckpile_core::item::{self, list_summaries, parse_full, read_full, ItemSummary};
 use muckpile_core::project::{classify, require_root, Position, ProjectConfig};
@@ -63,12 +63,21 @@ pub fn new(dir: &Path, item_type: &str, title: &str, blocks: Option<&str>) -> Re
     Ok(path)
 }
 
+/// What `pull` brought for one item: where it landed, and every reason its
+/// body can't be edited locally — none when it can. Said the moment the body
+/// comes down, not later when someone already edited it.
+#[derive(Debug)]
+pub struct Pulled {
+    pub path: PathBuf,
+    pub losses: Vec<Loss>,
+}
+
 /// Fetches one item and writes it as `<id>.<type>.md` into the `to-work/`
 /// view `cwd` stands exactly in. With no `id`, it's the view's own anchor —
 /// the same convention `worklist` already uses. Given one, it's a related
 /// item added to that same view, not a new one. A sprint or a query are a
 /// different call this doesn't cover yet.
-pub fn pull(root: &Path, cwd: &Path, id: Option<&str>, provider: &dyn Provider, config: &ProjectConfig) -> Result<PathBuf> {
+pub fn pull(root: &Path, cwd: &Path, id: Option<&str>, provider: &dyn Provider, config: &ProjectConfig) -> Result<Pulled> {
     let own_id = work_view_id(root, cwd)?;
     let id = match id {
         Some(id) => {
@@ -87,10 +96,10 @@ pub fn pull(root: &Path, cwd: &Path, id: Option<&str>, provider: &dyn Provider, 
 /// runs once it has a real key, so that a freshly created or found item
 /// ends up with the same commit `push`'s compare-and-swap already knows how
 /// to read.
-fn fetch_and_commit(dir: &Path, id: &str, provider: &dyn Provider, config: &ProjectConfig) -> Result<PathBuf> {
+fn fetch_and_commit(dir: &Path, id: &str, provider: &dyn Provider, config: &ProjectConfig) -> Result<Pulled> {
     let item = provider.item(id)?;
     let item_type = muckpile_type_of(config, &item.jira_type)?;
-    let text = render_pulled_text(&item)?;
+    let (text, losses) = render_pulled_text(&item)?;
 
     let filename = format!("{id}.{item_type}.md");
     let path = dir.join(&filename);
@@ -100,13 +109,14 @@ fn fetch_and_commit(dir: &Path, id: &str, provider: &dyn Provider, config: &Proj
     // since I last asked?" without a state file of its own — see
     // `commit_paths`.
     commit_paths(dir, &[&filename], &format!("pull {id}"))?;
-    Ok(path)
+    Ok(Pulled { path, losses })
 }
 
-/// The exact text `pull` writes for a fetched item — also what `push` uses
-/// to re-derive "what a fresh pull would say right now", to compare against
-/// the last one it actually committed.
-fn render_pulled_text(item: &Item) -> Result<String> {
+/// The exact text `pull` writes for a fetched item, and why its body can't
+/// be edited locally — also what `push` uses to re-derive "what a fresh pull
+/// would say right now", to compare against the last one it actually
+/// committed.
+fn render_pulled_text(item: &Item) -> Result<(String, Vec<Loss>)> {
     let mut text = String::from("---\n");
     text.push_str(&format!("title: {}\n", item.title));
     text.push_str(&format!("status: {}\n", item.status));
@@ -114,10 +124,12 @@ fn render_pulled_text(item: &Item) -> Result<String> {
         text.push_str(&format!("parent: {parent}\n"));
     }
     text.push_str("---\n");
-    if let Some(adf) = &item.body_adf {
-        text.push_str(&adf_to_body(adf)?);
-    }
-    Ok(text)
+    let body = match &item.body_adf {
+        Some(adf) => JiraAdfMarkdownFilter::filter(adf)?,
+        None => Filtered::default(),
+    };
+    text.push_str(&body.markdown);
+    Ok((text, body.losses))
 }
 
 /// The id of the `to-work/<id>/` view `cwd` stands exactly in, not one it's
@@ -533,7 +545,7 @@ fn push_one(view: &Path, local: &ItemSummary, provider: &dyn Provider) -> Result
     // commit — not the working copy, which is expected to differ by
     // exactly the edit this call is trying to send.
     let remote = provider.item(&local.id)?;
-    if render_pulled_text(&remote)? != head {
+    if render_pulled_text(&remote)?.0 != head {
         return Ok(outcome(PushResult::Stale));
     }
 
@@ -579,7 +591,7 @@ fn push_one(view: &Path, local: &ItemSummary, provider: &dyn Provider) -> Result
         parent: remote.parent.clone(),
         body_adf: if body_sent { sent_adf } else { remote.body_adf.clone() },
     };
-    let new_text = render_pulled_text(&committed)?;
+    let (new_text, _) = render_pulled_text(&committed)?;
     std::fs::write(&working_path, &new_text).with_context(|| format!("writing {}", working_path.display()))?;
     commit_paths(view, &[&filename], &format!("push {}", local.id))?;
 

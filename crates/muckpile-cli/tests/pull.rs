@@ -1,7 +1,8 @@
 //! `pull`, first slice: no argument, run standing exactly in `to-work/<id>/`
 //! — the same view `to-work` just left empty. Fetches that one item and
-//! writes `<id>.<type>.md` into it. Sprints, an explicit id argument,
-//! `relation.*`, and the `question` data directory are not this slice.
+//! writes `<id>.<type>.md` into it, saying right then whether its body can
+//! be edited locally. Sprints, an explicit id argument, `relation.*`, and
+//! the `question` data directory are not this slice.
 
 use muckpile_cli::pull;
 use muckpile_core::project::load_project_config;
@@ -47,7 +48,7 @@ fn writes_the_view_s_own_item_with_no_argument() {
     provider.seed_item("ACC-355", "Tarea", "Vistas de trabajo", "En curso", None, None);
 
     let view = root.join("to-work/ACC-355");
-    let path = pull(root, &view, None, &provider, &config).unwrap();
+    let path = pull(root, &view, None, &provider, &config).unwrap().path;
 
     assert_eq!(path, view.join("ACC-355.task.md"));
     let text = std::fs::read_to_string(&path).unwrap();
@@ -64,7 +65,7 @@ fn leaves_a_git_record_of_what_was_pulled() {
     provider.seed_item("ACC-355", "Tarea", "Vistas de trabajo", "En curso", None, None);
 
     let view = root.join("to-work/ACC-355");
-    let path = pull(root, &view, None, &provider, &config).unwrap();
+    let path = pull(root, &view, None, &provider, &config).unwrap().path;
 
     assert_eq!(head_count(&view), 1, "the fetched item should land as its own commit");
     let committed = muckpile_core::head_text(&view, "ACC-355.task.md").unwrap();
@@ -97,7 +98,7 @@ fn carries_the_parent_when_the_item_has_one() {
     provider.seed_item("ACC-355", "Tarea", "Vistas de trabajo", "En curso", Some("ACC-100"), None);
 
     let view = root.join("to-work/ACC-355");
-    let path = pull(root, &view, None, &provider, &config).unwrap();
+    let path = pull(root, &view, None, &provider, &config).unwrap().path;
 
     let text = std::fs::read_to_string(&path).unwrap();
     assert!(text.contains("\nparent: ACC-100\n"), "{text}");
@@ -114,12 +115,49 @@ fn converts_the_description_to_a_markdown_body() {
     provider.seed_item("ACC-355", "Tarea", "Vistas de trabajo", "En curso", None, Some(adf));
 
     let view = root.join("to-work/ACC-355");
-    let path = pull(root, &view, None, &provider, &config).unwrap();
+    let path = pull(root, &view, None, &provider, &config).unwrap().path;
 
     let text = std::fs::read_to_string(&path).unwrap();
     let (_, body) = text.split_once("---\n").unwrap();
     let (_, body) = body.split_once("---\n").unwrap();
     assert!(body.contains("hola"), "{text}");
+}
+
+#[test]
+fn a_body_that_comes_back_the_same_through_markdown_comes_down_editable() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    let config = load_project_config(root).unwrap();
+    let provider = FakeProvider::new();
+    let adf = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"hola"}]}]}"#;
+    provider.seed_item("ACC-355", "Tarea", "Vistas de trabajo", "En curso", None, Some(adf));
+
+    let view = root.join("to-work/ACC-355");
+    let pulled = pull(root, &view, None, &provider, &config).unwrap();
+
+    assert_eq!(pulled.losses, vec![]);
+}
+
+/// Said when the body comes down, not when someone already edited it and
+/// ran `push`.
+#[test]
+fn says_when_the_body_it_brought_is_read_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    let config = load_project_config(root).unwrap();
+    let provider = FakeProvider::new();
+    let numbered = r#"{"version":1,"type":"doc","content":[{"type":"table","attrs":{"isNumberColumnEnabled":true},"content":[
+        {"type":"tableRow","content":[{"type":"tableHeader","content":[{"type":"paragraph","content":[{"type":"text","text":"field"}]}]}]},
+        {"type":"tableRow","content":[{"type":"tableCell","content":[{"type":"paragraph","content":[{"type":"text","text":"status"}]}]}]}]}]}"#;
+    provider.seed_item("ACC-355", "Tarea", "Vistas de trabajo", "En curso", None, Some(numbered));
+
+    let view = root.join("to-work/ACC-355");
+    let pulled = pull(root, &view, None, &provider, &config).unwrap();
+
+    assert!(!pulled.losses.is_empty(), "a numbered table can't be written back through markdown");
+    assert!(pulled.path.exists(), "read-only still comes down: it's the editing that isn't safe");
 }
 
 #[test]
@@ -145,7 +183,7 @@ fn an_explicit_id_pulls_a_different_item_into_the_same_view() {
     provider.seed_item("ACC-100", "Tarea", "La épica madre", "Abierta", None, None);
 
     let view = root.join("to-work/ACC-355");
-    let path = pull(root, &view, Some("ACC-100"), &provider, &config).unwrap();
+    let path = pull(root, &view, Some("ACC-100"), &provider, &config).unwrap().path;
 
     assert_eq!(path, view.join("ACC-100.task.md"), "lands in the view standing, not a new one");
     let text = std::fs::read_to_string(&path).unwrap();
