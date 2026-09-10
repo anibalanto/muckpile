@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `7195b0c`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `86c8392`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -477,12 +477,12 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **El h1 es cuerpo, como cualquier otra línea.** En `ACC` casi toda descripción arranca con un h1 que repite el título —medido el 2026-09-10 sobre los últimos 100 ítems: 97 arrancan con un h1, y en 5 ya no coincide con el `summary`, porque se cambió de un lado y no del otro—. Es la convención de worklist, subida tal cual a Jira. `muckpile` no la sigue ni la limpia: el título es `summary`, un campo aparte, y lo que diga un h1 es contenido de la descripción.
 
-**Avance: 4/7.**
+**Avance: 5/7.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
 | `title <id> "<nuevo título>"` | `cerrada` | `title` ↔ fila `title` de la interfaz |
-| `parent <id> <padre>`, y `new --parent` | `pendiente` | Nada cambia el padre de un ítem ya sincronizado; un borrador sólo lo tiene si alguien lo escribe a mano |
+| `parent <id> <padre>`, y `new --parent` | `cerrada` | `parent` ↔ fila `parent`: valida los dos ids, se niega a que un ítem sea su propio padre, y pone la vista al día; `new` ↔ fila `new`: `--parent` escribe `parent:` en el borrador, un id real u otro `@slug` que `push` traduce. El `PUT` del padre está probado contra el mock del transporte, todavía no contra el board |
 | `unlink <a> <frase> <b>` | `pendiente` | — |
 | `link` y `unlink` aceptan la frase con `_` | `pendiente` | `link` compara la frase tal cual, con espacios |
 | `push` no sube nada del header: un header editado a mano choca, el ítem no se manda, y `push` sugiere el comando | `cerrada` | `header_edits` ↔ esta decisión: cada campo y cada relación que el archivo dice distinto del proveedor; `push_one` ↔ fila `push`: si hay alguno, `PushResult::HeaderClash` y nada más. El comando sugerido lo arma `main.rs` |
@@ -559,7 +559,7 @@ El choque de hoy, bajo este modelo, no es un `add/add` que exige `--force`: es u
 | `title` | Cambia el título de un ítem, en el momento. Es la única forma: editar `title:` en el header no se sube (decisión 12). | `$ muckpile title ACC-355 "Vistas de trabajo, con su ítem y su _data/"` |
 | `parent` | Cambia el padre de un ítem, en el momento (decisión 12). | `$ muckpile parent ACC-355 ACC-339` |
 
-**Avance de la tabla: quince de las dieciocho filas tienen bilink aceptado** (`show` tiene dos, uno por camino); `init`, `unlink` y `parent` todavía no tienen código. Que la fila esté atada no quiere decir que el comando esté completo: `pull` y `push` son parciales —lo que les falta está en las decisiones 5, 6, 7, 8 y 10—, y `to-work` diverge de su propia fila (decisión 6).
+**Avance de la tabla: dieciséis de las dieciocho filas tienen bilink aceptado** (`show` tiene dos, uno por camino); `init` y `unlink` todavía no tienen código. Que la fila esté atada no quiere decir que el comando esté completo: `pull` y `push` son parciales —lo que les falta está en las decisiones 5, 6, 7, 8 y 10—, y `to-work` diverge de su propia fila (decisión 6).
 
 Dieciocho comandos contra los veintitrés de hoy (once de `worklist`, doce de `worklist-server`). Lo que no está en la tabla — `install-hooks`, `check-push`, `assign-keys`, `bootstrap`, `reconcile`, `removes`, `push-states`, `create-or-find`, `provider set-status`, `window-open`, `propagate`, `adopt` — no falta: era la maquinaria de la asimetría que la decisión 1 saca. `bootstrap`/`reconcile`/`adopt` sí tienen equivalente, pero no como comando aparte: son `pull` con una consulta que trae de a muchos — `muckpile pull backlog --query "project = ACC AND sprint is empty"`.
 
