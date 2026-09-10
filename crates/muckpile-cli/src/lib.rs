@@ -9,7 +9,7 @@ use muckpile_core::item::{self, list_summaries, parse_full, read_full, ItemSumma
 use muckpile_core::project::{classify, require_root, Position, ProjectConfig};
 use muckpile_core::states::write_states_cache;
 use muckpile_core::{
-    commit_paths, find_file, head_text, is_valid_id, read_frontmatter_refs, resolve_batch, slugify_title, topo_order, MARKER, TYPES,
+    commit_paths, find_file, head_text, is_valid_id, read_frontmatter_refs, read_relations, resolve_batch, slugify_title, topo_order, MARKER, TYPES,
 };
 use muckpile_provider::link::{link as provider_link, Outcome as LinkOutcome};
 use muckpile_provider::provider::{Item, ItemLink, Provider, Sprint};
@@ -424,6 +424,11 @@ pub enum PushResult {
     /// creating it failed, or it depends on another pending item that
     /// failed first. The file is left exactly as it was, still pending.
     ResolveFailed(String),
+    /// A relation a just-created item's draft declared didn't reach the
+    /// provider. The item exists all the same; `PushOutcome::id` is its new
+    /// id, and `phrase`/`other` are what `link` needs to retry it — the
+    /// header is rebuilt from the provider, so the file won't carry it.
+    RelationFailed { phrase: String, other: String, reason: String },
 }
 
 /// A body edit `push` wouldn't send: why the provider's body can't be
@@ -505,12 +510,26 @@ fn resolve_pending(view: &Path, provider: &dyn Provider, config: &ProjectConfig)
             });
             continue;
         };
-        let real_parent = pending_item.parent.as_deref().map(|p| resolved.get(p).map(String::as_str).unwrap_or(p));
+        let real_id = |r: &str| resolved.get(r).cloned().unwrap_or_else(|| r.to_string());
+        let real_parent = pending_item.parent.as_deref().map(real_id);
 
-        match resolve_one(pending_item, jira_type, real_parent, provider, config) {
+        match resolve_one(pending_item, jira_type, real_parent.as_deref(), provider, config) {
             Ok((id, created)) => {
+                // What the draft's header declares travels only at creation,
+                // like its body and its parent: a found item already existed.
+                let relations = if created { read_relations(&text) } else { Vec::new() };
+                let mut failed = Vec::new();
+                for (phrase, others) in relations {
+                    for other in others {
+                        let other = real_id(&other);
+                        if let Some(reason) = link_failure(provider, &id, &phrase, &other) {
+                            failed.push(PushOutcome { id: id.clone(), result: PushResult::RelationFailed { phrase: phrase.clone(), other, reason } });
+                        }
+                    }
+                }
                 resolved.insert(slug.clone(), id.clone());
                 outcomes.push(PushOutcome { id: slug.clone(), result: PushResult::Resolved { id, created } });
+                outcomes.extend(failed);
             }
             Err(e) => outcomes.push(PushOutcome { id: slug.clone(), result: PushResult::ResolveFailed(e.to_string()) }),
         }
@@ -532,6 +551,16 @@ fn resolve_pending(view: &Path, provider: &dyn Provider, config: &ProjectConfig)
     }
 
     Ok(outcomes)
+}
+
+/// Creates one relation a draft declared, `id phrase other` — `None` when it
+/// landed, and why it didn't otherwise.
+fn link_failure(provider: &dyn Provider, id: &str, phrase: &str, other: &str) -> Option<String> {
+    match provider_link(provider, id, phrase, other) {
+        Ok(LinkOutcome::Applied { .. }) => None,
+        Ok(LinkOutcome::NoSuchPhrase { .. }) => Some(format!("ningún tipo de relación del proveedor dice \"{phrase}\"")),
+        Err(e) => Some(e.to_string()),
+    }
 }
 
 /// One pending item, already past the batch-dependency check: search by

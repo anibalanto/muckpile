@@ -3,7 +3,7 @@
 //! id, the compare-and-swap against the provider and the canonicity gate on
 //! the body.
 
-use muckpile_cli::{push, PushResult};
+use muckpile_cli::{push, PushOutcome, PushResult};
 use muckpile_core::project::ProjectConfig;
 use muckpile_provider::fake::FakeProvider;
 use std::collections::BTreeMap;
@@ -355,4 +355,102 @@ fn a_resolved_item_is_not_reported_again_as_unchanged_in_the_same_run() {
     let outcomes = push(view, &provider, &config()).unwrap();
 
     assert_eq!(outcomes.len(), 1, "one row for the resolve, none from the same-run item scan");
+}
+
+fn write_pending_with(view: &Path, slug: &str, title: &str, header: &str) {
+    std::fs::write(view.join(format!("{slug}.task.md")), format!("---\ntitle: {title}\n{header}---\n")).unwrap();
+}
+
+#[test]
+fn a_created_draft_carries_its_relations_to_the_provider() {
+    let dir = git_view();
+    let view = dir.path();
+    let provider = FakeProvider::new();
+    provider.seed_link_types(&[("Blocks", "blocks", "is blocked by")]);
+    provider.seed_item("ACC-229", "Tarea", "Lo bloqueado", "Abierta", None, None);
+    provider.queue_create("ACC-403", "Tareas por hacer");
+    write_pending_with(view, "@pregunta", "¿se hereda?", "relation.blocks: ACC-229\n");
+
+    let outcomes = push(view, &provider, &config()).unwrap();
+
+    assert_eq!(outcomes, vec![PushOutcome { id: "@pregunta".into(), result: PushResult::Resolved { id: "ACC-403".into(), created: true } }]);
+    assert_eq!(provider.links_created(), vec![("Blocks".to_string(), "ACC-403".to_string(), "ACC-229".to_string())]);
+    let committed = std::fs::read_to_string(view.join("ACC-403.task.md")).unwrap();
+    assert!(committed.contains("relation.blocks: [ACC-229]\n"), "the header rebuilt from the provider keeps it: {committed}");
+}
+
+/// The key is the provider's phrase with `_` for each space.
+#[test]
+fn a_relation_key_with_underscores_is_the_provider_s_phrase() {
+    let dir = git_view();
+    let view = dir.path();
+    let provider = FakeProvider::new();
+    provider.seed_link_types(&[("Blocks", "blocks", "is blocked by")]);
+    provider.seed_item("ACC-229", "Tarea", "Lo que bloquea", "Abierta", None, None);
+    provider.queue_create("ACC-403", "Tareas por hacer");
+    write_pending_with(view, "@algo", "bloqueada", "relation.is_blocked_by: [ACC-229]\n");
+
+    push(view, &provider, &config()).unwrap();
+
+    assert_eq!(provider.links_created(), vec![("Blocks".to_string(), "ACC-229".to_string(), "ACC-403".to_string())]);
+}
+
+#[test]
+fn a_relation_to_another_draft_in_the_batch_links_to_its_resolved_id() {
+    let dir = git_view();
+    let view = dir.path();
+    let provider = FakeProvider::new();
+    provider.seed_link_types(&[("Blocks", "blocks", "is blocked by")]);
+    provider.queue_create("ACC-100", "Tareas por hacer");
+    provider.queue_create("ACC-101", "Tareas por hacer");
+    write_pending_with(view, "@pregunta", "la pregunta", "relation.blocks: [@tarea]\n");
+    write_pending_with(view, "@tarea", "la tarea", "");
+
+    let outcomes = push(view, &provider, &config()).unwrap();
+
+    let resolved: std::collections::BTreeMap<_, _> = outcomes
+        .iter()
+        .filter_map(|o| match &o.result {
+            PushResult::Resolved { id, .. } => Some((o.id.as_str(), id.clone())),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(provider.links_created(), vec![("Blocks".to_string(), resolved["@pregunta"].clone(), resolved["@tarea"].clone())]);
+}
+
+/// The item is created all the same; what failed is said, with the command
+/// that retries it — the header rebuilt from the provider won't carry it.
+#[test]
+fn a_relation_the_provider_has_no_phrase_for_is_reported_with_the_command_to_retry() {
+    let dir = git_view();
+    let view = dir.path();
+    let provider = FakeProvider::new();
+    provider.seed_link_types(&[("Blocks", "blocks", "is blocked by")]);
+    provider.queue_create("ACC-403", "Tareas por hacer");
+    write_pending_with(view, "@algo", "un borrador", "relation.depends: ACC-229\n");
+
+    let outcomes = push(view, &provider, &config()).unwrap();
+
+    assert_eq!(outcomes[0].result, PushResult::Resolved { id: "ACC-403".into(), created: true });
+    let PushResult::RelationFailed { phrase, other, .. } = &outcomes[1].result else {
+        panic!("expected the failed relation to be reported, got {outcomes:?}");
+    };
+    assert_eq!((outcomes[1].id.as_str(), phrase.as_str(), other.as_str()), ("ACC-403", "depends", "ACC-229"));
+    assert!(provider.links_created().is_empty());
+}
+
+/// Only a created item gets what its draft declares — the same as its body
+/// and its parent.
+#[test]
+fn a_found_item_gets_no_relations_from_the_draft() {
+    let dir = git_view();
+    let view = dir.path();
+    let provider = FakeProvider::new();
+    provider.seed_link_types(&[("Blocks", "blocks", "is blocked by")]);
+    provider.seed_item("ACC-9", "Tarea", "Ya existe", "Abierta", None, None);
+    write_pending_with(view, "@algo", "Ya existe", "relation.blocks: ACC-229\n");
+
+    push(view, &provider, &config()).unwrap();
+
+    assert!(provider.links_created().is_empty());
 }

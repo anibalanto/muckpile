@@ -201,6 +201,10 @@ fn run_push(view_arg: &str) -> Result<()> {
                 println!("{}: {how} como {id}", outcome.id);
             }
             PushResult::ResolveFailed(reason) => println!("{}: no se pudo resolver — {reason}", outcome.id),
+            PushResult::RelationFailed { phrase, other, reason } => println!(
+                "{}: relation.{phrase} {other} no llegó al proveedor — {reason}. Para reintentarlo: muckpile link {} {phrase} {other}",
+                outcome.id, outcome.id
+            ),
             PushResult::Written { title, body, body_refused } => {
                 let mut sent = Vec::new();
                 if title {
