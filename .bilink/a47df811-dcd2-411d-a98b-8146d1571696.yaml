@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture 6248115ab3c7bff8bec2420bba676a03
+    accepted:
+    - agree:
+      - anibal
+      link: capture 6248115ab3c7bff8bec2420bba676a03
+      hash: 0e31c40a7bc0abc5df171286c2f6f94045ec5fe184ee94c63ec83d64c513dd2b
+    name: slug-resolution
+  1:
+    link: capture a130e7e866b7e4ef41e8d2ae17b173f4
+    accepted:
+    - agree:
+      - anibal
+      link: capture a130e7e866b7e4ef41e8d2ae17b173f4
+      hash: f9a8140b55b2cbfb957a2fa3d4f6764558325d30c6baf1ec15ccaed4c3c2ace6
+      hash_ast: 6d0697107fa207f94a6711f2c71f5cc5079916c6b8e0001ddba2e22af26f4c9e
+      n: declined
+    name: rest-find-by-title
