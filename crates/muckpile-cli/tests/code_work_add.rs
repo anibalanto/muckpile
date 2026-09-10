@@ -36,8 +36,8 @@ fn current_branch(dir: &Path) -> String {
 /// A project root with `to-work/<id>/` already there and a `sge` repo
 /// configured against `remote`.
 fn scaffold(root: &Path, id: &str, remote: &Path) -> ProjectConfig {
-    std::fs::create_dir_all(root.join(".muckpile")).unwrap();
-    std::fs::create_dir_all(root.join("to-work").join(id)).unwrap();
+    muckpile_core::ledger::init(root).unwrap();
+    muckpile_core::ledger::open_view(root, &format!("to-work/{id}")).unwrap();
     std::fs::write(
         root.join("muckpile.toml"),
         format!(

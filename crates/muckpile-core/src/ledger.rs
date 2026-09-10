@@ -34,7 +34,27 @@ pub fn init(project: &Path) -> Result<()> {
         bail!("{}: ya existe", ledger.display());
     }
     run(project, &["init", "-q", "--bare", LEDGER])?;
+    // A code worktree inside a view is another repository's, and none of
+    // the ledger's business — in every view at once.
+    std::fs::write(ledger.join("info/exclude"), "code-work/\n").with_context(|| format!("writing {}/info/exclude", ledger.display()))?;
     Ok(())
+}
+
+/// Closes the view at `<project>/<name>` — its worktree, its branch, its
+/// provider's ref — when it holds nothing: only ever one nobody put
+/// anything in. Returns whether it did.
+pub fn close_empty_view(project: &Path, name: &str) -> Result<bool> {
+    let view = project.join(name);
+    let holds_something = std::fs::read_dir(&view)?.flatten().any(|e| e.file_name() != ".git");
+    if holds_something || !git_in(&view, &["ls-tree", "HEAD"], None)?.is_empty() {
+        return Ok(false);
+    }
+    let ledger = project.join(LEDGER);
+    git_in(&ledger, &["worktree", "remove", &view.to_string_lossy()], None)?;
+    git_in(&ledger, &["branch", "-D", name], None)?;
+    git_in(&ledger, &["update-ref", "-d", &provider_ref_of(name)], None)?;
+    let _ = git_in(&ledger, &["config", "--remove-section", &format!("branch.{name}")], None);
+    Ok(true)
 }
 
 /// Opens a view at `<project>/<name>` — `to-work/SGE-9876`,

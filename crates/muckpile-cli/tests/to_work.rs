@@ -1,11 +1,12 @@
-//! `to-work` only assembles the view directory — no item fetched yet (that's
-//! `pull`'s job, and it doesn't exist), no worktree (that's `code-work add`).
+//! `to-work` only assembles the view — a worktree of the project's ledger,
+//! on its own branch — with no item fetched yet (that's `pull`'s job) and no
+//! code worktree (that's `code-work add`).
 
 use muckpile_cli::to_work;
 use std::path::Path;
 
 fn scaffold(root: &Path) {
-    std::fs::create_dir_all(root.join(".muckpile")).unwrap();
+    muckpile_core::ledger::init(root).unwrap();
     std::fs::create_dir_all(root.join("base")).unwrap();
     std::fs::create_dir_all(root.join("backlog/sprint")).unwrap();
     std::fs::create_dir_all(root.join("to-work")).unwrap();
@@ -20,15 +21,17 @@ fn creates_an_empty_view_at_the_project_root() {
     let view = to_work(root, root, "ACC-355").unwrap();
 
     assert_eq!(view, root.join("to-work/ACC-355"));
-    assert!(view.is_dir());
-    assert_eq!(std::fs::read_dir(&view).unwrap().count(), 0, "no item, no _data — that's pull's job");
+    let entries: Vec<String> = std::fs::read_dir(&view).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+    assert_eq!(entries, vec![".git".to_string()], "no item, no _data — that's pull's job");
+    let branch = std::process::Command::new("git").arg("-C").arg(&view).args(["symbolic-ref", "--short", "HEAD"]).output().unwrap();
+    assert_eq!(String::from_utf8_lossy(&branch.stdout).trim(), "to-work/ACC-355", "a worktree of the ledger, on the view's own branch");
 }
 
 #[test]
 fn creates_to_work_itself_when_the_project_does_not_have_it_yet() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
-    std::fs::create_dir_all(root.join(".muckpile")).unwrap();
+    muckpile_core::ledger::init(root).unwrap();
 
     let view = to_work(root, root, "ACC-355").unwrap();
 

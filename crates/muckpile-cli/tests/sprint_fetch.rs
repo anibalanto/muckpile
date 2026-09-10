@@ -9,7 +9,7 @@ use muckpile_provider::fake::FakeProvider;
 use std::path::Path;
 
 fn scaffold(root: &Path) {
-    std::fs::create_dir_all(root.join(".muckpile")).unwrap();
+    muckpile_core::ledger::init(root).unwrap();
     std::fs::create_dir_all(root.join("base")).unwrap();
     std::fs::create_dir_all(root.join("backlog/sprint")).unwrap();
     std::fs::create_dir_all(root.join("to-work")).unwrap();
@@ -35,6 +35,8 @@ fn creates_one_empty_folder_per_open_sprint_slugified() {
     assert_eq!(result.created, vec!["22_Las_vistas".to_string(), "23_Las_questions".to_string()]);
     assert!(root.join("backlog/sprint/22_Las_vistas").is_dir());
     assert!(root.join("backlog/sprint/23_Las_questions").is_dir());
+    let branch = std::process::Command::new("git").arg("-C").arg(root.join("backlog/sprint/22_Las_vistas")).args(["symbolic-ref", "--short", "HEAD"]).output().unwrap();
+    assert_eq!(String::from_utf8_lossy(&branch.stdout).trim(), "backlog/sprint/22_Las_vistas", "each sprint is a view of the ledger");
 }
 
 #[test]
@@ -125,7 +127,7 @@ fn a_name_the_provider_did_not_truncate_is_left_alone() {
 fn refuses_without_a_configured_board_id() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
-    std::fs::create_dir_all(root.join(".muckpile")).unwrap();
+    muckpile_core::ledger::init(root).unwrap();
     std::fs::create_dir_all(root.join("backlog/sprint")).unwrap();
     std::fs::write(
         root.join("muckpile.toml"),

@@ -6,6 +6,7 @@ use anyhow::{bail, Context, Result};
 use muckpile_core::body::{self, body_to_adf, cards_to_file_links, cited_keys, file_links_to_cards, Filtered, JiraAdfMarkdownFilter, Loss};
 use muckpile_core::codework::{add_worktree, derive_branch, ensure_cloned};
 use muckpile_core::item::{self, list_summaries, parse_full, read_full, ItemSummary};
+use muckpile_core::ledger;
 use muckpile_core::project::{classify, require_root, ItemType, Position, ProjectConfig};
 use muckpile_core::states::write_states_cache;
 use muckpile_core::{
@@ -17,21 +18,57 @@ use muckpile_provider::transition::{transition as provider_transition, Outcome};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-/// Assembles a working view: `<root>/to-work/<id>/`, empty. Fetching the
-/// item is `pull`'s job — see below — and this doesn't call it: a fresh
-/// view and an update to one are two different moments to fail at.
+/// Makes a project, `<multitask>/<name>/`: its ledger, a `muckpile.toml`
+/// to fill in, and the three reserved folders. The only command that makes
+/// a ledger — every other one refuses outside a project that has one.
+pub fn init(multitask: &Path, name: &str) -> Result<PathBuf> {
+    if name.is_empty() || name.starts_with('.') || name.contains(['/', '\\']) {
+        bail!("{name:?}: el nombre de un proyecto es una carpeta, sin / y sin empezar con punto");
+    }
+    let project = multitask.join(name);
+    if project.join(ledger::LEDGER).exists() {
+        bail!("{name}: ya es un proyecto");
+    }
+    for folder in ["base", "backlog/sprint", "to-work"] {
+        std::fs::create_dir_all(project.join(folder)).with_context(|| format!("creating {}/{folder}", project.display()))?;
+    }
+    ledger::init(&project)?;
+    let config = project.join("muckpile.toml");
+    if !config.exists() {
+        std::fs::write(&config, CONFIG_TEMPLATE).with_context(|| format!("writing {}", config.display()))?;
+    }
+    Ok(project)
+}
+
+/// What `init` leaves to fill in: the shape of the file, with placeholders
+/// where only the person knows the value.
+const CONFIG_TEMPLATE: &str = r#"provider = "jira-rest"
+jira_base_url = "https://INSTANCIA.atlassian.net"
+jira_project_key = "CLAVE"
+# jira_board_id = 0
+commit_prefix = "prefijo"
+
+# [repos.nombre]
+# remote = "git@host:grupo/repo.git"
+# branch = "main"
+
+[item_type]
+task = "Tarea"
+user-story = "Historia"
+epic = "Epic"
+question = { type = "Tarea", label = "question" }
+"#;
+
+/// Assembles a working view: `<root>/to-work/<id>/`, a worktree of the
+/// project's ledger, empty. Fetching the item is `pull`'s job — see below —
+/// and this doesn't call it: a fresh view and an update to one are two
+/// different moments to fail at.
 pub fn to_work(root: &Path, cwd: &Path, id: &str) -> Result<PathBuf> {
     require_root(root, cwd)?;
     if !is_valid_id(id) {
         bail!("{id}: no es un id válido");
     }
-
-    let view = root.join("to-work").join(id);
-    if view.exists() {
-        bail!("to-work/{id}: ya existe");
-    }
-    std::fs::create_dir_all(&view).with_context(|| format!("creating {}", view.display()))?;
-    Ok(view)
+    ledger::open_view(root, &format!("to-work/{id}"))
 }
 
 /// Writes `@<slug>.<type>.md` into `dir` — no network, no provider: the id
@@ -384,9 +421,8 @@ pub fn sprint_fetch(root: &Path, provider: &dyn Provider, config: &ProjectConfig
 
     let mut created = Vec::new();
     for slug in &slugs {
-        let path = dir.join(slug);
-        if !path.exists() {
-            std::fs::create_dir(&path).with_context(|| format!("creating {}", path.display()))?;
+        if !dir.join(slug).exists() {
+            ledger::open_view(root, &format!("backlog/sprint/{slug}"))?;
             created.push(slug.clone());
         }
     }
@@ -401,8 +437,15 @@ pub fn sprint_fetch(root: &Path, provider: &dyn Provider, config: &ProjectConfig
         if slugs.contains(&name) {
             continue;
         }
-        if std::fs::read_dir(entry.path())?.next().is_none() {
+        let closed = if entry.path().join(".git").exists() {
+            ledger::close_empty_view(root, &format!("backlog/sprint/{name}"))?
+        } else if std::fs::read_dir(entry.path())?.next().is_none() {
             std::fs::remove_dir(entry.path())?;
+            true
+        } else {
+            false
+        };
+        if closed {
             removed.push(name);
         }
     }
