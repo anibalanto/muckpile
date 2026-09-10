@@ -7,14 +7,14 @@ endpoint:
       - anibal
       link: capture e1938d387e13a68e2410fd2c1616009d
       hash: 49314969db07dce98b0199a282a9fa4859c89116f425697a2e64c0678f1bfe85
-    name: identity-spec
+    name: config-spec
   1:
-    link: capture ecf708824cc56af834ca826a0aeca17b
+    link: capture 8b28751e06527617d9d8b2c2d2aacb31
     accepted:
     - agree:
       - anibal
-      link: capture ecf708824cc56af834ca826a0aeca17b
-      hash: b6c785cd173d9723b5bf35dc2e9f99e56c4dbdec501bb466fff88963d8243eb5
-      hash_ast: c0224ec0c7f4bf485575ba2242818150fa187add75bf5e244ca7d2315b5fe38b
+      link: capture 8b28751e06527617d9d8b2c2d2aacb31
+      hash: 736370638c1be7aa94a06026051f6ec8cb163b47eac46e181b9c8b3c65422d53
+      hash_ast: 0c2c29201a53019668f1ea37af785e501d658ca7764a92e45dcfac1ac7f4b686
       n: declined
-    name: identity-impl
+    name: check-item-types
