@@ -48,12 +48,19 @@ pub fn read_summary(path: &Path) -> Result<ItemSummary> {
 pub fn read_full(path: &Path) -> Result<FullItem> {
     let (id, item_type) = id_and_type(path)?;
     let text = std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
-    let parsed = parse_frontmatter(&text).with_context(|| format!("{}: no empieza con frontmatter", path.display()))?;
+    parse_full(id, item_type, &text)
+}
 
+/// Like `read_full`, but from text already in hand rather than a path on
+/// disk — `push` uses it on both the working copy of an item and a
+/// git-committed snapshot of it (see `head_text`), neither of which is
+/// necessarily what's on disk right now.
+pub fn parse_full(id: String, item_type: String, text: &str) -> Result<FullItem> {
+    let parsed = parse_frontmatter(text).with_context(|| format!("{id}.{item_type}.md: no empieza con frontmatter"))?;
     Ok(FullItem {
         id,
         item_type,
-        title: parsed.title.with_context(|| format!("{}: sin title en el frontmatter", path.display()))?,
+        title: parsed.title.with_context(|| "sin title en el frontmatter".to_string())?,
         status: parsed.status,
         parent: parsed.parent,
         body: parsed.body,
