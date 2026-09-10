@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `da1da80`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `2965352`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -418,7 +418,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **Y no se resuelve pidiéndole a una IA que aplique el cambio a ciegas** — eso cambia el problema por uno peor: nadie compara el resultado contra lo que se pidió. Lo que ofrece `muckpile` es un diff: convierte el borrador editado a ADF con el mismo conversor —aunque no lo vaya a subir—, lo compara contra el ADF real, y muestra la diferencia, incluida la que se perdería si se aplicara tal cual. El borrador va como se mandaría, y el ADF real en la forma canónica del conversor: las tres normalizaciones de la tabla de arriba son equivalencias, y mostrarlas —un `attrs: {}` por cada celda de cada tabla— sólo taparía la diferencia que importa. Ese diff lo aplica una persona en Jira, o una IA operando ahí, con la pérdida ya visible antes de decidir — no escondida como hoy hace el round-trip de worklist.
 
-**Avance: 8/11.**
+**Avance: 10/11.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -431,8 +431,8 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 | No canónico → `push` no sube el cuerpo y ofrece el diff | `cerrada` | `push_one` ↔ fila `push` |
 | El diff es contra el ADF real | `cerrada` | `adf_diff` ↔ esta decisión, llamado desde `push_one`: el ADF real en la forma canónica del conversor contra el borrador como se mandaría |
 | El header no pasa por esto | `cerrada` | `push_one` ↔ fila `push`: un header editado a mano choca antes de llegar a la canonicidad, y `title`/`transition` lo escriben sin conversión |
-| Un link a `<clave>.<tipo>.md` sube como tarjeta, `inlineCard` con `<base>/browse/<clave>` | `pendiente` | Hoy sube como link de texto con destino `ACC-338.task.md`, que en Jira no lleva a ningún lado |
-| Una tarjeta o un link a `<base>/browse/<clave>` del proyecto baja como `[<clave>](<clave>.<tipo>.md)`, con el tipo del proveedor | `pendiente` | Hoy una tarjeta baja como bloque ADF crudo, y un link común queda como URL |
+| Un link a `<clave>.<tipo>.md` sube como tarjeta, `inlineCard` con `<base>/browse/<clave>` | `cerrada` | `file_links_to_cards` ↔ esta decisión: un tramo de texto que linkea al archivo de un ítem pasa a una tarjeta, y el texto no viaja. Lo usan todos los que mandan un cuerpo: crear un borrador, `push` y `comment` |
+| Una tarjeta o un link a `<base>/browse/<clave>` del proyecto baja como `[<clave>](<clave>.<tipo>.md)`, con el tipo del proveedor | `cerrada` | `cards_to_file_links` ↔ esta decisión, y `to_markdown` ↔ esta decisión, que pregunta los tipos —con sus etiquetas: una `question` baja como `.question.md`— en una sola búsqueda. Probado el 2026-09-10 con el binario en `ACC-354`: los links de worklist bajaron como `[ACC-326](ACC-326.task.md)` y `[ACC-332](ACC-332.task.md)`, y no quedó ninguna URL |
 
 ### 11. El código va en inglés entero — identificadores y comentarios, sin cita externa
 
