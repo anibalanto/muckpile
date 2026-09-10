@@ -6,7 +6,7 @@ use anyhow::{bail, Context, Result};
 use muckpile_core::body::{self, adf_to_body, body_to_adf, Filtered, JiraAdfMarkdownFilter, Loss};
 use muckpile_core::codework::{add_worktree, derive_branch, ensure_cloned};
 use muckpile_core::item::{self, list_summaries, parse_full, read_full, ItemSummary};
-use muckpile_core::project::{classify, require_root, Position, ProjectConfig};
+use muckpile_core::project::{classify, require_root, ItemType, Position, ProjectConfig};
 use muckpile_core::states::write_states_cache;
 use muckpile_core::{
     commit_paths, find_file, head_text, is_valid_id, read_frontmatter_refs, read_relations, resolve_batch, slugify_title, topo_order, MARKER, TYPES,
@@ -98,7 +98,9 @@ pub fn pull(root: &Path, cwd: &Path, id: Option<&str>, provider: &dyn Provider, 
 /// to read.
 fn fetch_and_commit(dir: &Path, id: &str, provider: &dyn Provider, config: &ProjectConfig) -> Result<Pulled> {
     let item = provider.item(id)?;
-    let item_type = muckpile_type_of(config, &item.jira_type)?;
+    let item_type = config
+        .muckpile_type_of(&item.jira_type, &item.labels)
+        .with_context(|| format!("{}: sin tipo de item para él en muckpile.toml", item.jira_type))?;
     let (text, losses) = render_pulled_text(&item)?;
 
     let filename = format!("{id}.{item_type}.md");
@@ -200,17 +202,6 @@ pub fn code_work_add(
 
     add_worktree(&base, &worktree_path, &branch, from_branch)?;
     Ok(worktree_path)
-}
-
-/// The muckpile type whose `muckpile.toml` mapping names `jira_type` — the
-/// reverse of the table decision 9 declares (muckpile type -> provider type).
-fn muckpile_type_of(config: &ProjectConfig, jira_type: &str) -> Result<String> {
-    config
-        .item_type
-        .iter()
-        .find(|(_, v)| v.as_str() == jira_type)
-        .map(|(k, _)| k.clone())
-        .with_context(|| format!("{jira_type}: sin tipo de item para él en muckpile.toml"))
 }
 
 /// What `sprint_fetch` did: the slugs it created, the slugs it removed
@@ -515,7 +506,7 @@ fn resolve_pending(view: &Path, provider: &dyn Provider, config: &ProjectConfig)
             continue;
         }
 
-        let Some(jira_type) = config.item_type.get(&pending_item.item_type) else {
+        let Some(provider_type) = config.item_type.get(&pending_item.item_type) else {
             outcomes.push(PushOutcome {
                 id: slug.clone(),
                 result: PushResult::ResolveFailed(format!("{}: sin tipo de item para él en muckpile.toml", pending_item.item_type)),
@@ -525,7 +516,7 @@ fn resolve_pending(view: &Path, provider: &dyn Provider, config: &ProjectConfig)
         let real_id = |r: &str| resolved.get(r).cloned().unwrap_or_else(|| r.to_string());
         let real_parent = pending_item.parent.as_deref().map(real_id);
 
-        match resolve_one(pending_item, jira_type, real_parent.as_deref(), provider, config) {
+        match resolve_one(pending_item, provider_type, real_parent.as_deref(), provider, config) {
             Ok((id, created)) => {
                 // What the draft's header declares travels only at creation,
                 // like its body and its parent: a found item already existed.
@@ -576,21 +567,23 @@ fn link_failure(provider: &dyn Provider, id: &str, phrase: &str, other: &str) ->
 }
 
 /// One pending item, already past the batch-dependency check: search by
-/// title, and only create when nothing matches. A found item never sends
-/// its draft body or parent — both only ever travel at creation, and
-/// finding means something already existed before this run touched it.
+/// title — and by label, when its type needs one to be told apart — and only
+/// create when nothing matches. A found item never sends its draft body or
+/// parent — both only ever travel at creation, and finding means something
+/// already existed before this run touched it.
 fn resolve_one(
     pending: &item::PendingItem,
-    jira_type: &str,
+    provider_type: &ItemType,
     real_parent: Option<&str>,
     provider: &dyn Provider,
     config: &ProjectConfig,
 ) -> Result<(String, bool)> {
-    if let Some(id) = provider.find_by_title(&config.jira_project_key, jira_type, &pending.title)? {
+    let (jira_type, label) = (provider_type.jira_type.as_str(), provider_type.label.as_deref());
+    if let Some(id) = provider.find_by_title(&config.jira_project_key, jira_type, label, &pending.title)? {
         return Ok((id, false));
     }
     let body_adf = if pending.body.trim().is_empty() { None } else { Some(body_to_adf(&pending.body)?) };
-    let id = provider.create_item(&config.jira_project_key, jira_type, &pending.title, real_parent, body_adf.as_deref())?;
+    let id = provider.create_item(&config.jira_project_key, jira_type, label, &pending.title, real_parent, body_adf.as_deref())?;
     Ok((id, true))
 }
 
@@ -659,6 +652,7 @@ fn push_one(view: &Path, local: &ItemSummary, provider: &dyn Provider) -> Result
         parent: remote.parent.clone(),
         body_adf: if body_sent { sent_adf } else { remote.body_adf.clone() },
         links: remote.links.clone(),
+        labels: remote.labels.clone(),
     };
     let (new_text, _) = render_pulled_text(&committed)?;
     std::fs::write(&working_path, &new_text).with_context(|| format!("writing {}", working_path.display()))?;

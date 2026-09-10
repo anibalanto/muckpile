@@ -29,6 +29,9 @@ pub struct Item {
     pub body_adf: Option<String>,
     /// Every link the item is on, each read from the item's own side.
     pub links: Vec<ItemLink>,
+    /// The item's labels — what tells apart two muckpile types that share
+    /// one provider type.
+    pub labels: Vec<String>,
 }
 
 /// One link, seen from the item that carries it: the phrase from its own
@@ -83,10 +86,11 @@ pub trait Provider {
     fn update_body(&self, key: &str, body_adf: &str) -> Result<()>;
 
     /// The key of the item whose title is exactly `title`, among those of
-    /// `jira_type` in `project_key` — `None` when there's no such item.
-    /// Checked before creating, so a retry after a partial failure doesn't
-    /// duplicate what an earlier attempt already made.
-    fn find_by_title(&self, project_key: &str, jira_type: &str, title: &str) -> Result<Option<String>>;
+    /// `jira_type` in `project_key` — carrying `label`, when there is one —
+    /// `None` when there's no such item. Checked before creating, so a retry
+    /// after a partial failure doesn't duplicate what an earlier attempt
+    /// already made.
+    fn find_by_title(&self, project_key: &str, jira_type: &str, label: Option<&str>, title: &str) -> Result<Option<String>>;
 
     /// Creates a new item and returns its key. `parent` and `body_adf`
     /// travel only here — an item this finds instead of creates never gets
@@ -96,6 +100,7 @@ pub trait Provider {
         &self,
         project_key: &str,
         jira_type: &str,
+        label: Option<&str>,
         title: &str,
         parent: Option<&str>,
         body_adf: Option<&str>,

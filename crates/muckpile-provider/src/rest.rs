@@ -92,7 +92,7 @@ impl Provider for JiraRest {
     }
 
     fn item(&self, key: &str) -> Result<Item> {
-        let v = self.call("GET", &format!("/rest/api/3/issue/{key}?fields=summary,status,issuetype,parent,description,issuelinks"), None)?;
+        let v = self.call("GET", &format!("/rest/api/3/issue/{key}?fields=summary,status,issuetype,parent,description,issuelinks,labels"), None)?;
         let fields = v.get("fields").ok_or_else(|| anyhow!("the response for {key} carries no `fields`"))?;
         let title = fields.get("summary").and_then(|s| s.as_str()).unwrap_or_default().to_string();
         let status = fields
@@ -110,7 +110,12 @@ impl Provider for JiraRest {
         let parent = fields.get("parent").and_then(|p| p.get("key")).and_then(|k| k.as_str()).map(str::to_string);
         let body_adf = fields.get("description").filter(|d| !d.is_null()).map(|d| d.to_string());
         let links = fields.get("issuelinks").and_then(|l| l.as_array()).map(|l| l.iter().filter_map(link_from_own_side).collect()).unwrap_or_default();
-        Ok(Item { jira_type, title, status, parent, body_adf, links })
+        let labels = fields
+            .get("labels")
+            .and_then(|l| l.as_array())
+            .map(|l| l.iter().filter_map(|l| l.as_str().map(str::to_string)).collect())
+            .unwrap_or_default();
+        Ok(Item { jira_type, title, status, parent, body_adf, links, labels })
     }
 
     fn open_sprints(&self, board_id: u64) -> Result<Vec<Sprint>> {
@@ -192,12 +197,15 @@ impl Provider for JiraRest {
         Ok(())
     }
 
-    fn find_by_title(&self, project_key: &str, jira_type: &str, title: &str) -> Result<Option<String>> {
+    fn find_by_title(&self, project_key: &str, jira_type: &str, label: Option<&str>, title: &str) -> Result<Option<String>> {
         let needle = search_text(title);
         if needle.is_empty() {
             bail!("{title:?}: no queda nada con qué buscar después de reducirlo para JQL");
         }
-        let jql = format!("project = {project_key} AND issuetype = \"{jira_type}\" AND summary ~ \"{needle}\"");
+        let mut jql = format!("project = {project_key} AND issuetype = \"{jira_type}\" AND summary ~ \"{needle}\"");
+        if let Some(label) = label {
+            jql.push_str(&format!(" AND labels = \"{label}\""));
+        }
         // `/search` without `/jql` answers 410 Gone: the provider retired it.
         let path = format!("/rest/api/3/search/jql?jql={}&fields=summary&maxResults=100", url_encode(&jql));
         let v = self.call("GET", &path, None)?;
@@ -213,7 +221,7 @@ impl Provider for JiraRest {
         }))
     }
 
-    fn create_item(&self, project_key: &str, jira_type: &str, title: &str, parent: Option<&str>, body_adf: Option<&str>) -> Result<String> {
+    fn create_item(&self, project_key: &str, jira_type: &str, label: Option<&str>, title: &str, parent: Option<&str>, body_adf: Option<&str>) -> Result<String> {
         let mut fields = serde_json::json!({
             "project": { "key": project_key },
             "issuetype": { "name": jira_type },
@@ -221,6 +229,9 @@ impl Provider for JiraRest {
         });
         if let Some(p) = parent {
             fields["parent"] = serde_json::json!({ "key": p });
+        }
+        if let Some(label) = label {
+            fields["labels"] = serde_json::json!([label]);
         }
         if let Some(adf) = body_adf {
             let adf_value: serde_json::Value = serde_json::from_str(adf).context("the body to send isn't JSON")?;

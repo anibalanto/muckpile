@@ -27,14 +27,86 @@ pub struct ProjectConfig {
     #[serde(default)]
     pub repos: BTreeMap<String, RepoConfig>,
     #[serde(default)]
-    pub item_type: BTreeMap<String, String>,
+    pub item_type: BTreeMap<String, ItemType>,
 }
 
-/// Reads `<root>/muckpile.toml`.
+/// How one muckpile type lives on the provider: its issue type, and the
+/// label that tells it apart when another muckpile type shares that issue
+/// type. Written as a bare string when it needs no label.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(from = "ItemTypeEntry")]
+pub struct ItemType {
+    pub jira_type: String,
+    pub label: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum ItemTypeEntry {
+    Plain(String),
+    Labeled {
+        #[serde(rename = "type")]
+        jira_type: String,
+        label: String,
+    },
+}
+
+impl From<ItemTypeEntry> for ItemType {
+    fn from(entry: ItemTypeEntry) -> Self {
+        match entry {
+            ItemTypeEntry::Plain(jira_type) => ItemType { jira_type, label: None },
+            ItemTypeEntry::Labeled { jira_type, label } => ItemType { jira_type, label: Some(label) },
+        }
+    }
+}
+
+impl From<&str> for ItemType {
+    fn from(jira_type: &str) -> Self {
+        ItemType { jira_type: jira_type.to_string(), label: None }
+    }
+}
+
+impl ProjectConfig {
+    /// The muckpile type an item of `jira_type` carrying `labels` is: the
+    /// one whose label it carries, or else the one on that type with no
+    /// label — `None` when neither exists.
+    pub fn muckpile_type_of(&self, jira_type: &str, labels: &[String]) -> Option<&str> {
+        let on_type = || self.item_type.iter().filter(|(_, t)| t.jira_type == jira_type);
+        on_type()
+            .find(|(_, t)| t.label.as_ref().is_some_and(|l| labels.contains(l)))
+            .or_else(|| on_type().find(|(_, t)| t.label.is_none()))
+            .map(|(name, _)| name.as_str())
+    }
+}
+
+/// Reads `<root>/muckpile.toml`, refusing an `item_type` table that would
+/// leave an item unable to say which muckpile type it is.
 pub fn load_project_config(root: &Path) -> Result<ProjectConfig> {
     let path = root.join("muckpile.toml");
     let text = std::fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
-    toml::from_str(&text).with_context(|| format!("parsing {}", path.display()))
+    let config: ProjectConfig = toml::from_str(&text).with_context(|| format!("parsing {}", path.display()))?;
+    check_item_types(&config.item_type).with_context(|| format!("{}", path.display()))?;
+    Ok(config)
+}
+
+/// Among the muckpile types sharing one provider type, at most one goes
+/// without a label, and no two share a label — otherwise an item of that
+/// type couldn't say which of them it is.
+fn check_item_types(item_types: &BTreeMap<String, ItemType>) -> Result<()> {
+    let mut by_key: BTreeMap<(&str, Option<&str>), Vec<&str>> = BTreeMap::new();
+    for (name, t) in item_types {
+        by_key.entry((t.jira_type.as_str(), t.label.as_deref())).or_default().push(name);
+    }
+    for ((jira_type, label), names) in by_key {
+        if names.len() > 1 {
+            let names = names.join(" y ");
+            match label {
+                None => bail!("{names} son \"{jira_type}\" sin etiqueta: un ítem de ese tipo no diría cuál es — a todos menos uno les falta `label`"),
+                Some(label) => bail!("{names} son \"{jira_type}\" con la misma etiqueta, \"{label}\": un ítem de ese tipo no diría cuál es"),
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Walks up from `start` looking for a directory holding `.muckpile/` — the

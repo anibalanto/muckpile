@@ -4,7 +4,7 @@
 //! changes by command, and the canonicity gate on the body.
 
 use muckpile_cli::{push, HeaderEdit, PushOutcome, PushResult};
-use muckpile_core::project::ProjectConfig;
+use muckpile_core::project::{ItemType, ProjectConfig};
 use muckpile_provider::fake::FakeProvider;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -12,7 +12,8 @@ use std::process::Command;
 
 fn config() -> ProjectConfig {
     let mut item_type = BTreeMap::new();
-    item_type.insert("task".to_string(), "Tarea".to_string());
+    item_type.insert("task".to_string(), "Tarea".into());
+    item_type.insert("question".to_string(), ItemType { jira_type: "Tarea".into(), label: Some("question".into()) });
     ProjectConfig {
         provider: "jira-rest".into(),
         jira_base_url: "https://x.atlassian.net".into(),
@@ -519,4 +520,37 @@ fn a_found_item_gets_no_relations_from_the_draft() {
     push(view, &provider, &config()).unwrap();
 
     assert!(provider.links_created().is_empty());
+}
+
+/// A question created on a board that has no question type of its own goes
+/// up as that type, labeled — the label is what brings it back as a question.
+#[test]
+fn a_created_question_carries_its_label() {
+    let dir = git_view();
+    let view = dir.path();
+    let provider = FakeProvider::new();
+    provider.queue_create("ACC-403", "Tareas por hacer");
+    std::fs::write(view.join("@se-hereda.question.md"), "---\ntitle: ¿se hereda?\n---\n").unwrap();
+
+    let outcomes = push(view, &provider, &config()).unwrap();
+
+    assert_eq!(outcomes[0].result, PushResult::Resolved { id: "ACC-403".into(), created: true });
+    assert_eq!(provider.labels_of("ACC-403"), vec!["question".to_string()]);
+    assert!(view.join("ACC-403.question.md").exists(), "it comes back as a question");
+}
+
+/// The search before creating narrows by the label too: a plain task with
+/// the same title isn't the question this draft is.
+#[test]
+fn a_pending_question_is_not_found_as_a_task_with_the_same_title() {
+    let dir = git_view();
+    let view = dir.path();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-9", "Tarea", "¿se hereda?", "Abierta", None, None);
+    provider.queue_create("ACC-403", "Tareas por hacer");
+    std::fs::write(view.join("@se-hereda.question.md"), "---\ntitle: ¿se hereda?\n---\n").unwrap();
+
+    let outcomes = push(view, &provider, &config()).unwrap();
+
+    assert_eq!(outcomes[0].result, PushResult::Resolved { id: "ACC-403".into(), created: true });
 }

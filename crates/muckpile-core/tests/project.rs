@@ -1,7 +1,7 @@
 //! Where a project root is, what a given directory counts as inside it, and
 //! reading `muckpile.toml`. No provider involved — this is all local.
 
-use muckpile_core::project::{classify, find_project_root, load_project_config, require_root, Position};
+use muckpile_core::project::{classify, find_project_root, load_project_config, require_root, ItemType, Position};
 use std::path::Path;
 
 /// The minimal shape a project root needs for `classify`/`require_root` to
@@ -82,7 +82,7 @@ branch = "main"
 task = "Tarea"
 user-story = "Historia"
 epic = "Epic"
-question = "Tarea"
+question = { type = "Tarea", label = "question" }
 "#,
     )
     .unwrap();
@@ -93,7 +93,51 @@ question = "Tarea"
     assert_eq!(config.commit_prefix, "jr");
     assert_eq!(config.repos["sge"].branch, "master");
     assert_eq!(config.repos["portal-escolar"].remote, "git@gitlab.lamansys.ar:minsal/portal-escolar.git");
-    assert_eq!(config.item_type["user-story"], "Historia");
+    assert_eq!(config.item_type["user-story"], ItemType { jira_type: "Historia".into(), label: None });
+    assert_eq!(config.item_type["question"], ItemType { jira_type: "Tarea".into(), label: Some("question".into()) });
+}
+
+fn config_with_item_types(item_types: &str) -> anyhow::Result<muckpile_core::project::ProjectConfig> {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("muckpile.toml"),
+        format!("provider = \"jira-rest\"\njira_base_url = \"https://x\"\njira_project_key = \"SGE\"\ncommit_prefix = \"jr\"\n\n[item_type]\n{item_types}"),
+    )
+    .unwrap();
+    load_project_config(dir.path())
+}
+
+/// Two muckpile types on the same provider type with nothing to tell them
+/// apart: an item of that type couldn't say which one it is.
+#[test]
+fn refuses_two_types_sharing_a_provider_type_with_no_label_between_them() {
+    let err = config_with_item_types("task = \"Tarea\"\nquestion = \"Tarea\"\n").unwrap_err();
+    let msg = format!("{err:#}");
+    assert!(msg.contains("Tarea") && msg.contains("question") && msg.contains("task"), "{msg}");
+}
+
+#[test]
+fn refuses_two_types_sharing_a_provider_type_and_a_label() {
+    let err = config_with_item_types("task = { type = \"Tarea\", label = \"x\" }\nquestion = { type = \"Tarea\", label = \"x\" }\n").unwrap_err();
+    assert!(format!("{err:#}").contains("x"), "{err:#}");
+}
+
+#[test]
+fn a_shared_provider_type_is_told_apart_by_its_label() {
+    let config = config_with_item_types("task = \"Tarea\"\nquestion = { type = \"Tarea\", label = \"question\" }\nepic = \"Epic\"\n").unwrap();
+    assert_eq!(config.muckpile_type_of("Tarea", &["question".to_string()]), Some("question"));
+    assert_eq!(config.muckpile_type_of("Tarea", &["otra".to_string()]), Some("task"), "the one with no label is the default");
+    assert_eq!(config.muckpile_type_of("Tarea", &[]), Some("task"));
+    assert_eq!(config.muckpile_type_of("Epic", &[]), Some("epic"));
+    assert_eq!(config.muckpile_type_of("Historia", &[]), None);
+}
+
+/// Every muckpile type on the provider type carries a label, and the item
+/// carries none of them: there's no default to fall back to.
+#[test]
+fn an_item_with_none_of_the_labels_and_no_default_has_no_type() {
+    let config = config_with_item_types("question = { type = \"Tarea\", label = \"question\" }\n").unwrap();
+    assert_eq!(config.muckpile_type_of("Tarea", &[]), None);
 }
 
 #[test]

@@ -27,6 +27,7 @@ struct Entry {
     parent: Option<String>,
     body_adf: Option<String>,
     links: Vec<ItemLink>,
+    labels: Vec<String>,
 }
 
 impl FakeProvider {
@@ -90,6 +91,7 @@ impl FakeProvider {
                 parent: None,
                 body_adf: None,
                 links: Vec::new(),
+                labels: Vec::new(),
             },
         );
     }
@@ -107,8 +109,20 @@ impl FakeProvider {
                 parent: parent.map(|s| s.to_string()),
                 body_adf: body_adf.map(|s| s.to_string()),
                 links: Vec::new(),
+                labels: Vec::new(),
             },
         );
+    }
+
+    /// Seeds the labels of an already-seeded item.
+    pub fn seed_labels(&self, key: &str, labels: &[&str]) {
+        let mut items = self.items.borrow_mut();
+        let item = items.get_mut(key).unwrap_or_else(|| panic!("FakeProvider: seed {key} before its labels"));
+        item.labels = labels.iter().map(|l| l.to_string()).collect();
+    }
+
+    pub fn labels_of(&self, key: &str) -> Vec<String> {
+        self.items.borrow().get(key).map(|i| i.labels.clone()).unwrap_or_default()
     }
 
     /// Seeds the links an already-seeded item is on, as `(phrase, other)`
@@ -165,6 +179,7 @@ impl Provider for FakeProvider {
             parent: i.parent.clone(),
             body_adf: i.body_adf.clone(),
             links: i.links.clone(),
+            labels: i.labels.clone(),
         })
     }
 
@@ -210,14 +225,16 @@ impl Provider for FakeProvider {
         Ok(())
     }
 
-    fn find_by_title(&self, _project_key: &str, jira_type: &str, title: &str) -> Result<Option<String>> {
-        Ok(self.items.borrow().iter().find(|(_, e)| e.jira_type == jira_type && e.title == title).map(|(k, _)| k.clone()))
+    fn find_by_title(&self, _project_key: &str, jira_type: &str, label: Option<&str>, title: &str) -> Result<Option<String>> {
+        let carries = |e: &Entry| label.is_none_or(|l| e.labels.iter().any(|have| have == l));
+        Ok(self.items.borrow().iter().find(|(_, e)| e.jira_type == jira_type && e.title == title && carries(e)).map(|(k, _)| k.clone()))
     }
 
     fn create_item(
         &self,
         _project_key: &str,
         jira_type: &str,
+        label: Option<&str>,
         title: &str,
         parent: Option<&str>,
         body_adf: Option<&str>,
@@ -237,6 +254,7 @@ impl Provider for FakeProvider {
                 parent: parent.map(str::to_string),
                 body_adf: body_adf.map(str::to_string),
                 links: Vec::new(),
+                labels: label.map(|l| vec![l.to_string()]).unwrap_or_default(),
             },
         );
         Ok(key)

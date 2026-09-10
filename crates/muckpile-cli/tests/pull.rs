@@ -17,7 +17,7 @@ fn scaffold(root: &Path) {
     std::fs::create_dir_all(root.join("to-work/ACC-355")).unwrap();
     std::fs::write(
         root.join("muckpile.toml"),
-        "provider = \"jira-rest\"\njira_base_url = \"https://x.atlassian.net\"\njira_project_key = \"ACC\"\ncommit_prefix = \"acc\"\n\n[item_type]\ntask = \"Tarea\"\n",
+        "provider = \"jira-rest\"\njira_base_url = \"https://x.atlassian.net\"\njira_project_key = \"ACC\"\ncommit_prefix = \"acc\"\n\n[item_type]\ntask = \"Tarea\"\nquestion = { type = \"Tarea\", label = \"question\" }\n",
     )
     .unwrap();
     git(root, &["init", "-q"]);
@@ -235,4 +235,35 @@ fn refuses_a_jira_type_with_no_configured_mapping() {
     let view = root.join("to-work/ACC-355");
     let err = pull(root, &view, None, &provider, &config).unwrap_err();
     assert!(err.to_string().contains("Historia"), "{err}");
+}
+
+#[test]
+fn a_task_labeled_as_a_question_comes_down_as_a_question() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    let config = load_project_config(root).unwrap();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-355", "Tarea", "¿se hereda?", "Abierta", None, None);
+    provider.seed_labels("ACC-355", &["question"]);
+
+    let view = root.join("to-work/ACC-355");
+    let path = pull(root, &view, None, &provider, &config).unwrap().path;
+
+    assert_eq!(path, view.join("ACC-355.question.md"));
+}
+
+#[test]
+fn a_task_with_no_label_comes_down_as_a_task() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    let config = load_project_config(root).unwrap();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-355", "Tarea", "Vistas", "Abierta", None, None);
+
+    let view = root.join("to-work/ACC-355");
+    let path = pull(root, &view, None, &provider, &config).unwrap().path;
+
+    assert_eq!(path, view.join("ACC-355.task.md"));
 }
