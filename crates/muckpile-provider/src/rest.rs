@@ -302,6 +302,12 @@ impl Provider for JiraRest {
         Ok(())
     }
 
+    fn set_parent(&self, key: &str, parent_key: &str) -> Result<()> {
+        let body = serde_json::json!({ "fields": { "parent": { "key": parent_key } } });
+        self.call("PUT", &format!("/rest/api/3/issue/{key}"), Some(body))?;
+        Ok(())
+    }
+
     fn update_body(&self, key: &str, body_adf: &str) -> Result<()> {
         let adf: serde_json::Value =
             serde_json::from_str(body_adf).with_context(|| format!("{key}: the body to send isn't JSON"))?;

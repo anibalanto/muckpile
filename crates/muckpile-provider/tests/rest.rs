@@ -294,6 +294,20 @@ fn update_title_puts_only_the_summary_field() {
 }
 
 #[test]
+fn set_parent_puts_only_the_parent_field_by_key() {
+    let (base, rx) = one_shot(204, "");
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    provider.set_parent("ACC-355", "ACC-339").unwrap();
+
+    let captured = rx.recv().unwrap();
+    assert_eq!(captured.method, "PUT");
+    assert_eq!(captured.path, "/rest/api/3/issue/ACC-355");
+    let body: serde_json::Value = serde_json::from_str(&captured.body).unwrap();
+    assert_eq!(body, serde_json::json!({ "fields": { "parent": { "key": "ACC-339" } } }));
+}
+
+#[test]
 fn update_body_puts_the_adf_as_the_description_field() {
     let (base, rx) = one_shot(204, "");
     let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));

@@ -846,6 +846,22 @@ pub fn title(id: &str, new_title: &str, provider: &dyn Provider) -> Result<()> {
     provider.update_title(id, new_title)
 }
 
+/// The only way the parent of an already-synced item changes: written to the
+/// provider right away — `push` never sends a `parent` edited by hand. That
+/// the parent exists, and can hold this item, is the provider's to say.
+pub fn parent(id: &str, parent_id: &str, provider: &dyn Provider) -> Result<()> {
+    if !is_valid_id(id) {
+        bail!("{id}: no es un id válido");
+    }
+    if !is_valid_id(parent_id) {
+        bail!("{parent_id}: no es un id válido");
+    }
+    if id == parent_id {
+        bail!("{id}: un ítem no puede ser su propio padre");
+    }
+    provider.set_parent(id, parent_id)
+}
+
 /// Who wrote a comment — every comment says, one way or the other.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Author<'a> {

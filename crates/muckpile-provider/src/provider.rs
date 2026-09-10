@@ -128,6 +128,11 @@ pub trait Provider {
     /// was written locally, no conversion.
     fn update_title(&self, key: &str, title: &str) -> Result<()>;
 
+    /// Makes `parent_key` the item's parent, replacing whichever it had.
+    /// Whether that parent exists, and may hold an item of this type, is the
+    /// provider's to check.
+    fn set_parent(&self, key: &str, parent_key: &str) -> Result<()>;
+
     /// Overwrites the item's body, as ADF. Only ever called with a body that
     /// round-trips losslessly through this same conversion, so what lands
     /// here is always something this system can read back exactly.

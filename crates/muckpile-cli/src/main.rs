@@ -25,6 +25,7 @@ fn main() -> Result<()> {
         [cmd, view] if cmd == "push" => run_push(view),
         [cmd, a, phrase, b] if cmd == "link" => run_link(a, phrase, b),
         [cmd, id, new_title] if cmd == "title" => run_title(id, new_title),
+        [cmd, id, parent_id] if cmd == "parent" => run_parent(id, parent_id),
         [cmd, id, file, rest @ ..] if cmd == "comment" => run_comment(id, file, rest),
         [cmd, id, file] if cmd == "attach" => run_attach(id, file),
         [cmd, item_type, title, rest @ ..] if cmd == "new" => run_new(item_type, title, rest),
@@ -32,7 +33,7 @@ fn main() -> Result<()> {
         [cmd, id, flag] if cmd == "show" && flag == "--local" => run_show(id, true),
         [cmd, sub, repo, rest @ ..] if cmd == "code-work" && sub == "add" => run_code_work_add(repo, rest),
         _ => bail!(
-            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile push <vista> | muckpile link <a> <frase> <b> | muckpile title <id> <título> | muckpile comment <id> <archivo> [--reply-to <id>] (--ai <modelo> | --i-human) | muckpile attach <id> <archivo> | muckpile new <tipo> <título> [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
+            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile push <vista> | muckpile link <a> <frase> <b> | muckpile title <id> <título> | muckpile parent <id> <padre> | muckpile comment <id> <archivo> [--reply-to <id>] (--ai <modelo> | --i-human) | muckpile attach <id> <archivo> | muckpile new <tipo> <título> [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
         ),
     }
 }
@@ -272,6 +273,15 @@ fn catch_up_view(cwd: &Path, id: &str, provider: &dyn Provider, config: &Project
         CatchUp::CaughtUp => println!("  {id}: vista al día"),
         CatchUp::Behind(why) => println!("  {id}: la vista queda atrás hasta el próximo pull — {why}"),
     }
+    Ok(())
+}
+
+fn run_parent(id: &str, parent_id: &str) -> Result<()> {
+    let (root, _cwd) = standing_in_a_project()?;
+    let config = load_project_config(&root)?;
+    let provider = build_provider(&root, &config)?;
+    muckpile_cli::parent(id, parent_id, provider.as_ref())?;
+    println!("{id}: padre cambiado a {parent_id}");
     Ok(())
 }
 

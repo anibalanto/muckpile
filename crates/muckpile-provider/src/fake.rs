@@ -169,6 +169,10 @@ impl FakeProvider {
         self.items.borrow().get(key).map(|i| i.title.clone())
     }
 
+    pub fn parent_of(&self, key: &str) -> Option<String> {
+        self.items.borrow().get(key).and_then(|i| i.parent.clone())
+    }
+
     pub fn body_adf_of(&self, key: &str) -> Option<String> {
         self.items.borrow().get(key).and_then(|i| i.body_adf.clone())
     }
@@ -296,6 +300,13 @@ impl Provider for FakeProvider {
         let mut items = self.items.borrow_mut();
         let Some(item) = items.get_mut(key) else { bail!("no such item: {key}") };
         item.title = title.to_string();
+        Ok(())
+    }
+
+    fn set_parent(&self, key: &str, parent_key: &str) -> Result<()> {
+        let mut items = self.items.borrow_mut();
+        let Some(item) = items.get_mut(key) else { bail!("no such item: {key}") };
+        item.parent = Some(parent_key.to_string());
         Ok(())
     }
 
