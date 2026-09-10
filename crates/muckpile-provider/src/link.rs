@@ -4,7 +4,7 @@
 //! wording, verbatim, the same idea `transition` already applies to status
 //! (decision 8).
 
-use crate::provider::Provider;
+use crate::provider::{LinkType, Provider};
 use anyhow::Result;
 use std::collections::BTreeSet;
 
@@ -24,17 +24,39 @@ pub enum Outcome {
 /// shows it: `is_blocked_by` is `is blocked by`.
 pub fn link(provider: &dyn Provider, a: &str, phrase: &str, b: &str) -> Result<Outcome> {
     let types = provider.link_types()?;
+    let Some(edge) = edge(&types, a, phrase, b) else {
+        return Ok(Outcome::NoSuchPhrase { available: phrases(&types) });
+    };
+    provider.create_link(&edge.type_name, edge.outward_key, edge.inward_key)?;
+    Ok(Outcome::Applied { type_name: edge.type_name })
+}
+
+/// The edge `a phrase b` names, in the provider's terms: which type, and
+/// which of the two keys plays its outward phrase.
+struct Edge<'k> {
+    type_name: String,
+    outward_key: &'k str,
+    inward_key: &'k str,
+}
+
+/// The first type among `types` whose outward or inward wording is
+/// `phrase` — verbatim, or with `_` for each space — and the edge
+/// `a phrase b` is of it. `None` when no type says `phrase`.
+fn edge<'k>(types: &[LinkType], a: &'k str, phrase: &str, b: &'k str) -> Option<Edge<'k>> {
     let says = |wording: &str| wording == phrase || wording.replace(' ', "_") == phrase;
-    for t in &types {
+    types.iter().find_map(|t| {
         if says(&t.outward) {
-            provider.create_link(&t.name, a, b)?;
-            return Ok(Outcome::Applied { type_name: t.name.clone() });
+            Some(Edge { type_name: t.name.clone(), outward_key: a, inward_key: b })
+        } else if says(&t.inward) {
+            Some(Edge { type_name: t.name.clone(), outward_key: b, inward_key: a })
+        } else {
+            None
         }
-        if says(&t.inward) {
-            provider.create_link(&t.name, b, a)?;
-            return Ok(Outcome::Applied { type_name: t.name.clone() });
-        }
-    }
+    })
+}
+
+/// Every phrase `types` offer, from either direction, once each and sorted.
+fn phrases(types: &[LinkType]) -> Vec<String> {
     let available: BTreeSet<String> = types.iter().flat_map(|t| [t.outward.clone(), t.inward.clone()]).collect();
-    Ok(Outcome::NoSuchPhrase { available: available.into_iter().collect() })
+    available.into_iter().collect()
 }
