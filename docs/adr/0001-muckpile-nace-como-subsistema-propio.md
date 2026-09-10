@@ -252,14 +252,16 @@ backlog/sprint/22_Las_vistas/  backlog/sprint/23_Las_questions/     ← no hay a
 - **`<id>_data/`, el directorio de datos del ítem**, sibling a su archivo, para cualquier tipo: `thread/` con un mensaje por archivo y el anidado en `in-reply-to`; `files/` con el borrador del artefacto que, al cerrarse la pregunta, se muda a la capa que lo gobierna. Es el mismo directorio que `ACC-334`/`ACC-335`/`ACC-336` especifican para worklist bajo el nombre `<id>/` desnudo — `muckpile` lo escribe como `<id>_data/` por la razón de la decisión 6: evitar la colisión con el nombre de la vista cuando coinciden.
 - La decisión 4 se aplica entera acá: el directorio viaja con el renombre — `@algo_data/` pasa a `ACC-231_data/` en el mismo commit que `@algo.question.md` pasa a `ACC-231.question.md`.
 
-**Avance: 3/7.**
+**Avance: 3/9.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
 | Tipo `question` (`<id>.question.md`) | `cerrada` | `TYPES`; `new` ↔ fila `new` |
 | `new question --blocks <id>` escribe `relation.blocks` | `cerrada` | `new` ↔ fila `new` |
 | `blocks` llega al proveedor | `diverge` | Medido: un `push` que resuelve la `question` la crea sin el link, y el `pull` que viene después reescribe el archivo sin `relation.blocks`. La relación se pierde de los dos lados |
-| `relation.*` baja con `pull` | `pendiente` | `pull` escribe `title`, `status` y `parent`, nada más |
+| `relation.*` baja con `pull` | `pendiente` | `pull` escribe `title`, `status` y `parent`, nada más: `item()` ni siquiera pide `issuelinks` |
+| Con qué clave baja un link como `relation.*`, y desde qué punta | `falta spec` | La clave de `relation.<nombre>` sólo admite `[a-zA-Z_]` (`rewrite_references`, `read_frontmatter_refs`), y la frase del proveedor tiene espacios —`is blocked by`, `relates to`—. Y una arista tiene dos puntas, cada una con su frase: esta decisión no dice si baja en las dos |
+| Qué hace `push` con un `relation.*` que el archivo tiene y el proveedor no, o al revés | `falta spec` | Lo decide el código: una edición de `relation.*` se descarta sin aviso, igual que la de `status:` (decisión 8). Es lo que falta para que el link de un borrador llegue cuando se lo resuelve —creado o encontrado— y para que un link que falló se reintente en el próximo `push` |
 | `<id>_data/thread/` y `files/`, traídos por `pull` | `pendiente` | `show` lista `<id>_data/` si alguien lo puso a mano; nada lo crea ni lo trae |
 | `_data/` viaja con el renombre del `@slug` | `cerrada` | `rename_one` lo mueve en el mismo commit; bilink de la decisión 4 |
 | De dónde salen `thread/` y `files/` en el proveedor, y cómo se muda `files/` cuando la pregunta cierra | `falta spec` | Ni esta decisión ni la 6 dicen a qué corresponden en Jira (¿comentarios? ¿adjuntos?), y sin eso no hay qué implementar |
