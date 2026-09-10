@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `ae5d5cd`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `c57d9d0`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -99,7 +99,7 @@ Lo único que se cae es la razón original de que existiera un hook para esto: q
 
 **El orden 3 → 4 no es un detalle.** Si la vista renombrara antes de rebasear, tendría un `ACC-360.task.md` escrito por su lado y la ref del proveedor otro, y el rebase chocaría — el mismo `add/add` de la sección "Contexto", con el mismo remedio mal ofrecido.
 
-**Avance: 4/8.**
+**Avance: 6/8.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -107,8 +107,8 @@ Lo único que se cae es la razón original de que existiera un hook para esto: q
 | Se busca por título antes de crear | `cerrada` | `resolve_pending` ↔ esta decisión; la búsqueda misma es `resolve_one`, y el transporte `JiraRest::find_by_title` ↔ esta decisión. Medido el 2026-09-10: buscaba en `/rest/api/3/search`, que el proveedor retiró —responde 410—, así que contra Jira real todo `@slug` fallaba al resolverse; ahora busca en `/search/jql`. Los demás endpoints que lee el transporte responden 200 |
 | Orden topológico sobre las referencias del lote | `cerrada` | `topo_order`, llamado desde `resolve_pending` — el bilink es de la función que orquesta, no de `topo_order` |
 | Renombre, `_data/` y reescritura de referencias en un solo commit | `cerrada` | `rename_one` ↔ esta decisión: un commit por ítem, con el archivo, su `_data/` y las referencias que reescribió, y nada más —ni la edición sin commitear de otra vista, ni algo que una persona dejó en staging—. Que un `push` deje además un commit `new` y uno `pull` por ítem es el orden viejo, y lo reemplazan las dos dimensiones de abajo |
-| Por cada ítem creado o encontrado, un commit `new @<slug>` o `found @<slug>` en la ref del proveedor, con lo que devolvió | `pendiente` | Hoy `fetch_and_commit` commitea `pull <id>` en la misma rama que la vista |
-| La vista se rebasea sobre ese commit antes de renombrar | `pendiente` | Hoy se renombra primero (`resolve_batch`) y se trae después |
+| Por cada ítem creado o encontrado, un commit `new @<slug>` o `found @<slug>` en la ref del proveedor, con lo que devolvió | `cerrada` | `resolve_pending` ↔ esta decisión: después de crear o encontrar, `record_item` registra el ítem —su archivo, su ADF, su hilo y sus adjuntos— con ese mensaje |
+| La vista se rebasea sobre ese commit antes de renombrar | `cerrada` | `resolve_pending` ↔ esta decisión: registra, rebasea, y recién ahí `rename_one` retira el borrador —el archivo del ítem ya bajó, así que el borrador se va en vez de moverse, y su `_data/` se funde con la del ítem— |
 | Qué pasa cuando no se puede resolver un pendiente del que otro depende | `falta spec` | Lo decide el código: lo que depende no se intenta, y su archivo queda como estaba (`PushResult::ResolveFailed`) |
 | Qué recibe un ítem que se encontró en vez de crearse | `falta spec` | Lo decide el código: nunca el cuerpo, el `parent` ni las relaciones del borrador, que sólo viajan al crear (`resolve_one`, `resolve_pending`). Tiene un borde: si un `push` creó el ítem y un link falló, el reintento lo encuentra y el link no se vuelve a intentar — queda sólo en el mensaje del primer `push` |
 
@@ -145,19 +145,19 @@ Git local es el registro de "qué es lo último que vi del proveedor", y lo llev
 
 **Cada vista es un worktree de `.muckpile/`**, el git del proyecto (decisión 6), parado en la rama de la vista. `code-work/`, adentro de una vista de trabajo, queda excluido: es un worktree de otro repo.
 
-**Avance: 2/11.**
+**Avance: 10/11.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
-| `pull` avanza la rama del proveedor con lo que devolvió | `diverge` | `fetch_and_commit` commitea en la rama en la que esté parada la vista, no en una ref del proveedor |
-| `push` vuelve a preguntar antes de escribir, y no pisa si algo cambió | `cerrada` | `push_one` ↔ fila `push` (`PushResult::Stale`) |
-| Cuando `push` no pisa, lo que el proveedor tenía queda registrado en su rama | `pendiente` | Hoy `PushResult::Stale` lo descarta |
-| La vista se actualiza con rebase sobre la rama del proveedor, en `pull` y en un `push` que no pisó | `pendiente` | — |
-| Dos refs por vista, con el nombre de la vista, y `refs/remotes/provider/<vista>` como upstream | `pendiente` | — |
-| La ref del proveedor guarda el ADF, y `push` compara ADF contra ADF | `pendiente` | Hoy no se guarda: `push` compara el markdown de lo que trae contra el último commit |
-| Con ediciones sin commitear, o con un rebase a medias, `pull` y `push` se niegan | `pendiente` | — |
+| `pull` avanza la rama del proveedor con lo que devolvió | `cerrada` | `record_item` ↔ esta decisión: un commit en la ref del proveedor, firmado `muckpile`, con lo que devolvió; `ledger::record` lo hace sin tocar la vista |
+| `push` vuelve a preguntar antes de escribir, y no pisa si algo cambió | `cerrada` | `push_one` ↔ fila `push`: compara lo que el proveedor tiene ahora contra lo que registró su ref (`PushResult::Stale`) |
+| Cuando `push` no pisa, lo que el proveedor tenía queda registrado en su rama | `cerrada` | `push_one` ↔ esta decisión: registra con `record_item` y rebasea antes de devolver `Stale` |
+| La vista se actualiza con rebase sobre la rama del proveedor, en `pull` y en un `push` que no pisó | `cerrada` | `ledger::rebase` ↔ esta decisión: lo llaman `pull`, el `push` que no pisa, el que escribió —y el commit propio de la edición se va, porque la ref ya tiene el cambio— y `catch_up`. Un choque para el rebase y lo dice, para que lo resuelva una persona con git |
+| Dos refs por vista, con el nombre de la vista, y `refs/remotes/provider/<vista>` como upstream | `cerrada` | `ledger::open_view` ↔ esta decisión: `git status` en la vista dice `[ahead N]` y `[behind N]` contra `provider/<vista>` |
+| La ref del proveedor guarda el ADF, y `push` compara ADF contra ADF | `cerrada` | `record_item` guarda `.provider/<id>.adf.json` tal cual lo devolvió el proveedor; `push_one` lo compara como JSON (`same_adf`) contra el ADF de ahora |
+| Con ediciones sin commitear, o con un rebase a medias, `pull` y `push` se niegan | `cerrada` | `ready_to_sync` ↔ esta decisión: un archivo nuevo que nadie agregó —un borrador— no estorba; `push` lo commitea al resolverlo |
 | El registro es git local, en `.muckpile/` — uno por proyecto, y cada vista un worktree suyo | `cerrada` | `ledger::open_view` ↔ esta decisión: `.muckpile/` es un git sin worktree propio, cada vista un worktree en su rama, con la ref del proveedor como upstream; `code-work/` excluido en todas |
-| Los commits que hace `muckpile` los firma `muckpile`; los de la persona, la persona | `pendiente` | El registro ya firma así (`ledger`); `pull`, `push` y el renombre todavía commitean con `commit_paths`, con la identidad de git de quien corre |
+| Los commits que hace `muckpile` los firma `muckpile`; los de la persona, la persona | `cerrada` | `ledger::record`, `ledger::rebase` y `ledger::tool_commit` ↔ esta decisión: firman `muckpile <muckpile@localhost>`; `commit_paths` y `rename_one` commitean por `tool_commit`. Un commit de la persona, rebaseado, conserva su autor |
 | Una vista nace vacía, de un commit sin archivos en sus dos refs | `cerrada` | `ledger::open_view` ↔ esta decisión |
 | Qué hace `push` con un ítem que la vista nunca registró | `falta spec` | Lo decide el código: se niega (`PushResult::NeverPulled`) en vez de comparar contra el proveedor sin base |
 
@@ -292,7 +292,7 @@ SGE-7699_data/
 | `blocks` llega al proveedor | `cerrada` | `resolve_pending` ↔ esta decisión: al crear un borrador, crea cada relación que su header declara —`relation.blocks` incluida, con un `@slug` del mismo lote ya traducido a su id—; la que falla sale como `PushResult::RelationFailed`, con el `link` que la reintenta |
 | `relation.*` baja con `pull`: todos los links, en las dos puntas, con la clave de la decisión 12 | `cerrada` | `relations` ↔ decisión 12: una clave por frase, `_` por espacio, ids ordenados; `link_from_own_side` ↔ decisión 12: cada link leído desde el lado del ítem, con la forma medida en `ACC` |
 | `thread/` baja con `pull`: un archivo por comentario, `in-reply-to` desde el `parentId` | `cerrada` | `render_comment` ↔ esta decisión: el header y el cuerpo de cada comentario; `JiraRest::comments` ↔ esta decisión: el endpoint propio, de a páginas, con el `parentId` como número. Probado el 2026-09-10 con el binario contra `SGE-7699`: `42180.md`, y `42224.md` con `in-reply-to: 42180`, en el mismo commit que el ítem |
-| `files/` baja con `pull`: un archivo por adjunto, sin borrar lo que no escribió | `cerrada` | `write_files` ↔ esta decisión; `JiraRest::attachment_content` pide `redirect=false`, medido: sin él, un 303 hacia otro host. Probado contra `SGE-7699`: el PNG bajó con sus 34828 bytes. Un borde: un comentario o un adjunto borrado en Jira deja su archivo, porque `pull` todavía no borra nada — lo resuelve la ref del proveedor (decisión 5) |
+| `files/` baja con `pull`: un archivo por adjunto, sin borrar lo que no escribió | `cerrada` | `write_files` ↔ esta decisión; `JiraRest::attachment_content` pide `redirect=false`, medido: sin él, un 303 hacia otro host. Probado contra `SGE-7699`: el PNG bajó con sus 34828 bytes. Un comentario o un adjunto que el proveedor ya no tiene se va con el `pull` siguiente —`record_item` lo borra de la ref del proveedor—, y un borrador que nadie subió no, porque la ref nunca lo tuvo |
 | `comment <id> <archivo>`, con `--reply-to` | `cerrada` | `comment` ↔ fila `comment`; `JiraRest::add_comment` ↔ esta decisión, con `parentId` como número. Probado el 2026-09-10 con el binario en `ACC-360`: la respuesta quedó colgada del comentario que nombró |
 | `attach <id> <archivo>` | `cerrada` | `attach` ↔ fila `attach`; `JiraRest::add_attachment` ↔ esta decisión: multipart, con `X-Atlassian-Token: no-check`. Probado en `ACC-360`: subió, y el `pull` siguiente lo bajó a `files/` |
 | `--ai <modelo>` o `--i-human`, siempre uno de los dos: el modelo como dato al principio del comentario, y `pull` lo pasa al header | `cerrada` | `comment` ↔ esta decisión: sin ninguno se niega, y `--ai` antepone `ai: <modelo>` con el modelo como código; `render_comment` lo lee de vuelta (`split_ai`). Probado en `ACC-360`: el `pull` bajó `ai: claude-opus-5` al header y lo sacó del cuerpo |
@@ -424,7 +424,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **Y no se resuelve pidiéndole a una IA que aplique el cambio a ciegas** — eso cambia el problema por uno peor: nadie compara el resultado contra lo que se pidió. Lo que ofrece `muckpile` es un diff: convierte el borrador editado a ADF con el mismo conversor —aunque no lo vaya a subir—, lo compara contra el ADF real, y muestra la diferencia, incluida la que se perdería si se aplicara tal cual. El borrador va como se mandaría, y el ADF real en la forma canónica del conversor: las tres normalizaciones de la tabla de arriba son equivalencias, y mostrarlas —un `attrs: {}` por cada celda de cada tabla— sólo taparía la diferencia que importa. Ese diff lo aplica una persona en Jira, o una IA operando ahí, con la pérdida ya visible antes de decidir — no escondida como hoy hace el round-trip de worklist.
 
-**Avance: 10/11.**
+**Avance: 11/11.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -433,7 +433,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 | El criterio: ADF → markdown → ADF, contra la forma canónica del conversor, como JSON | `cerrada` | `impl JiraAdfMarkdownFilter` ↔ esta decisión. El test de la tabla con las filas numeradas, `a_table_with_numbered_rows_is_not_canonical`, es el caso medido que el criterio viejo dejaba pasar |
 | Un aviso `Lossy` del conversor deja el cuerpo de sólo lectura | `cerrada` | `impl JiraAdfMarkdownFilter` ↔ esta decisión: un `Lossy` de cualquiera de las dos conversiones es un `Loss::Lossy` |
 | El conversor es el fork, con el espacio al borde de una marca y las celdas combinadas | `cerrada` | `atlassian-markdown-converter` en `muckpile-core/Cargo.toml`, al commit `91407e5` del fork. `bilinker` no lee TOML: el bilink ata esta decisión a los dos tests que fallan con 0.1.0, `a_bold_run_cut_by_code_reads_back_as_bold` y `a_table_with_merged_cells_survives_the_trip_through_markdown` |
-| `RsMarkdownAdfFilter` reescribe el borrador a su forma canónica, en un commit propio, y eso es lo que se manda | `diverge` | `prune_marks` corta la marca sobre el ADF, en silencio: el archivo no cambia, y el cuerpo que crea nace no canónico |
+| `RsMarkdownAdfFilter` reescribe el borrador a su forma canónica, en un commit propio, y eso es lo que se manda | `cerrada` | `settle_canonical` ↔ esta decisión: convierte el cuerpo ida y vuelta con los dos filtros; si cambia, reescribe el archivo en un commit propio, firmado `muckpile`, antes de mandarlo —al crear un borrador y en `push`—. Lo que se manda es el resultado, y lo que vuelve coincide con la vista |
 | No canónico → `push` no sube el cuerpo y ofrece el diff | `cerrada` | `push_one` ↔ fila `push` |
 | El diff es contra el ADF real | `cerrada` | `adf_diff` ↔ esta decisión, llamado desde `push_one`: el ADF real en la forma canónica del conversor contra el borrador como se mandaría |
 | El header no pasa por esto | `cerrada` | `push_one` ↔ fila `push`: un header editado a mano choca antes de llegar a la canonicidad, y `title`/`transition` lo escriben sin conversión |
@@ -493,7 +493,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 | `link` y `unlink` aceptan la frase con `_` | `cerrada` | `edge`, en `link.rs` ↔ esta decisión: el tipo y la dirección salen de la frase igual para los dos, con espacios o con `_` |
 | `push` no sube nada del header: un header editado a mano choca, el ítem no se manda, y `push` sugiere el comando | `cerrada` | `header_edits` ↔ esta decisión: cada campo y cada relación que el archivo dice distinto del proveedor; `push_one` ↔ fila `push`: si hay alguno, `PushResult::HeaderClash` y nada más. El comando sugerido lo arma `main.rs` |
 | Después de escribir, el comando hace lo que un `pull` del ítem en la vista | `cerrada` | `catch_up` ↔ esta decisión: si la vista tiene el ítem, lo trae y lo commitea; si el archivo, o algo ya trackeado en su `_data/`, tiene cambios sin commitear, no toca nada y dice que la vista queda atrás —un borrador sin commitear en `files/` no estorba: sólo se escribe lo que viene del proveedor—. Lo llaman `title`, `transition`, `link` —en sus dos puntas—, `comment` y `attach`. Probado el 2026-09-10 con el binario en `ACC-360`: después de `title`, la vista quedó al día y el `push` siguiente dijo "sin cambios" |
-| Si el proveedor cambia el tipo de un ítem, `pull` renombra el archivo y reescribe los links al nombre viejo | `cerrada` | `retype` ↔ esta decisión: mueve el archivo y reescribe cada link al nombre viejo, sin commitear; `fetch_and_commit` lo llama cuando el tipo que baja no es el del archivo, y lo commitea en el mismo `pull` |
+| Si el proveedor cambia el tipo de un ítem, `pull` renombra el archivo y reescribe los links al nombre viejo | `cerrada` | `record_item` ↔ esta decisión: cuando el tipo que baja no es el que registró la ref del proveedor, el mismo commit borra el nombre viejo, escribe el nuevo y reescribe cada link al viejo en los demás archivos que registró |
 | `unlink` de un tipo cuyas dos frases son la misma —`Relates`: `relates to` de ida y de vuelta— lo busca en las dos direcciones | `cerrada` | `link::unlink` ↔ esta decisión: si no lo encuentra en la dirección de la frase y el tipo dice lo mismo de los dos lados, prueba la otra. Probado el 2026-09-10 en el board: un `Relates` creado desde `ACC-361` se quitó con `unlink ACC-360 relates_to ACC-361` |
 
 ---
