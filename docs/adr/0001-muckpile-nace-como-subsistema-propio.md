@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `ffc8dbb`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `ae5d5cd`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -47,12 +47,12 @@ No hay `pre-receive` ni `post-receive`, no hay convención `secure/`/`insecure/`
 
 Esto se lleva puesto, con su nombre: `install-hooks`, `check-push`, `assign-keys`, `window-open`, `propagate`, el par `secure`/`insecure`. Ninguno resuelve algo que siga haciendo falta una vez que el cliente puede hablar solo — ver decisión 3.
 
-**Avance: 0/2.**
+**Avance: 2/2.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
-| Un solo binario, `muckpile`, sin hooks ni servidor | `sin bilink` | `[[bin]] muckpile` en `muckpile-cli`; el impl no tiene `hooks/` |
-| Cada comando habla con el proveedor en el momento en que corre | `sin bilink` | `build_provider`, en `main.rs`, llamado por cada comando que toca la red |
+| Un solo binario, `muckpile`, sin hooks ni servidor | `cerrada` | `main`, en `main.rs` ↔ esta decisión: el único `[[bin]]` del impl, sin `hooks/` ni servidor —el único listener es el mock de los tests del transporte— |
+| Cada comando habla con el proveedor en el momento en que corre | `cerrada` | `build_provider`, en `main.rs` ↔ esta decisión: lo llama cada comando que habla con el proveedor, en el momento en que corre |
 
 ### 2. Subsistema propio, separado de worklist
 
@@ -70,13 +70,13 @@ Esto se lleva puesto, con su nombre: `install-hooks`, `check-push`, `assign-keys
 
 Un solo puerto, no tres transportes tapándose agujeros entre sí. Hoy esa API pega directo contra la REST de Jira. El día que exista, un `muckpile-server` — un servidor git propio — puede implementar el mismo puerto sin que el resto del sistema note la diferencia: misma forma, otro backend, la misma idea que `AGENTS.md` ya aplica al bare del worklist ("el día que haya acuerdo con la empresa, el servidor pasa a un GitLab suyo — misma forma, otro host").
 
-**Avance: 0/3.**
+**Avance: 3/3.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
-| Un solo puerto para el proveedor | `sin bilink` | trait `Provider`, en `muckpile-provider/src/provider.rs` |
-| Hoy, la REST de Jira directo — ni `acli` ni `jira-cli` | `sin bilink` | `JiraRest`, en `rest.rs`: `ureq` con auth Basic |
-| El backend se elige por `provider` en `muckpile.toml` | `sin bilink` | `build_provider`: acepta `jira-rest`, y cualquier otro valor es un error |
+| Un solo puerto para el proveedor | `cerrada` | trait `Provider` ↔ esta decisión: el CLI sólo recibe un `&dyn Provider`, y `ureq` sólo vive en `rest.rs` |
+| Hoy, la REST de Jira directo — ni `acli` ni `jira-cli` | `cerrada` | `JiraRest` ↔ esta decisión: `ureq` con auth Basic; el único proceso externo del impl es `git` |
+| El backend se elige por `provider` en `muckpile.toml` | `cerrada` | `build_provider` ↔ esta decisión: acepta `jira-rest`, y cualquier otro valor es un error |
 
 ### 4. El `@slug` se mantiene, y su transformación también — la corre el cliente, no un hook
 
@@ -145,7 +145,7 @@ Git local es el registro de "qué es lo último que vi del proveedor", y lo llev
 
 **Cada vista es un worktree de `.muckpile/`**, el git del proyecto (decisión 6), parado en la rama de la vista. `code-work/`, adentro de una vista de trabajo, queda excluido: es un worktree de otro repo.
 
-**Avance: 1/9.**
+**Avance: 2/11.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -156,7 +156,9 @@ Git local es el registro de "qué es lo último que vi del proveedor", y lo llev
 | Dos refs por vista, con el nombre de la vista, y `refs/remotes/provider/<vista>` como upstream | `pendiente` | — |
 | La ref del proveedor guarda el ADF, y `push` compara ADF contra ADF | `pendiente` | Hoy no se guarda: `push` compara el markdown de lo que trae contra el último commit |
 | Con ediciones sin commitear, o con un rebase a medias, `pull` y `push` se niegan | `pendiente` | — |
-| El registro es git local, en `.muckpile/` — uno por proyecto, y cada vista un worktree suyo | `diverge` | `.muckpile/` es un directorio vacío que sólo marca la raíz (`find_project_root`). Los commits van al `.git` que gobierne la vista —en los tests, un `git init` en la raíz del proyecto— y ningún comando crea ni uno ni otro |
+| El registro es git local, en `.muckpile/` — uno por proyecto, y cada vista un worktree suyo | `cerrada` | `ledger::open_view` ↔ esta decisión: `.muckpile/` es un git sin worktree propio, cada vista un worktree en su rama, con la ref del proveedor como upstream; `code-work/` excluido en todas |
+| Los commits que hace `muckpile` los firma `muckpile`; los de la persona, la persona | `pendiente` | El registro ya firma así (`ledger`); `pull`, `push` y el renombre todavía commitean con `commit_paths`, con la identidad de git de quien corre |
+| Una vista nace vacía, de un commit sin archivos en sus dos refs | `cerrada` | `ledger::open_view` ↔ esta decisión |
 | Qué hace `push` con un ítem que la vista nunca registró | `falta spec` | Lo decide el código: se niega (`PushResult::NeverPulled`) en vez de comparar contra el proveedor sin base |
 
 ### 6. Multi-proyecto: una carpeta propia, y vistas que agrupan un conjunto de ítems para un contexto de desarrollo
@@ -238,7 +240,7 @@ backlog/sprint/22_Las_vistas/  backlog/sprint/23_Las_questions/     ← no hay a
 
 **Un proyecto lo crea `init`, y ningún otro comando.** Corrido en `multitask/`, `muckpile init <proyecto>` deja `<proyecto>/.muckpile/` —el git del proyecto, sin worktree propio: el registro de la decisión 5—, un `muckpile.toml` para completar (decisión 9), y las tres carpetas reservadas. Cada vista la crea después el comando que la necesita —`to-work` una de trabajo, `sprint fetch` una por sprint—, como un worktree de `.muckpile/` parado en su rama. Fuera de un proyecto iniciado, los demás comandos se niegan: ninguno arma un `.muckpile/` de paso.
 
-**Avance: 3/9.**
+**Avance: 4/9.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -249,7 +251,7 @@ backlog/sprint/22_Las_vistas/  backlog/sprint/23_Las_questions/     ← no hay a
 | `pull` de una vista de sprint (`backlog/sprint/<slug>`) | `pendiente` | `pull` sólo corre parado en `to-work/<id>/` |
 | `pull` con una consulta — lo que reemplaza a `bootstrap`/`reconcile`/`adopt` | `pendiente` | — |
 | El chequeo local: "¿ya tengo este ítem en otra vista, en esta máquina?" | `pendiente` | — |
-| `init` crea el proyecto —`.muckpile/`, `muckpile.toml`, las tres carpetas—, y las vistas nacen como worktrees suyos | `pendiente` | Hoy se arma a mano, y `to-work`/`sprint fetch` crean carpetas comunes |
+| `init` crea el proyecto —`.muckpile/`, `muckpile.toml`, las tres carpetas—, y las vistas nacen como worktrees suyos | `cerrada` | `init` ↔ fila `init`; `to_work` y `sprint_fetch` abren cada vista con `ledger::open_view`, y `sprint fetch` cierra con `ledger::close_empty_view` sólo la que nadie usó |
 | `init` que recupera un proyecto: `.muckpile/` borrado con vistas todavía en disco | `falta spec` | Esta decisión sólo dice que `init` crea un proyecto nuevo. Con qué parámetros se recupera uno, y qué pasa con lo que cada vista no subió, queda para el final: es fino |
 
 ### 7. `question` desde el día uno: tipo, la relación `blocks`, y el directorio de datos del ítem
@@ -334,11 +336,11 @@ $ muckpile link ACC-229 "is blocked by" ACC-338
 
 Las dos líneas declaran la misma arista — `ACC-229` bloqueada por `ACC-338` —, dichas desde cada punta. `muckpile` no necesita saber que son la misma relación: le alcanza con que una de las dos frases matchee un tipo, en cualquier dirección.
 
-**Avance: 5/6.**
+**Avance: 6/6.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
-| `pull` baja el `status` literal, sin traducir | `sin bilink` | `render_pulled_text`; ninguna fila bilinkeada lo dice |
+| `pull` baja el `status` literal, sin traducir | `cerrada` | `render_pulled_text` ↔ esta decisión: escribe `status:` tal cual lo lee `JiraRest::item` de `fields.status.name` |
 | `transition` decide por `to`, no por el nombre de la transición | `cerrada` | `transition` ↔ fila `transition` |
 | `states discover` cachea `{nombre -> categoría}` | `cerrada` | `states_discover` ↔ fila `states discover` |
 | `list --state` y `--category` | `cerrada` | `list` ↔ fila `list` |
@@ -385,13 +387,13 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **Un tipo de Jira que usan dos tipos de `muckpile` se distingue por una etiqueta, declarada.** En el ejemplo, `task` y `question` son las dos `"Tarea"`: `question` declara `label = "question"`, `new question` crea la Tarea con esa etiqueta, y `pull` baja una Tarea con la etiqueta como `.question.md` y una sin ella como `.task.md`. De los tipos que comparten un tipo de Jira, uno solo puede ir sin etiqueta —es el que baja por defecto—; si la tabla deja una Tarea sin forma de saber qué es, `muckpile.toml` no se carga, y dice por qué. La etiqueta queda a la vista en Jira: quien mire el board ve que es una pregunta. Medido el 2026-09-10: `ACC` no tiene un tipo propio para una pregunta, y ninguno de sus últimos 100 ítems usa etiquetas.
 
-**Avance: 2/4.**
+**Avance: 4/4.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
-| `muckpile.toml` por proyecto, compartible | `sin bilink` | `ProjectConfig` y `load_project_config`, en `project.rs` |
+| `muckpile.toml` por proyecto, compartible | `cerrada` | `load_project_config` ↔ esta decisión: `ProjectConfig` no tiene email ni token —viven en `identity.toml`— |
 | `identity.toml` por máquina: el email y el nombre de la variable | `cerrada` | `load_identity` ↔ esta decisión |
-| El token sólo se lee del entorno, nunca de un archivo | `sin bilink` | `build_provider` |
+| El token sólo se lee del entorno, nunca de un archivo | `cerrada` | `build_provider` ↔ esta decisión: el token sale sólo de la variable que nombra `identity.toml` |
 | La tabla `item_type` al revés: de tipo de Jira a tipo de `muckpile`, con la etiqueta que distingue un tipo compartido | `cerrada` | `ProjectConfig::muckpile_type_of` y `check_item_types` ↔ esta decisión: la etiqueta primero, el tipo sin etiqueta por defecto, y una tabla ambigua no se carga. `new question` la pone al crear y la búsqueda antes de crear la exige (`resolve_one`). Un borde: la búsqueda de un tipo sin etiqueta no excluye las etiquetas de los otros, así que un borrador `task` con el título exacto de una `question` existente la encontraría |
 
 ### 10. Editar el cuerpo local sólo si es seguro — canonicidad, no origen
@@ -446,12 +448,12 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **Y esto no reemplaza el método — lo hace más estricto donde antes había una salida fácil.** La correspondencia entre spec y código sigue siendo la de `AGENTS.md`: se toca la spec, `bilinker check` reporta los endpoints no-OK, cada uno apunta al fragmento que hay que tocar, se cambia el código y se acepta. Es el bilink el que ata el código a la spec —estructural, verificable, y `bilinker check` avisa si se rompe— y no una línea de comentario que diga "ver tal archivo", que es lo que el comentario ya no puede hacer.
 
-**Avance: 1/3.**
+**Avance: 2/3.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
 | Identificadores y comentarios en inglés | `cumple` | — |
-| Ningún comentario cita un ADR, una spec o un ítem | `no cumple` | 18 comentarios dicen `decision N`. En el código, 12: 7 en `muckpile-cli/src/lib.rs`, 1 en `muckpile-core/src/states.rs`, 1 en `muckpile-provider/src/link.rs`, 3 en `muckpile-provider/src/provider.rs`. En los tests, 6 doc-comments de módulo: `new.rs`, `states_discover.rs` y `transition.rs` de `muckpile-cli`, `identity.rs` y `states.rs` de `muckpile-core`, `link.rs` de `muckpile-provider` |
+| Ningún comentario cita un ADR, una spec o un ítem | `cumple` | Desde `ae5d5cd`, `git grep "decision [0-9]" -- crates` no encuentra nada; donde la cita decía algo, lo dice en términos del código |
 | El idioma de lo que ve el usuario | `falta spec` | Los mensajes y los errores están todos en castellano; esta decisión fija el idioma del código, no el de la salida |
 
 ### 12. El header cambia sólo por comando; el cuerpo se edita como texto
@@ -564,7 +566,7 @@ El choque de hoy, bajo este modelo, no es un `add/add` que exige `--force`: es u
 | `title` | Cambia el título de un ítem, en el momento. Es la única forma: editar `title:` en el header no se sube (decisión 12). | `$ muckpile title ACC-355 "Vistas de trabajo, con su ítem y su _data/"` |
 | `parent` | Cambia el padre de un ítem, en el momento (decisión 12). | `$ muckpile parent ACC-355 ACC-339` |
 
-**Avance de la tabla: diecisiete de las dieciocho filas tienen bilink aceptado** (`show` tiene dos, uno por camino); `init` todavía no tiene código. Que la fila esté atada no quiere decir que el comando esté completo: `pull` y `push` son parciales —lo que les falta está en las decisiones 5, 6, 7, 8 y 10—, y `to-work` diverge de su propia fila (decisión 6).
+**Avance de la tabla: las dieciocho filas tienen bilink aceptado** (`show` tiene dos, uno por camino). Que la fila esté atada no quiere decir que el comando esté completo: `pull` y `push` son parciales —lo que les falta está en las decisiones 5, 6, 7, 8 y 10—, y `to-work` diverge de su propia fila (decisión 6).
 
 Dieciocho comandos contra los veintitrés de hoy (once de `worklist`, doce de `worklist-server`). Lo que no está en la tabla — `install-hooks`, `check-push`, `assign-keys`, `bootstrap`, `reconcile`, `removes`, `push-states`, `create-or-find`, `provider set-status`, `window-open`, `propagate`, `adopt` — no falta: era la maquinaria de la asimetría que la decisión 1 saca. `bootstrap`/`reconcile`/`adopt` sí tienen equivalente, pero no como comando aparte: son `pull` con una consulta que trae de a muchos — `muckpile pull backlog --query "project = ACC AND sprint is empty"`.
 
