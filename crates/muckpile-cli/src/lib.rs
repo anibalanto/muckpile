@@ -4,8 +4,8 @@
 
 use anyhow::{bail, Context, Result};
 use muckpile_core::body::adf_to_body;
-use muckpile_core::is_valid_id;
 use muckpile_core::item::{list_summaries, ItemSummary};
+use muckpile_core::{is_valid_id, slugify_title, MARKER, TYPES};
 use muckpile_core::project::{classify, require_root, Position, ProjectConfig};
 use muckpile_core::states::write_states_cache;
 use muckpile_provider::link::{link as provider_link, Outcome as LinkOutcome};
@@ -29,6 +29,35 @@ pub fn to_work(root: &Path, cwd: &Path, id: &str) -> Result<PathBuf> {
     }
     std::fs::create_dir_all(&view).with_context(|| format!("creating {}", view.display()))?;
     Ok(view)
+}
+
+/// Writes `@<slug>.<type>.md` into `dir` — no network, no provider: the id
+/// is local until the first `push` resolves it (decision 4). `blocks`
+/// declares the one relation a fresh item can carry, `relation.blocks`
+/// (decision 7's `question`, though nothing here restricts it to that type).
+pub fn new(dir: &Path, item_type: &str, title: &str, blocks: Option<&str>) -> Result<PathBuf> {
+    if !TYPES.contains(&item_type) {
+        bail!("{item_type}: tipo desconocido — {}", TYPES.join(", "));
+    }
+    if let Some(blocks) = blocks {
+        if !is_valid_id(blocks) {
+            bail!("{blocks}: no es un id válido");
+        }
+    }
+
+    let slug = format!("{MARKER}{}", slugify_title(title));
+    let path = dir.join(format!("{slug}.{item_type}.md"));
+    if path.exists() {
+        bail!("{slug}.{item_type}.md: ya existe");
+    }
+
+    let mut text = format!("---\ntitle: {title}\n");
+    if let Some(blocks) = blocks {
+        text.push_str(&format!("relation.blocks: {blocks}\n"));
+    }
+    text.push_str("---\n");
+    std::fs::write(&path, text).with_context(|| format!("writing {}", path.display()))?;
+    Ok(path)
 }
 
 /// Fetches one item and writes it as `<id>.<type>.md` into the `to-work/`

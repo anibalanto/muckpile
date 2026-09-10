@@ -22,8 +22,9 @@ fn main() -> Result<()> {
         [cmd, rest @ ..] if cmd == "list" => run_list(rest),
         [cmd, view] if cmd == "status" => run_status(view),
         [cmd, a, phrase, b] if cmd == "link" => run_link(a, phrase, b),
+        [cmd, item_type, title, rest @ ..] if cmd == "new" => run_new(item_type, title, rest),
         _ => bail!(
-            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile link <a> <frase> <b>"
+            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile link <a> <frase> <b> | muckpile new <tipo> <título> [--blocks <id>]"
         ),
     }
 }
@@ -173,6 +174,26 @@ fn run_link(a: &str, phrase: &str, b: &str) -> Result<()> {
             println!("\"{phrase}\": no es una frase de relación del proveedor — disponibles: {}", available.join(", "));
         }
     }
+    Ok(())
+}
+
+fn run_new(item_type: &str, title: &str, flags: &[String]) -> Result<()> {
+    let mut blocks = None;
+    let mut i = 0;
+    while i < flags.len() {
+        let flag = &flags[i];
+        let value = flags.get(i + 1).with_context(|| format!("{flag}: falta el valor"))?;
+        match flag.as_str() {
+            "--blocks" => blocks = Some(value.as_str()),
+            _ => bail!("{flag}: opción desconocida"),
+        }
+        i += 2;
+    }
+
+    let cwd = std::env::current_dir()?;
+    let path = muckpile_cli::new(&cwd, item_type, title, blocks)?;
+    let name = path.file_name().context("el path creado no tiene nombre")?.to_string_lossy();
+    println!("{name} creado");
     Ok(())
 }
 

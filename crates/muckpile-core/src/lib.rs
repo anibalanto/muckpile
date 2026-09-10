@@ -30,6 +30,41 @@ pub fn is_unassigned(slug: &str) -> bool {
     slug.starts_with(MARKER)
 }
 
+/// The mechanical rule `worklist new` already documents: lowercase, common
+/// Latin accents stripped, and any run of characters outside `[a-z0-9]`
+/// collapsed to one `-`, trimmed from both ends. No length cap — a title is
+/// as long as it needs to be, and cutting it short would stop answering the
+/// question a slug exists for.
+pub fn slugify_title(title: &str) -> String {
+    let mut out = String::with_capacity(title.len());
+    let mut pending_hyphen = false;
+    for c in title.chars() {
+        let base = strip_latin_accent(c).to_ascii_lowercase();
+        if base.is_ascii_lowercase() || base.is_ascii_digit() {
+            if pending_hyphen && !out.is_empty() {
+                out.push('-');
+            }
+            pending_hyphen = false;
+            out.push(base);
+        } else {
+            pending_hyphen = true;
+        }
+    }
+    out
+}
+
+fn strip_latin_accent(c: char) -> char {
+    match c {
+        'á' | 'à' | 'ä' | 'â' | 'Á' | 'À' | 'Ä' | 'Â' => 'a',
+        'é' | 'è' | 'ë' | 'ê' | 'É' | 'È' | 'Ë' | 'Ê' => 'e',
+        'í' | 'ì' | 'ï' | 'î' | 'Í' | 'Ì' | 'Ï' | 'Î' => 'i',
+        'ó' | 'ò' | 'ö' | 'ô' | 'Ó' | 'Ò' | 'Ö' | 'Ô' => 'o',
+        'ú' | 'ù' | 'ü' | 'û' | 'Ú' | 'Ù' | 'Ü' | 'Û' => 'u',
+        'ñ' | 'Ñ' => 'n',
+        _ => c,
+    }
+}
+
 fn is_id_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_' || c == '-'
 }
