@@ -273,9 +273,11 @@ SGE-7699_data/
 
 **Se escriben con comandos, como el header (decisión 12).** `comment <id> <archivo>` manda un archivo markdown como comentario —por `RsMarkdownAdfFilter`, como cualquier cuerpo—, y `--reply-to <id del comentario>` lo cuelga de otro. `attach <id> <archivo>` sube un adjunto. Los dos, después de escribir, hacen lo que un `pull` del ítem en la vista. Editar a mano un archivo de `thread/` no se sube: es lo que alguien ya dijo. Medido el 2026-09-10 en un ítem descartable, `ACC-360`: el POST de un comentario acepta `parentId` y Jira lo guarda como respuesta, y un adjunto se sube por multipart, con `X-Atlassian-Token: no-check`.
 
-**Todo comentario dice quién lo escribió: `--ai <modelo>` o `--i-human`, uno de los dos, siempre.** Sin ninguno, `comment` se niega. `--ai` pone el modelo como dato al principio del comentario —un primer párrafo `ai: <modelo>`, con el modelo como código—, y así lo ve cualquiera en Jira; `pull` lo reconoce y lo pasa al header del archivo, `ai: <modelo>`, fuera del cuerpo. `--i-human` no agrega nada: es quien corre el comando declarando que lo escribió una persona. Así, un comentario sin `ai:` no es uno al que se le olvidó ponerlo.
+**Todo comentario dice quién lo escribió: `--ai <modelo>` o `--i-human`, uno de los dos, siempre.** Sin ninguno, `comment` se niega. `--ai` pone el modelo como dato al principio del comentario —un primer párrafo `ai: <modelo>`, con el modelo como código—, y así lo ve cualquiera en Jira; `pull` lo reconoce y lo pasa al header del archivo, `ai: <modelo>`, fuera del cuerpo. `--i-human` no agrega nada al comentario: es quien corre el comando declarando que lo escribió una persona. Así, un comentario sin `ai:` no es uno al que se le olvidó ponerlo.
 
-**Avance: 10/11.**
+**Y `--i-human` lo tiene que confirmar alguien frente a una terminal.** `comment` muestra una frase de dos palabras cortas, distinta cada vez —`faro-azul`, `puma-veloz`, como los nombres que Docker les pone a los contenedores—, y pide que se la escriba de vuelta. La lee de la terminal misma —`/dev/tty` en Linux y Mac, la consola en Windows—, nunca de la entrada estándar, así que no se le puede pasar con un pipe; sin terminal, se niega. Medido el 2026-09-10: el shell desde el que un agente como Claude Code corre comandos no tiene terminal —`tty` dice `not a tty`, y `/dev/tty` no se puede abrir—. Frena a un agente que agrega `--i-human` por comodidad; no frena a uno que se arme una terminal a propósito para leer la frase y tipearla, ni a uno que postee directo contra la API con el token. Eso ya no es usar mal un flag, y lo que lo cierra no es local: que la IA tenga su propia cuenta en el proveedor, y que `author_id` diga quién escribió. No se guarda nada: no hay frase que recordar, ni hash en ningún archivo.
+
+**Avance: 10/12.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -288,6 +290,7 @@ SGE-7699_data/
 | `comment <id> <archivo>`, con `--reply-to` | `cerrada` | `comment` ↔ fila `comment`; `JiraRest::add_comment` ↔ esta decisión, con `parentId` como número. Probado el 2026-09-10 con el binario en `ACC-360`: la respuesta quedó colgada del comentario que nombró |
 | `attach <id> <archivo>` | `cerrada` | `attach` ↔ fila `attach`; `JiraRest::add_attachment` ↔ esta decisión: multipart, con `X-Atlassian-Token: no-check`. Probado en `ACC-360`: subió, y el `pull` siguiente lo bajó a `files/` |
 | `--ai <modelo>` o `--i-human`, siempre uno de los dos: el modelo como dato al principio del comentario, y `pull` lo pasa al header | `cerrada` | `comment` ↔ esta decisión: sin ninguno se niega, y `--ai` antepone `ai: <modelo>` con el modelo como código; `render_comment` lo lee de vuelta (`split_ai`). Probado en `ACC-360`: el `pull` bajó `ai: claude-opus-5` al header y lo sacó del cuerpo |
+| `--i-human` pide en la terminal una frase distinta cada vez, y sin terminal se niega | `pendiente` | Hoy `--i-human` es un flag que cualquiera puede pasar |
 | `_data/` viaja con el renombre del `@slug` | `cerrada` | `rename_one` lo mueve en el mismo commit; bilink de la decisión 4 |
 | Cómo se muda `files/` cuando la pregunta cierra | `falta spec` | La pregunta que dejó `ACC-335`: quién mueve el borrador a la capa que lo gobierna, y qué pasa si la pregunta cierra y el borrador se queda |
 
