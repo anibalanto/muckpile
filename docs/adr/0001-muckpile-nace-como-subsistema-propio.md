@@ -252,23 +252,21 @@ backlog/sprint/22_Las_vistas/  backlog/sprint/23_Las_questions/     ← no hay a
 - **`<id>_data/`, el directorio de datos del ítem**, sibling a su archivo, para cualquier tipo: `thread/` con un mensaje por archivo y el anidado en `in-reply-to`; `files/` con el borrador del artefacto que, al cerrarse la pregunta, se muda a la capa que lo gobierna. Es el mismo directorio que `ACC-334`/`ACC-335`/`ACC-336` especifican para worklist bajo el nombre `<id>/` desnudo — `muckpile` lo escribe como `<id>_data/` por la razón de la decisión 6: evitar la colisión con el nombre de la vista cuando coinciden.
 - La decisión 4 se aplica entera acá: el directorio viaja con el renombre — `@algo_data/` pasa a `ACC-231_data/` en el mismo commit que `@algo.question.md` pasa a `ACC-231.question.md`.
 
-**Avance: 3/9.**
+**Avance: 3/7.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
 | Tipo `question` (`<id>.question.md`) | `cerrada` | `TYPES`; `new` ↔ fila `new` |
 | `new question --blocks <id>` escribe `relation.blocks` | `cerrada` | `new` ↔ fila `new` |
 | `blocks` llega al proveedor | `diverge` | Medido: un `push` que resuelve la `question` la crea sin el link, y el `pull` que viene después reescribe el archivo sin `relation.blocks`. La relación se pierde de los dos lados |
-| `relation.*` baja con `pull` | `pendiente` | `pull` escribe `title`, `status` y `parent`, nada más: `item()` ni siquiera pide `issuelinks` |
-| Con qué clave baja un link como `relation.*`, y desde qué punta | `falta spec` | La clave de `relation.<nombre>` sólo admite `[a-zA-Z_]` (`rewrite_references`, `read_frontmatter_refs`), y la frase del proveedor tiene espacios —`is blocked by`, `relates to`—. Y una arista tiene dos puntas, cada una con su frase: esta decisión no dice si baja en las dos |
-| Qué hace `push` con un `relation.*` que el archivo tiene y el proveedor no, o al revés | `falta spec` | Lo decide el código: una edición de `relation.*` se descarta sin aviso, igual que la de `status:` (decisión 8). Es lo que falta para que el link de un borrador llegue cuando se lo resuelve —creado o encontrado— y para que un link que falló se reintente en el próximo `push` |
+| `relation.*` baja con `pull`: todos los links, en las dos puntas, con la clave de la decisión 12 | `pendiente` | `pull` escribe `title`, `status` y `parent`, nada más: `item()` ni siquiera pide `issuelinks` |
 | `<id>_data/thread/` y `files/`, traídos por `pull` | `pendiente` | `show` lista `<id>_data/` si alguien lo puso a mano; nada lo crea ni lo trae |
 | `_data/` viaja con el renombre del `@slug` | `cerrada` | `rename_one` lo mueve en el mismo commit; bilink de la decisión 4 |
 | De dónde salen `thread/` y `files/` en el proveedor, y cómo se muda `files/` cuando la pregunta cierra | `falta spec` | Ni esta decisión ni la 6 dicen a qué corresponden en Jira (¿comentarios? ¿adjuntos?), y sin eso no hay qué implementar |
 
 ### 8. Sin vocabulario propio de estados: el que baja es el estado del proveedor, literal
 
-**No hay traducción.** El `status:` que trae un `pull` es el string que el proveedor tiene, tal cual — `Finalizada`, `En curso`, `Tareas por hacer` — no una palabra de un vocabulario de `muckpile` que haya que mapear de vuelta. Lo mismo vale al revés: lo que un `push` escribe es ese mismo string.
+**No hay traducción.** El `status:` que trae un `pull` es el string que el proveedor tiene, tal cual — `Finalizada`, `En curso`, `Tareas por hacer` — no una palabra de un vocabulario de `muckpile` que haya que mapear de vuelta. Lo mismo vale al revés: lo que `transition` escribe es ese mismo string. `push` no escribe `status`: nada del header se sube editándolo (decisión 12).
 
 **Y esto no es una simplificación menor: le saca el problema entero a la raíz.** `concepts/states.md`, en worklist, existe porque *ahí* hay dos vocabularios —el del proyecto y el del proveedor— y el mapeo entre los dos puede no ser función: en este mismo board, `Finalizada` vuelve a `done` y a `dropped`, y no hay forma de elegir sin inventar. Con un solo vocabulario —el del proveedor— no hay dos puntas que puedan desalinearse, y esa clase de ambigüedad no puede ocurrir.
 
@@ -302,12 +300,11 @@ $ muckpile link ACC-229 "is blocked by" ACC-338
 
 Las dos líneas declaran la misma arista — `ACC-229` bloqueada por `ACC-338` —, dichas desde cada punta. `muckpile` no necesita saber que son la misma relación: le alcanza con que una de las dos frases matchee un tipo, en cualquier dirección.
 
-**Avance: 4/6.**
+**Avance: 4/5.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
 | `pull` baja el `status` literal, sin traducir | `sin bilink` | `render_pulled_text`; ninguna fila bilinkeada lo dice |
-| `push` escribe ese mismo string | `diverge` | `push` nunca escribe `status`: una edición local de `status:` se descarta sin aviso cuando la base se vuelve a armar desde el proveedor. El único camino es `transition` |
 | `transition` decide por `to`, no por el nombre de la transición | `cerrada` | `transition` ↔ fila `transition` |
 | `states discover` cachea `{nombre -> categoría}` | `cerrada` | `states_discover` ↔ fila `states discover` |
 | `list --state` y `--category` | `cerrada` | `list` ↔ fila `list` |
@@ -382,7 +379,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **Canónico → se edita local y `push` lo sube sin objeción.** Es siempre el caso de un ítem que `muckpile` mismo creó —por construcción, porque todo lo que manda pasó antes por `RsMarkdownAdfFilter`—, y sigue siéndolo mientras nadie le agregue, del lado de Jira, algo que markdown no representa.
 
-**No canónico → el cuerpo local queda de sólo lectura.** Algo que el conversor sólo puede aproximar, y lo avisa como `Lossy`: una tabla con las filas numeradas, un título en un bloque de código, el pie de una imagen. `push` no sube el cuerpo aunque el archivo tenga cambios — se niega, y dice por qué. Título y transición de estado no pasan por esto: viajan sin conversión, así que no tienen de qué ser "canónicos".
+**No canónico → el cuerpo local queda de sólo lectura.** Algo que el conversor sólo puede aproximar, y lo avisa como `Lossy`: una tabla con las filas numeradas, un título en un bloque de código, el pie de una imagen. `push` no sube el cuerpo aunque el archivo tenga cambios — se niega, y dice por qué. El header no pasa por esto: cambia por comando (decisión 12) y viaja sin conversión, así que no tiene de qué ser "canónico".
 
 **Y no se resuelve pidiéndole a una IA que aplique el cambio a ciegas** — eso cambia el problema por uno peor: nadie compara el resultado contra lo que se pidió. Lo que ofrece `muckpile` es un diff: convierte el borrador editado a ADF con el mismo conversor —aunque no lo vaya a subir—, lo compara contra el ADF real, y muestra la diferencia, incluida la que se perdería si se aplicara tal cual. El borrador va como se mandaría, y el ADF real en la forma canónica del conversor: las tres normalizaciones de la tabla de arriba son equivalencias, y mostrarlas —un `attrs: {}` por cada celda de cada tabla— sólo taparía la diferencia que importa. Ese diff lo aplica una persona en Jira, o una IA operando ahí, con la pérdida ya visible antes de decidir — no escondida como hoy hace el round-trip de worklist.
 
@@ -415,6 +412,40 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 | Identificadores y comentarios en inglés | `cumple` | — |
 | Ningún comentario cita un ADR, una spec o un ítem | `no cumple` | 19 comentarios dicen `decision N`. En el código, 13: 8 en `muckpile-cli/src/lib.rs`, 1 en `muckpile-core/src/states.rs`, 1 en `muckpile-provider/src/link.rs`, 3 en `muckpile-provider/src/provider.rs`. En los tests, 6 doc-comments de módulo: `new.rs`, `states_discover.rs` y `transition.rs` de `muckpile-cli`, `identity.rs` y `states.rs` de `muckpile-core`, `link.rs` de `muckpile-provider` |
 | El idioma de lo que ve el usuario | `falta spec` | Los mensajes y los errores están todos en castellano; esta decisión fija el idioma del código, no el de la salida |
+
+### 12. El header cambia sólo por comando; el cuerpo se edita como texto
+
+**El archivo de un ítem tiene dos partes, con dueño distinto.** El header —`title`, `status`, `parent`, `relation.*`— es lo que el proveedor dice del ítem, campo por campo, y cambia sólo por comando. El cuerpo —todo lo que está debajo del header— es la descripción, y se edita como texto: es lo único que `push` sube.
+
+| Campo | Comando |
+|---|---|
+| `title` | `title <id> "<nuevo título>"` |
+| `status` | `transition <id> <estado>` (decisión 8) |
+| `parent` | `parent <id> <padre>` |
+| `relation.*` | `link <a> <frase> <b>` para agregar, `unlink <a> <frase> <b>` para quitar (decisión 8) |
+
+**Es la razón de la decisión 8, extendida a todo el header.** Un campo del header no es texto libre: es un dato que el proveedor valida —un estado al que el workflow tiene que dejar llegar, un padre que tiene que existir, una frase que tiene que ser la de uno de sus tipos de relación—, y escribirlo es pedirle una operación, no mandarle un string. Un comando la pide en el momento y dice si salió; un `push` que la dedujera de un diff del header tendría que adivinar qué operación es, y fallaría lejos de donde se escribió.
+
+**Cada comando le escribe al proveedor en el momento, y después hace lo que haría un `pull` de ese ítem en la vista donde se corre:** lo que el proveedor devolvió queda registrado, y el header local al día. Sin eso, el `push` siguiente de un cuerpo editado vería el `status` nuevo como un cambio del otro lado, y no pisaría. Corrido fuera de una vista, o sobre un ítem que la vista no tiene, sólo escribe en el proveedor. Si ese `pull` se niega —ediciones sin commitear, un rebase a medias (decisión 5)—, el proveedor ya quedó escrito, y el comando dice que la vista queda atrás hasta el próximo `pull`.
+
+**Una edición a mano del header no se sube, y `push` lo dice.** Nombra el campo, el valor escrito y el comando que lo cambia —`ACC-355: status "Finalizada" editado a mano, no se sube — muckpile transition ACC-355 "Finalizada"`—, sigue con el resto, y el header vuelve a ser el del proveedor: el valor queda en el mensaje, no en un archivo que diría algo que el proveedor no tiene.
+
+**Un borrador no tiene header del proveedor todavía.** Un `@slug` lleva el header que escribió `new` —el título, `--parent`, `--blocks`—, y viaja entero al crearlo, relaciones incluidas (decisión 4). Una vez creado, rige lo mismo que para cualquier ítem.
+
+**Las relaciones bajan todas, en las dos puntas, con la frase del proveedor.** Cada ítem lista cada link en el que está, con la frase de su lado: `ACC-338.question.md` trae `relation.blocks: [ACC-229]`, y `ACC-229.task.md` trae `relation.is_blocked_by: [ACC-338]`. La clave es la frase tal cual con los espacios cambiados por `_` —la misma regla que el nombre de un sprint (decisión 6)—, y nada más cambia: mayúsculas y acentos quedan. Los ids de una misma frase van en una sola lista, ordenados. `link` y `unlink` aceptan la frase de las dos formas: con espacios, o como la muestra el header.
+
+**El h1 es cuerpo, como cualquier otra línea.** En `ACC` casi toda descripción arranca con un h1 que repite el título —medido el 2026-09-10 sobre los últimos 100 ítems: 97 arrancan con un h1, y en 5 ya no coincide con el `summary`, porque se cambió de un lado y no del otro—. Es la convención de worklist, subida tal cual a Jira. `muckpile` no la sigue ni la limpia: el título es `summary`, un campo aparte, y lo que diga un h1 es contenido de la descripción.
+
+**Avance: 0/6.**
+
+| Dimensión | Estado | Evidencia |
+|---|---|---|
+| `title <id> "<nuevo título>"` | `pendiente` | Hoy el título cambia editando el header, y `push` lo manda (`push_one`) |
+| `parent <id> <padre>`, y `new --parent` | `pendiente` | Nada cambia el padre de un ítem ya sincronizado; un borrador sólo lo tiene si alguien lo escribe a mano |
+| `unlink <a> <frase> <b>` | `pendiente` | — |
+| `link` y `unlink` aceptan la frase con `_` | `pendiente` | `link` compara la frase tal cual, con espacios |
+| `push` no sube nada del header, y una edición a mano lo dice | `diverge` | `push_one` manda el título editado; una edición de `status:`, `parent:` o `relation.*` se descarta sin aviso cuando el header se vuelve a armar desde el proveedor |
+| Después de escribir, el comando hace lo que un `pull` del ítem en la vista | `diverge` | `transition` y `link` no tocan la vista: el `push` siguiente ve lo que escribieron como un cambio del otro lado, y no pisa |
 
 ---
 
@@ -468,7 +499,7 @@ El choque de hoy, bajo este modelo, no es un `add/add` que exige `--force`: es u
 | Comando | Qué hace | Ejemplo |
 |---|---|---|
 | `init` | Crea un proyecto: `<proyecto>/.muckpile/`, un `muckpile.toml` para completar, y `base/`, `backlog/`, `to-work/`. Es el único comando que crea `.muckpile/` (decisión 6). | `$ cd multitask && muckpile init sge` |
-| `new` | Escribe `@slug.<tipo>.md` local — sin red. El slug sale de slugificar el título entero, sin tope de largo — la misma regla que `worklist new` ya documenta. `<tipo>` incluye `question`, con su relación al ítem que bloquea. | `$ muckpile new question "¿el rol se hereda de la capa de arriba?" --blocks ACC-229`<br>`@el-rol-se-hereda-de-la-capa-de-arriba.question.md creado` |
+| `new` | Escribe `@slug.<tipo>.md` local — sin red. El slug sale de slugificar el título entero, sin tope de largo — la misma regla que `worklist new` ya documenta. `<tipo>` incluye `question`, con su relación al ítem que bloquea. `--parent <id>` y `--blocks <id>` escriben el header que viaja al crearlo (decisión 12). | `$ muckpile new question "¿el rol se hereda de la capa de arriba?" --blocks ACC-229`<br>`@el-rol-se-hereda-de-la-capa-de-arriba.question.md creado` |
 | `show` | Frontmatter, cuerpo, y el listado de `<id>_data/` si existe (decisión 6) — del proveedor en vivo o de la copia local con `--local`. | `$ muckpile show ACC-355` |
 | `list` | Ítems por vista, sprint, estado (el string real, sin traducir), categoría (`new`/`indeterminate`/`done`, de Jira) o padre. | `$ muckpile list backlog/sprint/22_Las_vistas --state "Finalizada"`<br>`$ muckpile list backlog/sprint/22_Las_vistas --category done` |
 | `sprint fetch` | Trae los sprints abiertos del proyecto y crea una carpeta vacía por cada uno bajo `backlog/sprint/`, con el nombre slugificado — para tab-completar y para tener contra qué correr `pull`. Nunca borra una carpeta que ya tiene algo adentro. | `$ muckpile sprint fetch` |
@@ -476,14 +507,17 @@ El choque de hoy, bajo este modelo, no es un `add/add` que exige `--force`: es u
 | `to-work` | Arma una vista de trabajo bajo `to-work/`: `to-work/<id>/` con su `_data/`. No toca código — eso es `code-work add`. Sólo corre parado en la raíz del proyecto — se niega en `base/`, `backlog/`, `backlog/sprint/`, o adentro de `to-work/`. | `$ muckpile to-work SGE-344`  ← crea `to-work/SGE-344/`<br>`$ cd backlog/sprint/22_Las_vistas && muckpile to-work ACC-355`<br>`error: to-work corre en la raíz del proyecto, no en backlog/sprint/22_Las_vistas` |
 | `code-work add` | Corrido adentro de una vista de trabajo, agrega un worktree por repo: `code-work/<repo>/`. Por default, trackea la rama derivada de `commit_prefix` si ya existe en el remoto, o la crea desde la principal de `base/<repo>/` si no — clonándolo en el momento si todavía no está en disco. `--from` pisa el punto de partida (un hotfix desde `rc-??`); `--branch` pisa el nombre cuando no es el derivado (split FE/BE). | `$ cd to-work/SGE-9876 && muckpile code-work add sge`<br>`$ muckpile code-work add portal-escolar --from rc-3.2` |
 | `pull` | Trae o actualiza una vista — un ítem, un sprint ya conocido por `sprint fetch` (bajo `backlog/sprint/`), una consulta. Sin argumento, actualiza la vista donde estás parado — misma convención que ya usa `worklist`. Corrido adentro de una vista con un id nuevo, le agrega lo relacionado. Nunca el proyecto entero. | `$ muckpile pull backlog/sprint/22_Las_vistas`  ← desde `acc/`<br>`$ cd acc/backlog/sprint/22_Las_vistas && muckpile pull`  ← la misma, parado adentro<br>`$ cd sge/to-work/SGE-344 && muckpile pull SGE-9875`  ← agrega un relacionado |
-| `push` | Primero resuelve los `@slug` pendientes que la vista toca —busca, crea, renombra archivo y directorio, reescribe referencias, un commit—; después escribe lo editado. Antes de escribir, vuelve a preguntar: si el proveedor cambió desde el último `pull`, no pisa. El cuerpo, además, sólo se sube si es canónico (decisión 10) — si no, se niega y ofrece el diff. | `$ muckpile push backlog/sprint/22_Las_vistas`<br>`ACC-355: cambió del otro lado desde tu último pull — no se escribió nada`<br>`ACC-360: el cuerpo no es canónico — no se sube. Diff: …` |
+| `push` | Primero resuelve los `@slug` pendientes que la vista toca —busca, crea, renombra archivo y directorio, reescribe referencias, un commit—; después escribe el cuerpo editado. El header no se sube: cambia por comando, y una edición a mano se dice y no se manda (decisión 12). Antes de escribir, vuelve a preguntar: si el proveedor cambió desde el último `pull`, no pisa. El cuerpo, además, sólo se sube si es canónico (decisión 10) — si no, se niega y ofrece el diff. | `$ muckpile push backlog/sprint/22_Las_vistas`<br>`ACC-355: cambió del otro lado desde tu último pull — no se escribió nada`<br>`ACC-360: el cuerpo no es canónico — no se sube. Diff: …` |
 | `status` | Compara local contra el proveedor en vivo, sin escribir. | `$ muckpile status backlog/sprint/22_Las_vistas` |
 | `transition` | Reemplaza a `start`/`done`/`close`/`drop` — no hay vocabulario propio que darles (decisión 8). Lista las transiciones del ítem, busca la que lleva al estado pedido, la ejecuta. | `$ muckpile transition ACC-355 "Finalizada"` |
-| `link` | Declara una relación entre dos ítems, en el momento — sin vocabulario propio (decisión 8): la frase es una de las dos que el proveedor ya usa para ese tipo, de ida (`outward`) o de vuelta (`inward`). | `$ muckpile link ACC-338 blocks ACC-229`<br>`$ muckpile link ACC-229 "is blocked by" ACC-338` |
+| `link` | Declara una relación entre dos ítems, en el momento — sin vocabulario propio (decisión 8): la frase es una de las dos que el proveedor ya usa para ese tipo, de ida (`outward`) o de vuelta (`inward`), con espacios o con `_` como la muestra el header. | `$ muckpile link ACC-338 blocks ACC-229`<br>`$ muckpile link ACC-229 "is blocked by" ACC-338` |
+| `unlink` | Quita una relación, en el momento: la misma frase y las mismas dos formas que `link` (decisión 12). | `$ muckpile unlink ACC-338 blocks ACC-229` |
+| `title` | Cambia el título de un ítem, en el momento. Es la única forma: editar `title:` en el header no se sube (decisión 12). | `$ muckpile title ACC-355 "Vistas de trabajo, con su ítem y su _data/"` |
+| `parent` | Cambia el padre de un ítem, en el momento (decisión 12). | `$ muckpile parent ACC-355 ACC-339` |
 
-**Avance de la tabla: doce de las trece filas tienen bilink aceptado** (`show` tiene dos, uno por camino); `init` todavía no tiene código. Que la fila esté atada no quiere decir que el comando esté completo: `pull` y `push` son parciales —lo que les falta está en las decisiones 5, 6, 7, 8 y 10—, y `to-work` diverge de su propia fila (decisión 6).
+**Avance de la tabla: doce de las dieciséis filas tienen bilink aceptado** (`show` tiene dos, uno por camino); `init`, `unlink`, `title` y `parent` todavía no tienen código. Que la fila esté atada no quiere decir que el comando esté completo: `pull` y `push` son parciales —lo que les falta está en las decisiones 5, 6, 7, 8 y 10—, y `to-work` diverge de su propia fila (decisión 6).
 
-Trece comandos contra los veintitrés de hoy (once de `worklist`, doce de `worklist-server`). Lo que no está en la tabla — `install-hooks`, `check-push`, `assign-keys`, `bootstrap`, `reconcile`, `removes`, `push-states`, `create-or-find`, `provider set-status`, `window-open`, `propagate`, `adopt` — no falta: era la maquinaria de la asimetría que la decisión 1 saca. `bootstrap`/`reconcile`/`adopt` sí tienen equivalente, pero no como comando aparte: son `pull` con una consulta que trae de a muchos — `muckpile pull backlog --query "project = ACC AND sprint is empty"`.
+Dieciséis comandos contra los veintitrés de hoy (once de `worklist`, doce de `worklist-server`). Lo que no está en la tabla — `install-hooks`, `check-push`, `assign-keys`, `bootstrap`, `reconcile`, `removes`, `push-states`, `create-or-find`, `provider set-status`, `window-open`, `propagate`, `adopt` — no falta: era la maquinaria de la asimetría que la decisión 1 saca. `bootstrap`/`reconcile`/`adopt` sí tienen equivalente, pero no como comando aparte: son `pull` con una consulta que trae de a muchos — `muckpile pull backlog --query "project = ACC AND sprint is empty"`.
 
 ---
 
@@ -502,4 +536,4 @@ Trece comandos contra los veintitrés de hoy (once de `worklist`, doce de `workl
 **Lo que este ADR no decide:**
 - Si `.muckpile/` —uno por proyecto, según decisión 6— necesita algún metadato propio además de lo que git ya da.
 - Cómo el workflow del proveedor hace cumplir `blocks` en la práctica — decisión 7/8 dice que es su responsabilidad y no la de `muckpile`, pero no dice cómo se configura eso en un board real.
-- Si el formato de archivo de un ítem (`<id>.<tipo>.md`, frontmatter con `title`/`status`/`parent`/`relation.*`) se conserva tal cual — este ADR asume que sí, porque nada de lo de arriba lo obliga a cambiar.
+- Si el formato de archivo de un ítem (`<id>.<tipo>.md`, frontmatter con `title`/`status`/`parent`/`relation.*`) se conserva tal cual — este ADR asume que sí, porque nada de lo de arriba lo obliga a cambiar. La decisión 12 fija quién cambia el header y con qué clave baja una relación, no la forma del archivo.
