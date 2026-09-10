@@ -3,6 +3,7 @@ use muckpile_core::identity::load_identity;
 use muckpile_core::project::{find_project_root, load_project_config, ProjectConfig};
 use muckpile_provider::provider::Provider;
 use muckpile_provider::rest::{Credentials, JiraRest};
+use muckpile_provider::transition::Outcome;
 use std::path::{Path, PathBuf};
 
 fn main() -> Result<()> {
@@ -12,7 +13,8 @@ fn main() -> Result<()> {
         [cmd] if cmd == "pull" => run_pull(None),
         [cmd, id] if cmd == "pull" => run_pull(Some(id)),
         [cmd, sub] if cmd == "sprint" && sub == "fetch" => run_sprint_fetch(),
-        _ => bail!("uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch"),
+        [cmd, id, status] if cmd == "transition" => run_transition(id, status),
+        _ => bail!("uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado>"),
     }
 }
 
@@ -47,6 +49,21 @@ fn run_sprint_fetch() -> Result<()> {
     }
     for slug in &result.removed {
         println!("  backlog/sprint/{slug}/       borrada, ya no está abierto y no tenía nada adentro");
+    }
+    Ok(())
+}
+
+fn run_transition(id: &str, target_status: &str) -> Result<()> {
+    let (root, _cwd) = standing_in_a_project()?;
+    let config = load_project_config(&root)?;
+    let provider = build_provider(&root, &config)?;
+    match muckpile_cli::transition(id, target_status, provider.as_ref())? {
+        Outcome::Applied { transition_name } => {
+            println!("{id}: transición \"{transition_name}\" -> {target_status}");
+        }
+        Outcome::NoSuchTransition { available } => {
+            println!("{id}: no hay transición hacia \"{target_status}\" — disponibles: {}", available.join(", "));
+        }
     }
     Ok(())
 }

@@ -7,6 +7,7 @@ use muckpile_core::body::adf_to_body;
 use muckpile_core::is_valid_id;
 use muckpile_core::project::{classify, require_root, Position, ProjectConfig};
 use muckpile_provider::provider::{Provider, Sprint};
+use muckpile_provider::transition::{transition as provider_transition, Outcome};
 use std::path::{Path, PathBuf};
 
 /// Assembles a working view: `<root>/to-work/<id>/`, empty. Fetching the
@@ -163,4 +164,16 @@ fn legible_name(sprint: &Sprint) -> String {
 /// ASCII up to that point, so byte slicing is safe.
 fn date_only(iso: &str) -> &str {
     &iso[..10.min(iso.len())]
+}
+
+/// Replaces `start`/`done`/`close`/`drop` (decision 8): fires the workflow's
+/// own transition leading to `target_status`, deciding by `to` — never by
+/// guessing whether a transition's own name is the status it leads to. The
+/// deciding logic lives in `muckpile-provider`; this only adds the id check
+/// every other command already applies to an argument coming from argv.
+pub fn transition(id: &str, target_status: &str, provider: &dyn Provider) -> Result<Outcome> {
+    if !is_valid_id(id) {
+        bail!("{id}: no es un id válido");
+    }
+    provider_transition(provider, id, target_status)
 }
