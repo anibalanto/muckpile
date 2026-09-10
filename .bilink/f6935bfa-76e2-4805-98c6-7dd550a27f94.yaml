@@ -14,7 +14,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 2f423399b0cc3e6ece49d81c64bcb42c
-      hash: 9c4cdd24e1ca98a172c54b10d9ed48db0516b188474883767e049732c1378739
-      hash_ast: fe927510d3e4e437150013fad4c3e26c97d389a114dc71bbef032f42a3a30377
+      hash: 4d0a49396b5c2ab6cd4ed9af6655a6b59f2fd3eb2136f9bdee5e0fa1abc04ad7
+      hash_ast: 3c4cbb0a3e9009758505225a77fba542140fa465b0cdabf11ed368653877d57c
       n: declined
     name: provider-trait
