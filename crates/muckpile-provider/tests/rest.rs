@@ -276,6 +276,75 @@ fn update_body_puts_the_adf_as_the_description_field() {
 }
 
 #[test]
+fn find_by_title_matches_the_exact_summary_among_the_results() {
+    let response = r#"{"issues":[
+        {"key":"ACC-1","fields":{"summary":"Vistas de trabajo, borrador"}},
+        {"key":"ACC-2","fields":{"summary":"Vistas de trabajo"}}
+    ]}"#;
+    let (base, rx) = one_shot(200, response);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    let key = provider.find_by_title("ACC", "Tarea", "Vistas de trabajo").unwrap();
+    assert_eq!(key.as_deref(), Some("ACC-2"), "full-text can return more than the exact title");
+
+    let captured = rx.recv().unwrap();
+    assert_eq!(captured.method, "GET");
+    assert!(captured.path.starts_with("/rest/api/3/search?jql="), "{}", captured.path);
+    assert!(captured.path.contains("project"), "{}", captured.path);
+}
+
+#[test]
+fn find_by_title_is_none_when_nothing_matches_exactly() {
+    let response = r#"{"issues":[{"key":"ACC-1","fields":{"summary":"algo distinto"}}]}"#;
+    let (base, rx) = one_shot(200, response);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    let key = provider.find_by_title("ACC", "Tarea", "Vistas de trabajo").unwrap();
+    assert_eq!(key, None);
+    rx.recv().unwrap();
+}
+
+#[test]
+fn find_by_title_refuses_a_title_with_nothing_searchable() {
+    let provider = JiraRest::new("http://127.0.0.1:1", Credentials::new("a@b.com", "tok"));
+    let err = provider.find_by_title("ACC", "Tarea", "---").unwrap_err();
+    assert!(format!("{err:#}").contains("---"), "{err:#}");
+}
+
+#[test]
+fn create_item_posts_project_type_and_summary() {
+    let (base, rx) = one_shot(201, r#"{"key":"ACC-403"}"#);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    let key = provider.create_item("ACC", "Tarea", "Vistas de trabajo", None, None).unwrap();
+    assert_eq!(key, "ACC-403");
+
+    let captured = rx.recv().unwrap();
+    assert_eq!(captured.method, "POST");
+    assert_eq!(captured.path, "/rest/api/3/issue");
+    let body: serde_json::Value = serde_json::from_str(&captured.body).unwrap();
+    assert_eq!(body["fields"]["project"]["key"], "ACC");
+    assert_eq!(body["fields"]["issuetype"]["name"], "Tarea");
+    assert_eq!(body["fields"]["summary"], "Vistas de trabajo");
+    assert!(body["fields"].get("parent").is_none());
+    assert!(body["fields"].get("description").is_none());
+}
+
+#[test]
+fn create_item_includes_parent_and_description_when_given() {
+    let (base, rx) = one_shot(201, r#"{"key":"ACC-404"}"#);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+    let adf = r#"{"type":"doc","version":1,"content":[]}"#;
+
+    provider.create_item("ACC", "Tarea", "x", Some("ACC-100"), Some(adf)).unwrap();
+
+    let captured = rx.recv().unwrap();
+    let body: serde_json::Value = serde_json::from_str(&captured.body).unwrap();
+    assert_eq!(body["fields"]["parent"]["key"], "ACC-100");
+    assert_eq!(body["fields"]["description"]["type"], "doc");
+}
+
+#[test]
 fn item_with_no_parent_or_description_leaves_both_absent() {
     let response = r#"{"fields":{"summary":"x","status":{"name":"Abierta"},"issuetype":{"name":"Tarea"}}}"#;
     let (base, rx) = one_shot(200, response);

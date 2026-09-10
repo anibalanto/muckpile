@@ -69,6 +69,25 @@ pub trait Provider {
     /// round-trips losslessly through this same conversion, so what lands
     /// here is always something this system can read back exactly.
     fn update_body(&self, key: &str, body_adf: &str) -> Result<()>;
+
+    /// The key of the item whose title is exactly `title`, among those of
+    /// `jira_type` in `project_key` — `None` when there's no such item.
+    /// Checked before creating, so a retry after a partial failure doesn't
+    /// duplicate what an earlier attempt already made.
+    fn find_by_title(&self, project_key: &str, jira_type: &str, title: &str) -> Result<Option<String>>;
+
+    /// Creates a new item and returns its key. `parent` and `body_adf`
+    /// travel only here — an item this finds instead of creates never gets
+    /// either applied after the fact, because there was nothing new to
+    /// write in the first place.
+    fn create_item(
+        &self,
+        project_key: &str,
+        jira_type: &str,
+        title: &str,
+        parent: Option<&str>,
+        body_adf: Option<&str>,
+    ) -> Result<String>;
 }
 
 /// A relationship type, named from both directions — e.g. Jira's `Blocks`:

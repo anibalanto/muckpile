@@ -1,6 +1,7 @@
 //! The real transport: Jira's REST API, reached directly — one port, not
 //! three transports each covering for what the other two can't do.
 
+use crate::jql::search_text;
 use crate::provider::{Item, LinkType, Provider, Sprint, Status, Transition};
 use anyhow::{anyhow, bail, Context, Result};
 use std::collections::BTreeMap;
@@ -170,6 +171,46 @@ impl Provider for JiraRest {
         self.call("PUT", &format!("/rest/api/3/issue/{key}"), Some(body))?;
         Ok(())
     }
+
+    fn find_by_title(&self, project_key: &str, jira_type: &str, title: &str) -> Result<Option<String>> {
+        let needle = search_text(title);
+        if needle.is_empty() {
+            bail!("{title:?}: no queda nada con qué buscar después de reducirlo para JQL");
+        }
+        let jql = format!("project = {project_key} AND issuetype = \"{jira_type}\" AND summary ~ \"{needle}\"");
+        let path = format!("/rest/api/3/search?jql={}&fields=summary", url_encode(&jql));
+        let v = self.call("GET", &path, None)?;
+        let issues = v.get("issues").and_then(|i| i.as_array()).ok_or_else(|| anyhow!("no `issues` in the search response"))?;
+        // The JQL is deliberately imprecise (`~` is full-text, not literal):
+        // the exact match is decided here, by comparing the whole `summary`.
+        Ok(issues.iter().find_map(|issue| {
+            let summary = issue.get("fields")?.get("summary")?.as_str()?;
+            if summary != title {
+                return None;
+            }
+            issue.get("key")?.as_str().map(str::to_string)
+        }))
+    }
+
+    fn create_item(&self, project_key: &str, jira_type: &str, title: &str, parent: Option<&str>, body_adf: Option<&str>) -> Result<String> {
+        let mut fields = serde_json::json!({
+            "project": { "key": project_key },
+            "issuetype": { "name": jira_type },
+            "summary": title,
+        });
+        if let Some(p) = parent {
+            fields["parent"] = serde_json::json!({ "key": p });
+        }
+        if let Some(adf) = body_adf {
+            let adf_value: serde_json::Value = serde_json::from_str(adf).context("the body to send isn't JSON")?;
+            fields["description"] = adf_value;
+        }
+        let v = self.call("POST", "/rest/api/3/issue", Some(serde_json::json!({ "fields": fields })))?;
+        v.get("key")
+            .and_then(|k| k.as_str())
+            .map(str::to_string)
+            .ok_or_else(|| anyhow!("create no devolvió 'key': {v}"))
+    }
 }
 
 /// The only thing that touches `ureq`. A `4xx`/`5xx` isn't an `Err` here —
@@ -190,6 +231,20 @@ fn http(method: &str, url: &str, auth: &str, body: Option<serde_json::Value>) ->
         Err(ureq::Error::Status(status, r)) => Ok((status, r.into_string().unwrap_or_default())),
         Err(e) => Err(anyhow!("{e}")),
     }
+}
+
+/// Percent-encodes `s` for a URL query value — byte by byte, so a
+/// multi-byte UTF-8 character (an accent in a title) comes out as one
+/// `%XX` per byte, which is exactly what a percent-decoder expects back.
+fn url_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(b as char),
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
 }
 
 fn base64(bytes: &[u8]) -> String {

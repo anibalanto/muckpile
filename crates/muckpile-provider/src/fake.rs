@@ -4,9 +4,9 @@
 //! every `cargo test`.
 
 use crate::provider::{self, LinkType, Provider, Sprint, Status, Transition};
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 pub struct FakeProvider {
     items: RefCell<HashMap<String, Entry>>,
@@ -14,6 +14,7 @@ pub struct FakeProvider {
     statuses: RefCell<Vec<Status>>,
     link_types: RefCell<Vec<LinkType>>,
     links_created: RefCell<Vec<(String, String, String)>>,
+    next_keys: RefCell<VecDeque<(String, String)>>,
 }
 
 /// What `FakeProvider` holds per item — a superset of what any one `Provider`
@@ -35,7 +36,16 @@ impl FakeProvider {
             statuses: RefCell::new(Vec::new()),
             link_types: RefCell::new(Vec::new()),
             links_created: RefCell::new(Vec::new()),
+            next_keys: RefCell::new(VecDeque::new()),
         }
+    }
+
+    /// Queues the `(key, initial status)` `create_item` hands back the next
+    /// time it's called — in order, one pair consumed per call. A test
+    /// decides the key and status explicitly instead of this guessing a
+    /// workflow's real default.
+    pub fn queue_create(&self, key: &str, initial_status: &str) {
+        self.next_keys.borrow_mut().push_back((key.to_string(), initial_status.to_string()));
     }
 
     /// Seeds the provider's own relationship types as `(name, outward,
@@ -168,5 +178,36 @@ impl Provider for FakeProvider {
         let Some(item) = items.get_mut(key) else { bail!("no such item: {key}") };
         item.body_adf = Some(body_adf.to_string());
         Ok(())
+    }
+
+    fn find_by_title(&self, _project_key: &str, jira_type: &str, title: &str) -> Result<Option<String>> {
+        Ok(self.items.borrow().iter().find(|(_, e)| e.jira_type == jira_type && e.title == title).map(|(k, _)| k.clone()))
+    }
+
+    fn create_item(
+        &self,
+        _project_key: &str,
+        jira_type: &str,
+        title: &str,
+        parent: Option<&str>,
+        body_adf: Option<&str>,
+    ) -> Result<String> {
+        let (key, status) = self
+            .next_keys
+            .borrow_mut()
+            .pop_front()
+            .with_context(|| "FakeProvider: no queued key — call queue_create first")?;
+        self.items.borrow_mut().insert(
+            key.clone(),
+            Entry {
+                status,
+                transitions: Vec::new(),
+                jira_type: jira_type.to_string(),
+                title: title.to_string(),
+                parent: parent.map(str::to_string),
+                body_adf: body_adf.map(str::to_string),
+            },
+        );
+        Ok(key)
     }
 }
