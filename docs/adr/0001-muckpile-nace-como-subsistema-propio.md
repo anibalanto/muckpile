@@ -298,7 +298,7 @@ $ muckpile link ACC-338 blocks ACC-229
 $ muckpile link ACC-229 "is blocked by" ACC-338
 ```
 
-Las dos líneas declaran la misma arista — `ACC-338` bloqueada por `ACC-229` —, dichas desde cada punta. `muckpile` no necesita saber que son la misma relación: le alcanza con que una de las dos frases matchee un tipo, en cualquier dirección.
+Las dos líneas declaran la misma arista — `ACC-229` bloqueada por `ACC-338` —, dichas desde cada punta. `muckpile` no necesita saber que son la misma relación: le alcanza con que una de las dos frases matchee un tipo, en cualquier dirección.
 
 **Avance: 4/6.**
 
