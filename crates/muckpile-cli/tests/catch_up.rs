@@ -8,7 +8,6 @@ use muckpile_core::project::ProjectConfig;
 use muckpile_provider::fake::FakeProvider;
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::process::Command;
 
 fn config() -> ProjectConfig {
     let mut item_type = BTreeMap::new();
@@ -24,18 +23,31 @@ fn config() -> ProjectConfig {
     }
 }
 
-fn git_view() -> tempfile::TempDir {
-    let dir = tempfile::tempdir().unwrap();
-    for args in [&["init", "-q"][..], &["config", "user.email", "t@t"], &["config", "user.name", "t"]] {
-        assert!(Command::new("git").arg("-C").arg(dir.path()).args(args).status().unwrap().success());
-    }
-    dir
+/// A project with a ledger and one view in it, `to-work/ACC-1`.
+struct Fixture {
+    _dir: tempfile::TempDir,
+    root: std::path::PathBuf,
+    view: std::path::PathBuf,
 }
 
-fn seed_pulled(view: &Path, provider: &FakeProvider) {
+impl Fixture {
+    fn path(&self) -> &Path {
+        &self.view
+    }
+}
+
+fn git_view() -> Fixture {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("acc");
+    std::fs::create_dir_all(&root).unwrap();
+    muckpile_core::ledger::init(&root).unwrap();
+    let view = muckpile_core::ledger::open_view(&root, "to-work/ACC-1").unwrap();
+    Fixture { _dir: dir, root, view }
+}
+
+fn seed_pulled(fixture: &Fixture, provider: &FakeProvider) {
     provider.seed_item("ACC-1", "Tarea", "vieja", "Abierta", None, None);
-    std::fs::write(view.join("ACC-1.task.md"), "---\ntitle: vieja\nstatus: Abierta\n---\n").unwrap();
-    muckpile_core::commit_paths(view, &["ACC-1.task.md"], "pull ACC-1").unwrap();
+    muckpile_cli::pull(&fixture.root, &fixture.view, None, provider, &config()).unwrap();
 }
 
 #[test]
@@ -43,7 +55,7 @@ fn the_view_catches_up_with_what_the_command_wrote() {
     let dir = git_view();
     let view = dir.path();
     let provider = FakeProvider::new();
-    seed_pulled(view, &provider);
+    seed_pulled(&dir, &provider);
     title("ACC-1", "nueva", &provider).unwrap();
 
     let caught = catch_up(view, "ACC-1", &provider, &config()).unwrap();
@@ -62,7 +74,7 @@ fn an_item_with_uncommitted_edits_is_left_behind() {
     let dir = git_view();
     let view = dir.path();
     let provider = FakeProvider::new();
-    seed_pulled(view, &provider);
+    seed_pulled(&dir, &provider);
     std::fs::write(view.join("ACC-1.task.md"), "---\ntitle: vieja\nstatus: Abierta\n---\nun cuerpo a medio escribir\n").unwrap();
     title("ACC-1", "nueva", &provider).unwrap();
 
@@ -80,7 +92,7 @@ fn an_edited_file_in_its_data_leaves_it_behind_too() {
     let dir = git_view();
     let view = dir.path();
     let provider = FakeProvider::new();
-    seed_pulled(view, &provider);
+    seed_pulled(&dir, &provider);
     std::fs::create_dir_all(view.join("ACC-1_data/thread")).unwrap();
     std::fs::write(view.join("ACC-1_data/thread/42.md"), "---\nauthor: x\n---\nhola\n").unwrap();
     muckpile_core::commit_paths(view, &["ACC-1_data/thread/42.md"], "pull ACC-1").unwrap();
@@ -96,7 +108,7 @@ fn a_local_draft_in_files_does_not_hold_it_back() {
     let dir = git_view();
     let view = dir.path();
     let provider = FakeProvider::new();
-    seed_pulled(view, &provider);
+    seed_pulled(&dir, &provider);
     std::fs::create_dir_all(view.join("ACC-1_data/files")).unwrap();
     std::fs::write(view.join("ACC-1_data/files/borrador.md"), "sin commitear\n").unwrap();
     title("ACC-1", "nueva", &provider).unwrap();

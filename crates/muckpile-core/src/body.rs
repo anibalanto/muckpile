@@ -137,6 +137,16 @@ fn as_json(adf: &str) -> Result<serde_json::Value> {
     serde_json::from_str(adf).with_context(|| format!("the ADF the converter produced isn't JSON: {adf}"))
 }
 
+/// Whether two serialized ADF documents are the same document — as JSON,
+/// not as bytes. Both absent is the same; one absent isn't.
+pub fn same_adf(a: Option<&str>, b: Option<&str>) -> Result<bool> {
+    match (a, b) {
+        (None, None) => Ok(true),
+        (Some(a), Some(b)) => Ok(as_json(a)? == as_json(b)?),
+        _ => Ok(false),
+    }
+}
+
 /// What sending a draft would do to the provider's body: a line diff of the
 /// provider's ADF against `sent_adf` — the draft exactly as it would be
 /// sent — both as indented JSON. The provider's side is in the converter's

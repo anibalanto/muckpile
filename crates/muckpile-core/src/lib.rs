@@ -305,19 +305,6 @@ pub fn topo_order(view: &Path, slugs: &[String]) -> Result<Vec<String>> {
     Ok(order)
 }
 
-fn git(view: &Path, args: &[&str]) -> Result<()> {
-    let status = Command::new("git")
-        .arg("-C")
-        .arg(view)
-        .args(args)
-        .status()
-        .with_context(|| format!("running git {:?}", args))?;
-    if !status.success() {
-        bail!("git {:?} failed with {status}", args);
-    }
-    Ok(())
-}
-
 /// Commits exactly `paths` (relative to `view`) into whatever git repository
 /// governs `view`, if any of them actually differ from what's already
 /// committed — a no-op, returning `false`, otherwise. `git add -A` with no
@@ -330,12 +317,7 @@ pub fn commit_paths(view: &Path, paths: &[&str], message: &str) -> Result<bool> 
         return Ok(false);
     }
 
-    let mut add_args = vec!["add", "--"];
-    add_args.extend(paths);
-    git(view, &add_args)?;
-    let mut commit_args = vec!["commit", "-q", "-m", message, "--"];
-    commit_args.extend(paths);
-    git(view, &commit_args)?;
+    ledger::tool_commit(view, paths, message)?;
     Ok(true)
 }
 
@@ -428,15 +410,21 @@ fn replace_link(re: &Regex, text: &str, changed: &mut bool, new_id: &str, item_t
     out
 }
 
-/// Renames an item, its sibling `_data/` directory if it has one, and
-/// rewrites every reference across the view, in one commit. Returns the
-/// files touched, not counting the renamed item itself.
+/// Retires the draft `old_slug` in favor of the item `new_id`, in one
+/// commit signed as the tool: every reference across the view rewritten,
+/// the draft's `_data/` merged into the item's, and the draft file gone —
+/// or, when the provider's own file for the item hasn't come down, the
+/// draft becomes it. Returns the files whose references were rewritten.
 pub fn rename_one(view: &Path, old_slug: &str, new_id: &str) -> Result<Vec<String>> {
     let (src, item_type) = find_file(view, old_slug)?;
+    let src_name = src.file_name().unwrap().to_string_lossy().into_owned();
     let dst_name = format!("{new_id}.{item_type}.md");
 
     let mut touched = Vec::new();
     for path in markdown_files(view) {
+        if path == src {
+            continue;
+        }
         let text = std::fs::read_to_string(&path)?;
         let (new_text, changed) = rewrite_references(&text, old_slug, &item_type, new_id);
         if changed {
@@ -445,36 +433,58 @@ pub fn rename_one(view: &Path, old_slug: &str, new_id: &str) -> Result<Vec<Strin
         }
     }
 
-    let src_name = src.file_name().unwrap().to_str().unwrap().to_string();
-    git(view, &["mv", &src_name, &dst_name])?;
+    // When the provider's own file for the item already came down, the
+    // draft is only what it was made from, and goes; otherwise it becomes
+    // the item's file.
+    if view.join(&dst_name).exists() {
+        std::fs::remove_file(&src).with_context(|| format!("removing {src_name}"))?;
+    } else {
+        std::fs::rename(&src, view.join(&dst_name)).with_context(|| format!("renaming {src_name}"))?;
+    }
     let mut paths = vec![src_name, dst_name];
 
     let old_data = format!("{old_slug}_data");
     if view.join(&old_data).is_dir() {
         let new_data = format!("{new_id}_data");
-        git(view, &["mv", &old_data, &new_data])?;
+        move_merging(&view.join(&old_data), &view.join(&new_data))?;
         paths.extend([old_data, new_data]);
     }
     paths.extend(touched.iter().cloned());
+    paths.retain(|p| view.join(p).exists() || is_tracked(view, p));
 
     let msg = if touched.is_empty() {
         format!("rename {old_slug} -> {new_id}")
     } else {
         format!("rename {old_slug} -> {new_id} ({} refs)", touched.len())
     };
-    // `git mv` already staged the moves; the rewritten references still
-    // need adding. The commit names every path — only what this rename
-    // touched, never another view's uncommitted edit, nor something a
-    // person staged by hand.
-    if !touched.is_empty() {
-        let mut add_args = vec!["add", "--"];
-        add_args.extend(touched.iter().map(String::as_str));
-        git(view, &add_args)?;
-    }
-    let mut commit_args = vec!["commit", "-q", "-m", msg.as_str(), "--"];
-    commit_args.extend(paths.iter().map(String::as_str));
-    git(view, &commit_args)?;
+    // Every path named, and nothing else: never another view's uncommitted
+    // edit, nor something a person staged by hand.
+    let paths: Vec<&str> = paths.iter().map(String::as_str).collect();
+    ledger::tool_commit(view, &paths, &msg)?;
     Ok(touched)
+}
+
+/// Moves everything under `from` to the same place under `to`, which may
+/// already exist — a file already there is left as it is — and removes
+/// `from`.
+fn move_merging(from: &Path, to: &Path) -> Result<()> {
+    if !to.exists() {
+        return std::fs::rename(from, to).with_context(|| format!("moving {}", from.display()));
+    }
+    for entry in std::fs::read_dir(from)? {
+        let entry = entry?;
+        let target = to.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            move_merging(&entry.path(), &target)?;
+        } else if !target.exists() {
+            std::fs::rename(entry.path(), &target)?;
+        }
+    }
+    std::fs::remove_dir_all(from).with_context(|| format!("removing {}", from.display()))
+}
+
+fn is_tracked(view: &Path, path: &str) -> bool {
+    Command::new("git").arg("-C").arg(view).args(["ls-files", "--error-unmatch", "--", path]).output().map(|o| o.status.success()).unwrap_or(false)
 }
 
 /// Renames a batch of requests in topological order. On a cycle, nothing is

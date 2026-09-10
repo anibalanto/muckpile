@@ -26,12 +26,26 @@ fn config() -> ProjectConfig {
     }
 }
 
-fn git_view() -> tempfile::TempDir {
+/// A project with a ledger, and one view in it, `to-work/ACC-1` — what
+/// every test here pushes from. Derefs to the view's path.
+struct Fixture {
+    _dir: tempfile::TempDir,
+    view: std::path::PathBuf,
+}
+
+impl Fixture {
+    fn path(&self) -> &Path {
+        &self.view
+    }
+}
+
+fn git_view() -> Fixture {
     let dir = tempfile::tempdir().unwrap();
-    run(dir.path(), &["init", "-q"]);
-    run(dir.path(), &["config", "user.email", "test@test"]);
-    run(dir.path(), &["config", "user.name", "test"]);
-    dir
+    let root = dir.path().join("acc");
+    std::fs::create_dir_all(&root).unwrap();
+    muckpile_core::ledger::init(&root).unwrap();
+    let view = muckpile_core::ledger::open_view(&root, "to-work/ACC-1").unwrap();
+    Fixture { _dir: dir, view }
 }
 
 fn run(repo: &Path, args: &[&str]) {
@@ -47,49 +61,21 @@ fn head_count(repo: &Path) -> usize {
     String::from_utf8(out.stdout).unwrap().trim().parse().unwrap()
 }
 
-/// Writes and commits an item exactly as `pull` would have left it — the
-/// baseline `push`'s compare-and-swap reads back as "the last thing I knew".
-fn seed_pulled(view: &Path, id: &str, status: &str, title: &str, body: &str) {
-    let filename = format!("{id}.task.md");
-    let text = format!("---\ntitle: {title}\nstatus: {status}\n---\n{body}");
-    std::fs::write(view.join(&filename), &text).unwrap();
-    muckpile_core::commit_paths(view, &[filename.as_str()], &format!("pull {id}")).unwrap();
+/// Pulls `id` into the view from what `provider` holds — the record `push`
+/// compares against as "the last thing the provider said".
+fn seed_pulled(view: &Path, provider: &FakeProvider, id: &str) {
+    let root = view.parent().unwrap().parent().unwrap();
+    muckpile_cli::pull(root, view, Some(id), provider, &config()).unwrap();
 }
 
+/// A person edits the item and commits the edit — `push` only sends what's
+/// committed.
 fn edit_file(view: &Path, id: &str, status: &str, title: &str, body: &str) {
     let filename = format!("{id}.task.md");
     let text = format!("---\ntitle: {title}\nstatus: {status}\n---\n{body}");
     std::fs::write(view.join(&filename), &text).unwrap();
-}
-
-#[test]
-fn reports_unchanged_when_the_file_matches_the_last_pull() {
-    let dir = git_view();
-    let view = dir.path();
-    let provider = FakeProvider::new();
-    provider.seed_item("ACC-1", "Tarea", "x", "Abierta", None, None);
-    seed_pulled(view, "ACC-1", "Abierta", "x", "");
-
-    let outcomes = push(view, &provider, &config()).unwrap();
-
-    assert_eq!(outcomes.len(), 1);
-    assert_eq!(outcomes[0].result, PushResult::Unchanged);
-    assert_eq!(head_count(view), 1, "nothing to commit");
-}
-
-#[test]
-fn reports_never_pulled_when_the_view_has_no_git_record_for_the_item() {
-    let dir = git_view();
-    let view = dir.path();
-    let provider = FakeProvider::new();
-    provider.seed_item("ACC-1", "Tarea", "x", "Abierta", None, None);
-    // Written by hand, never committed — no `pull` ever ran for this file.
-    std::fs::write(view.join("ACC-1.task.md"), "---\ntitle: x\nstatus: Abierta\n---\n").unwrap();
-
-    let outcomes = push(view, &provider, &config()).unwrap();
-
-    assert_eq!(outcomes[0].result, PushResult::NeverPulled);
-    assert_eq!(provider.title_of("ACC-1").as_deref(), Some("x"), "nothing should have been sent");
+    run(view, &["add", &filename]);
+    run(view, &["-c", "user.name=Ana", "-c", "user.email=ana@x", "commit", "-qm", "edit"]);
 }
 
 fn field(name: &str, written: Option<&str>, provider: Option<&str>) -> HeaderEdit {
@@ -105,15 +91,16 @@ fn a_title_edited_by_hand_clashes_and_nothing_is_sent() {
     let view = dir.path();
     let provider = FakeProvider::new();
     provider.seed_item("ACC-1", "Tarea", "vieja", "Abierta", None, None);
-    seed_pulled(view, "ACC-1", "Abierta", "vieja", "");
+    seed_pulled(view, &provider, "ACC-1");
     edit_file(view, "ACC-1", "Abierta", "nueva", "");
     let edited = std::fs::read_to_string(view.join("ACC-1.task.md")).unwrap();
+    let before = head_count(view);
 
     let outcomes = push(view, &provider, &config()).unwrap();
 
     assert_eq!(outcomes[0].result, PushResult::HeaderClash(vec![field("title", Some("nueva"), Some("vieja"))]));
     assert_eq!(provider.title_of("ACC-1").as_deref(), Some("vieja"));
-    assert_eq!(head_count(view), 1, "nothing committed");
+    assert_eq!(head_count(view), before, "nothing committed");
     assert_eq!(std::fs::read_to_string(view.join("ACC-1.task.md")).unwrap(), edited, "the file is left for git diff");
 }
 
@@ -123,7 +110,7 @@ fn a_status_edited_by_hand_clashes() {
     let view = dir.path();
     let provider = FakeProvider::new();
     provider.seed_item("ACC-1", "Tarea", "x", "En curso", None, None);
-    seed_pulled(view, "ACC-1", "En curso", "x", "");
+    seed_pulled(view, &provider, "ACC-1");
     edit_file(view, "ACC-1", "Finalizada", "x", "");
 
     let outcomes = push(view, &provider, &config()).unwrap();
@@ -141,7 +128,7 @@ fn a_body_edit_next_to_a_header_edit_is_not_sent_either() {
     let provider = FakeProvider::new();
     let adf = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"original"}]}]}"#;
     provider.seed_item("ACC-1", "Tarea", "x", "Abierta", None, Some(adf));
-    seed_pulled(view, "ACC-1", "Abierta", "x", "original\n");
+    seed_pulled(view, &provider, "ACC-1");
     edit_file(view, "ACC-1", "Abierta", "otro", "edited body\n");
 
     let outcomes = push(view, &provider, &config()).unwrap();
@@ -159,10 +146,9 @@ fn a_relation_edited_by_hand_clashes_one_edit_per_link() {
     let provider = FakeProvider::new();
     provider.seed_item("ACC-1", "Tarea", "x", "Abierta", None, None);
     provider.seed_links("ACC-1", &[("blocks", "ACC-2")]);
-    let pulled = "---\ntitle: x\nstatus: Abierta\nrelation.blocks: [ACC-2]\n---\n";
-    std::fs::write(view.join("ACC-1.task.md"), pulled).unwrap();
-    muckpile_core::commit_paths(view, &["ACC-1.task.md"], "pull ACC-1").unwrap();
+    seed_pulled(view, &provider, "ACC-1");
     std::fs::write(view.join("ACC-1.task.md"), "---\ntitle: x\nstatus: Abierta\nrelation.blocks: [ACC-3]\n---\n").unwrap();
+    run(view, &["-c", "user.name=Ana", "-c", "user.email=ana@x", "commit", "-qam", "edit"]);
 
     let outcomes = push(view, &provider, &config()).unwrap();
 
@@ -183,7 +169,7 @@ fn sends_the_body_when_it_changed_and_is_canonical() {
     let provider = FakeProvider::new();
     let adf = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"original"}]}]}"#;
     provider.seed_item("ACC-1", "Tarea", "x", "Abierta", None, Some(adf));
-    seed_pulled(view, "ACC-1", "Abierta", "x", "original\n");
+    seed_pulled(view, &provider, "ACC-1");
     edit_file(view, "ACC-1", "Abierta", "x", "edited body\n");
 
     let outcomes = push(view, &provider, &config()).unwrap();
@@ -208,10 +194,7 @@ fn refuses_a_noncanonical_body() {
     let provider = FakeProvider::new();
     provider.seed_item("ACC-1", "Tarea", "vieja", "Abierta", None, Some(NON_CANONICAL_ADF));
 
-    // Seed the git baseline from what `pull` would actually have rendered —
-    // not from a hand-typed guess at the markdown amdc produces.
-    let pulled_body = muckpile_core::body::adf_to_body(NON_CANONICAL_ADF).unwrap();
-    seed_pulled(view, "ACC-1", "Abierta", "vieja", &pulled_body);
+    seed_pulled(view, &provider, "ACC-1");
     edit_file(view, "ACC-1", "Abierta", "vieja", "edited by hand, should never reach the provider\n");
 
     let outcomes = push(view, &provider, &config()).unwrap();
@@ -235,7 +218,7 @@ fn the_diff_of_a_refused_body_is_against_the_provider_s_adf() {
     let provider = FakeProvider::new();
     provider.seed_item("ACC-1", "Tarea", "x", "Abierta", None, Some(NON_CANONICAL_ADF));
     let pulled_body = muckpile_core::body::adf_to_body(NON_CANONICAL_ADF).unwrap();
-    seed_pulled(view, "ACC-1", "Abierta", "x", &pulled_body);
+    seed_pulled(view, &provider, "ACC-1");
     edit_file(view, "ACC-1", "Abierta", "x", &format!("{pulled_body}\nOne more line.\n"));
 
     let outcomes = push(view, &provider, &config()).unwrap();
@@ -249,24 +232,121 @@ fn the_diff_of_a_refused_body_is_against_the_provider_s_adf() {
     assert!(added("One more line."), "{}", refused.diff);
 }
 
+/// The provider moved since the view last heard from it: nothing is
+/// written. What it has now is recorded on its ref, and the view rebased
+/// onto it — the person's edit on top — to look at before pushing again.
 #[test]
 fn refuses_when_the_provider_changed_since_the_last_pull() {
     let dir = git_view();
     let view = dir.path();
     let provider = FakeProvider::new();
-    provider.seed_item("ACC-1", "Tarea", "vieja", "Abierta", None, None);
-    seed_pulled(view, "ACC-1", "Abierta", "vieja", "");
+    let adf = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"original"}]}]}"#;
+    provider.seed_item("ACC-1", "Tarea", "vieja", "Abierta", None, Some(adf));
+    seed_pulled(view, &provider, "ACC-1");
 
     // Someone (or `transition`) moved the item on the provider's side,
     // without anyone running `pull` again in this view.
-    provider.seed_item("ACC-1", "Tarea", "vieja", "Finalizada", None, None);
-    edit_file(view, "ACC-1", "Abierta", "nueva", "");
+    provider.seed_item("ACC-1", "Tarea", "vieja", "Finalizada", None, Some(adf));
+    edit_file(view, "ACC-1", "Abierta", "vieja", "original\n\nmás cuerpo\n");
 
     let outcomes = push(view, &provider, &config()).unwrap();
 
     assert_eq!(outcomes[0].result, PushResult::Stale);
-    assert_eq!(provider.title_of("ACC-1").as_deref(), Some("vieja"), "nothing should have been written");
-    assert_eq!(head_count(view), 1, "no commit for a refused item");
+    assert_eq!(provider.body_adf_of("ACC-1").as_deref(), Some(adf), "nothing should have been written");
+    let text = std::fs::read_to_string(view.join("ACC-1.task.md")).unwrap();
+    assert!(text.contains("status: Finalizada") && text.contains("más cuerpo"), "recorded, and the edit rebased on top: {text}");
+}
+
+/// When what the provider did and what the person edited touch the same
+/// lines, the rebase stops, for the person to settle with git — push says
+/// so instead of guessing.
+#[test]
+fn a_clash_with_what_the_provider_did_stops_the_rebase_for_a_person() {
+    let dir = git_view();
+    let view = dir.path();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-1", "Tarea", "vieja", "Abierta", None, None);
+    seed_pulled(view, &provider, "ACC-1");
+    provider.seed_item("ACC-1", "Tarea", "vieja", "Finalizada", None, None);
+    edit_file(view, "ACC-1", "En curso", "vieja", "");
+
+    let err = push(view, &provider, &config()).unwrap_err();
+
+    assert!(err.to_string().contains("rebase"), "{err}");
+    assert!(muckpile_core::ledger::rebasing(view).unwrap());
+}
+
+/// `push` sends what's committed: an edit nobody committed is refused, not
+/// guessed at.
+#[test]
+fn refuses_a_view_with_uncommitted_edits() {
+    let dir = git_view();
+    let view = dir.path();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-1", "Tarea", "x", "Abierta", None, None);
+    seed_pulled(view, &provider, "ACC-1");
+    std::fs::write(view.join("ACC-1.task.md"), "---\ntitle: x\nstatus: Abierta\n---\nsin commitear\n").unwrap();
+
+    let err = push(view, &provider, &config()).unwrap_err();
+
+    assert!(err.to_string().contains("sin commitear"), "{err}");
+}
+
+/// After a push the view is up to date: the edit's own commit went away,
+/// because the provider's ref now holds the same change.
+#[test]
+fn after_a_push_the_view_is_neither_ahead_nor_behind() {
+    let dir = git_view();
+    let view = dir.path();
+    let provider = FakeProvider::new();
+    let adf = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"original"}]}]}"#;
+    provider.seed_item("ACC-1", "Tarea", "x", "Abierta", None, Some(adf));
+    seed_pulled(view, &provider, "ACC-1");
+    edit_file(view, "ACC-1", "Abierta", "x", "editado\n");
+
+    push(view, &provider, &config()).unwrap();
+
+    let status = Command::new("git").arg("-C").arg(view).args(["status", "-sb"]).output().unwrap();
+    assert!(String::from_utf8_lossy(&status.stdout).starts_with("## to-work/ACC-1...provider/to-work/ACC-1\n"), "{}", String::from_utf8_lossy(&status.stdout));
+}
+
+/// A draft's body goes out in the form it comes back in: when that differs
+/// from what was written — a bold run cut by a code span — the draft is
+/// rewritten to it first, in a commit of its own, signed as the tool.
+#[test]
+fn a_draft_is_rewritten_to_its_canonical_form_in_its_own_commit_before_it_goes() {
+    let dir = git_view();
+    let view = dir.path();
+    let provider = FakeProvider::new();
+    provider.queue_create("ACC-403", "Tareas por hacer");
+    write_pending(view, "@algo", "Un borrador", None, "**el `reach`, y el que falla**\n");
+
+    push(view, &provider, &config()).unwrap();
+
+    let log = Command::new("git").arg("-C").arg(view).args(["log", "--format=%an %s"]).output().unwrap();
+    let log = String::from_utf8_lossy(&log.stdout);
+    assert!(log.contains("muckpile forma canónica de @algo.task"), "{log}");
+    let text = std::fs::read_to_string(view.join("ACC-403.task.md")).unwrap();
+    assert!(text.contains("**el** `reach`**, y el que falla**"), "{text}");
+}
+
+/// The order that keeps the rebase from clashing: the provider's answer is
+/// recorded, the view rebased onto it, and only then the draft retired.
+#[test]
+fn resolving_records_new_on_the_provider_s_ref_before_the_rename() {
+    let dir = git_view();
+    let view = dir.path();
+    let provider = FakeProvider::new();
+    provider.queue_create("ACC-403", "Tareas por hacer");
+    write_pending(view, "@algo", "Un borrador", None, "");
+
+    push(view, &provider, &config()).unwrap();
+
+    let provider_log = Command::new("git").arg("-C").arg(view).args(["log", "-1", "--format=%s", "provider/to-work/ACC-1"]).output().unwrap();
+    assert_eq!(String::from_utf8_lossy(&provider_log.stdout).trim(), "new @algo");
+    let view_log = Command::new("git").arg("-C").arg(view).args(["log", "-1", "--format=%s"]).output().unwrap();
+    assert_eq!(String::from_utf8_lossy(&view_log.stdout).trim(), "rename @algo -> ACC-403");
+    assert!(!view.join("@algo.task.md").exists());
 }
 
 #[test]
@@ -276,8 +356,8 @@ fn only_touches_the_items_that_actually_changed() {
     let provider = FakeProvider::new();
     provider.seed_item("ACC-1", "Tarea", "a", "Abierta", None, None);
     provider.seed_item("ACC-2", "Tarea", "b", "Abierta", None, None);
-    seed_pulled(view, "ACC-1", "Abierta", "a", "");
-    seed_pulled(view, "ACC-2", "Abierta", "b", "");
+    seed_pulled(view, &provider, "ACC-1");
+    seed_pulled(view, &provider, "ACC-2");
     edit_file(view, "ACC-2", "Abierta", "b", "a body edit\n");
 
     let outcomes = push(view, &provider, &config()).unwrap();
@@ -401,7 +481,7 @@ fn a_slug_with_no_configured_item_type_fails_without_touching_the_rest() {
     let view = dir.path();
     let provider = FakeProvider::new();
     provider.seed_item("ACC-1", "Tarea", "a", "Abierta", None, None);
-    seed_pulled(view, "ACC-1", "Abierta", "a", "");
+    seed_pulled(view, &provider, "ACC-1");
     std::fs::write(view.join("@raro.user-story.md"), "---\ntitle: sin tipo configurado\n---\n").unwrap();
 
     let outcomes = push(view, &provider, &config()).unwrap();
@@ -582,7 +662,7 @@ fn a_link_to_an_item_file_goes_up_as_a_card() {
     provider.seed_item("ACC-100", "Tarea", "La madre", "Abierta", None, None);
     let adf = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"original"}]}]}"#;
     provider.seed_item("ACC-1", "Tarea", "x", "Abierta", None, Some(adf));
-    seed_pulled(view, "ACC-1", "Abierta", "x", "original\n");
+    seed_pulled(view, &provider, "ACC-1");
     edit_file(view, "ACC-1", "Abierta", "x", "Cuelga de [ACC-100](ACC-100.task.md).\n");
 
     let outcomes = push(view, &provider, &config()).unwrap();

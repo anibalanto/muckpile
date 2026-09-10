@@ -6,12 +6,10 @@ use anyhow::{bail, Context, Result};
 use muckpile_core::body::{self, body_to_adf, cards_to_file_links, cited_keys, file_links_to_cards, Filtered, JiraAdfMarkdownFilter, Loss};
 use muckpile_core::codework::{add_worktree, derive_branch, ensure_cloned};
 use muckpile_core::item::{self, list_summaries, parse_full, read_full, ItemSummary};
-use muckpile_core::ledger;
+use muckpile_core::ledger::{self, Rebase};
 use muckpile_core::project::{classify, require_root, ItemType, Position, ProjectConfig};
 use muckpile_core::states::write_states_cache;
-use muckpile_core::{
-    commit_paths, find_file, head_text, is_valid_id, read_frontmatter_refs, read_relations, resolve_batch, retype, status_lines, slugify_title, topo_order, MARKER, TYPES,
-};
+use muckpile_core::{commit_paths, find_file, is_valid_id, read_frontmatter_refs, read_relations, rename_one, rewrite_type_references, slugify_title, topo_order, MARKER, TYPES};
 use muckpile_provider::link::{link as provider_link, unlink as provider_unlink, Outcome as LinkOutcome, UnlinkOutcome};
 use muckpile_provider::provider::{Attachment, Comment, Item, ItemLink, Provider, Sprint};
 use muckpile_provider::transition::{transition as provider_transition, Outcome};
@@ -136,58 +134,87 @@ pub fn pull(root: &Path, cwd: &Path, id: Option<&str>, provider: &dyn Provider, 
         }
         None => own_id,
     };
-    fetch_and_commit(cwd, &id, provider, config)
+    ready_to_sync(cwd)?;
+    let pulled = record_item(cwd, &id, provider, config, &format!("pull {id}"))?;
+    rebase_or_explain(cwd)?;
+    Ok(pulled)
 }
 
-/// Fetches `id` and writes/commits it into `dir` in pulled form — the tail
-/// `pull` runs for its own argument, and what resolving a pending `@slug`
-/// runs once it has a real key, so that a freshly created or found item
-/// ends up with the same commit `push`'s compare-and-swap already knows how
-/// to read.
-fn fetch_and_commit(dir: &Path, id: &str, provider: &dyn Provider, config: &ProjectConfig) -> Result<Pulled> {
+/// Refuses a view in the middle of a rebase, or with uncommitted edits to
+/// what it tracks: syncing rebases it, and setting those edits aside and
+/// putting them back can clash in a way harder to follow than a rebase's
+/// own. A new file nobody added yet — a fresh draft — isn't in the way.
+fn ready_to_sync(view: &Path) -> Result<()> {
+    if ledger::rebasing(view)? {
+        bail!("hay un rebase a medias en {} — terminalo con git (git rebase --continue) antes", view.display());
+    }
+    let changed = ledger::tracked_changes(view)?;
+    if !changed.is_empty() {
+        bail!("hay cambios sin commitear ({}) — commitealos o descartalos antes", changed.join(", "));
+    }
+    Ok(())
+}
+
+/// Rebases `view` onto its provider's ref, and when a clash stops it, says
+/// so: settling it is a person's call, with git.
+fn rebase_or_explain(view: &Path) -> Result<()> {
+    match ledger::rebase(view)? {
+        Rebase::Done => Ok(()),
+        Rebase::Stopped(what) => bail!("la vista quedó en un rebase a medias: resolvé el choque con git y corré git rebase --continue\n{what}"),
+    }
+}
+
+/// Records on `view`'s provider ref what the provider has for `id` right
+/// now, as the files of the view: the item's markdown, its ADF as the
+/// provider returned it — `.provider/<id>.adf.json` —, its thread and its
+/// attachments. Never touches the view itself: it's behind until it
+/// rebases. The same record `pull`, a `push` that finds the provider moved,
+/// and a `push` that just wrote all leave, so a view's history is always
+/// what the provider said.
+fn record_item(view: &Path, id: &str, provider: &dyn Provider, config: &ProjectConfig, message: &str) -> Result<Pulled> {
     let item = provider.item(id)?;
     let item_type = config
         .muckpile_type_of(&item.jira_type, &item.labels)
         .with_context(|| format!("{}: sin tipo de item para él en muckpile.toml", item.jira_type))?;
     let (text, losses) = render_pulled_text(&item, provider, config)?;
+    let filename = format!("{id}.{item_type}.md");
 
+    let mut changes: Vec<(String, Option<Vec<u8>>)> = Vec::new();
     // The provider may have changed the item's type since the last pull:
-    // the file follows, renamed in this same commit, and never stays behind
-    // as a second file for the same item.
-    let mut written = Vec::new();
-    if let Ok((_, old_type)) = find_file(dir, id) {
-        if old_type != item_type {
-            written.extend(retype(dir, id, &old_type, item_type)?);
+    // its file follows under the new name, every link to the old one
+    // rewritten, in this same commit — never two files for the same item.
+    let recorded = ledger::provider_paths(view)?;
+    for old_type in TYPES.iter().filter(|t| **t != item_type) {
+        let old_name = format!("{id}.{old_type}.md");
+        if !recorded.contains(&old_name) {
+            continue;
+        }
+        changes.push((old_name.clone(), None));
+        for path in recorded.iter().filter(|p| p.ends_with(".md") && **p != old_name && **p != filename) {
+            let Some(other) = ledger::provider_text(view, path)? else { continue };
+            let (rewritten, changed) = rewrite_type_references(&other, id, old_type, item_type);
+            if changed {
+                changes.push((path.clone(), Some(rewritten.into_bytes())));
+            }
         }
     }
-
-    let filename = format!("{id}.{item_type}.md");
-    let path = dir.join(&filename);
-    std::fs::write(&path, &text).with_context(|| format!("writing {}", path.display()))?;
-    written.push(filename);
-    written.extend(write_thread(dir, id, provider, config)?);
-    written.extend(write_files(dir, id, &item.attachments, provider)?);
-
-    // The commit is what lets `push` later ask "did the provider change
-    // since I last asked?" without a state file of its own — see
-    // `commit_paths`.
-    let written: Vec<&str> = written.iter().map(String::as_str).collect();
-    commit_paths(dir, &written, &format!("pull {id}"))?;
-    Ok(Pulled { path, losses })
-}
-
-/// Writes each of the item's comments as `<id>_data/thread/<comment id>.md`
-/// and returns the paths written, relative to `dir`.
-fn write_thread(dir: &Path, id: &str, provider: &dyn Provider, config: &ProjectConfig) -> Result<Vec<String>> {
-    let mut written = Vec::new();
-    for comment in provider.comments(id)? {
-        let rel = format!("{id}_data/thread/{}.md", comment.id);
-        write_under(dir, &rel, render_comment(&comment, provider, config)?.as_bytes())?;
-        written.push(rel);
+    changes.push((filename.clone(), Some(text.into_bytes())));
+    changes.push((format!(".provider/{id}.adf.json"), item.body_adf.clone().map(String::into_bytes)));
+    for (path, text) in thread_files(id, provider, config)? {
+        changes.push((path, Some(text.into_bytes())));
     }
-    Ok(written)
-}
+    for (path, bytes) in attachment_files(id, &item.attachments, provider)? {
+        changes.push((path, Some(bytes)));
+    }
 
+    ledger::record(view, &changes, message)?;
+    Ok(Pulled { path: view.join(filename), losses })
+}
+/// Each of the item's comments as `<id>_data/thread/<comment id>.md`, and
+/// its text.
+fn thread_files(id: &str, provider: &dyn Provider, config: &ProjectConfig) -> Result<Vec<(String, String)>> {
+    provider.comments(id)?.iter().map(|comment| Ok((format!("{id}_data/thread/{}.md", comment.id), render_comment(comment, provider, config)?))).collect()
+}
 /// A comment as a thread file: who wrote it and when, the comment it
 /// replies to, and — when it opens with `ai: <model>`, the model as code —
 /// that model, taken out of the body and into the header.
@@ -221,29 +248,18 @@ fn split_ai(markdown: &str) -> (Option<&str>, &str) {
     }
 }
 
-/// Downloads each attachment into `<id>_data/files/`, under its own name —
-/// or with its id in front, when another attachment shares that name — and
-/// returns the paths written. Nothing else in `files/` is touched: it also
-/// holds the drafts nobody uploaded.
-fn write_files(dir: &Path, id: &str, attachments: &[Attachment], provider: &dyn Provider) -> Result<Vec<String>> {
-    let mut written = Vec::new();
+/// Each attachment as `<id>_data/files/<name>` — with its id in front when
+/// another attachment shares that name — and its bytes. Only these are
+/// ever recorded under `files/`: a draft nobody uploaded is the view's own.
+fn attachment_files(id: &str, attachments: &[Attachment], provider: &dyn Provider) -> Result<Vec<(String, Vec<u8>)>> {
+    let mut out = Vec::new();
     for attachment in attachments {
         let shared = attachments.iter().filter(|a| a.filename == attachment.filename).count() > 1;
         let name = Path::new(&attachment.filename).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| attachment.id.clone());
         let name = if shared { format!("{}-{name}", attachment.id) } else { name };
-        let rel = format!("{id}_data/files/{name}");
-        write_under(dir, &rel, &provider.attachment_content(&attachment.id)?)?;
-        written.push(rel);
+        out.push((format!("{id}_data/files/{name}"), provider.attachment_content(&attachment.id)?));
     }
-    Ok(written)
-}
-
-fn write_under(dir: &Path, rel: &str, bytes: &[u8]) -> Result<()> {
-    let path = dir.join(rel);
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
-    }
-    std::fs::write(&path, bytes).with_context(|| format!("writing {}", path.display()))
+    Ok(out)
 }
 
 /// The exact text `pull` writes for a fetched item, and why its body can't
@@ -299,24 +315,26 @@ pub enum CatchUp {
 
 /// After a command writes to the provider, what a `pull` of that item in
 /// `view` would do — so the next `push` doesn't take the command's own write
-/// for a change on the other side. Refused, and left behind, when the item's
-/// file has any uncommitted change, or a file already tracked in its
-/// `_data/` does: those are what it rewrites. A draft nobody committed in
-/// `files/` isn't in the way — only what comes from the provider is written.
+/// for a change on the other side. Left behind, like a `pull` would refuse,
+/// when the view has uncommitted edits to what it tracks or a rebase half
+/// done. A draft nobody committed isn't in the way.
 pub fn catch_up(view: &Path, id: &str, provider: &dyn Provider, config: &ProjectConfig) -> Result<CatchUp> {
-    let Ok((path, _)) = find_file(view, id) else { return Ok(CatchUp::NotHere) };
-    let file = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-    if !status_lines(view, &[&file])?.is_empty() {
-        return Ok(CatchUp::Behind(format!("{file} tiene cambios sin commitear")));
+    if find_file(view, id).is_err() {
+        return Ok(CatchUp::NotHere);
     }
-    let data = format!("{id}_data");
-    if status_lines(view, &[&data])?.iter().any(|line| !line.starts_with("??")) {
-        return Ok(CatchUp::Behind(format!("{data}/ tiene cambios sin commitear")));
+    if ledger::rebasing(view)? {
+        return Ok(CatchUp::Behind("la vista tiene un rebase a medias".to_string()));
     }
-    fetch_and_commit(view, id, provider, config)?;
-    Ok(CatchUp::CaughtUp)
+    let changed = ledger::tracked_changes(view)?;
+    if !changed.is_empty() {
+        return Ok(CatchUp::Behind(format!("hay cambios sin commitear: {}", changed.join(", "))));
+    }
+    record_item(view, id, provider, config, &format!("pull {id}"))?;
+    match ledger::rebase(view)? {
+        Rebase::Done => Ok(CatchUp::CaughtUp),
+        Rebase::Stopped(what) => Ok(CatchUp::Behind(format!("el rebase paró en un choque, que hay que resolver con git: {what}"))),
+    }
 }
-
 /// A body or a comment from the provider, as markdown. First, each card —
 /// or ordinary link — to one of this project's items becomes a link to its
 /// file, with the type the provider gives, labels included, so it doesn't
@@ -667,6 +685,7 @@ pub struct BodyRefused {
 /// through the second half: it only changes by command, so an item whose
 /// header was edited by hand is reported and left exactly as it is.
 pub fn push(view: &Path, provider: &dyn Provider, config: &ProjectConfig) -> Result<Vec<PushOutcome>> {
+    ready_to_sync(view)?;
     let mut outcomes = resolve_pending(view, provider, config)?;
     let just_resolved: HashSet<String> = outcomes
         .iter()
@@ -729,7 +748,14 @@ fn resolve_pending(view: &Path, provider: &dyn Provider, config: &ProjectConfig)
         let real_id = |r: &str| resolved.get(r).cloned().unwrap_or_else(|| r.to_string());
         let real_parent = pending_item.parent.as_deref().map(real_id);
 
-        match resolve_one(pending_item, provider_type, real_parent.as_deref(), provider, config) {
+        // The draft becomes part of the view's history before anything goes:
+        // what follows — its canonical form, the rename — is commits on top.
+        let draft = format!("{slug}.{}.md", pending_item.item_type);
+        let data = format!("{slug}_data");
+        let draft_paths: Vec<&str> = if view.join(&data).is_dir() { vec![&draft, &data] } else { vec![&draft] };
+        commit_paths(view, &draft_paths, &format!("borrador {slug}"))?;
+
+        match resolve_one(view, pending_item, provider_type, real_parent.as_deref(), provider, config) {
             Ok((id, created)) => {
                 // What the draft's header declares travels only at creation,
                 // like its body and its parent: a found item already existed.
@@ -743,26 +769,18 @@ fn resolve_pending(view: &Path, provider: &dyn Provider, config: &ProjectConfig)
                         }
                     }
                 }
+                // What the provider made of it is recorded first, and the
+                // view rebased onto it; only then is the draft retired for
+                // the item's own file. The other way round, the view would
+                // write that file itself and the rebase would clash on it.
+                record_item(view, &id, provider, config, &format!("{} {slug}", if created { "new" } else { "found" }))?;
+                rebase_or_explain(view)?;
+                rename_one(view, slug, &id)?;
                 resolved.insert(slug.clone(), id.clone());
                 outcomes.push(PushOutcome { id: slug.clone(), result: PushResult::Resolved { id, created } });
                 outcomes.extend(failed);
             }
             Err(e) => outcomes.push(PushOutcome { id: slug.clone(), result: PushResult::ResolveFailed(e.to_string()) }),
-        }
-    }
-
-    if !resolved.is_empty() {
-        // `git mv` needs its source tracked, and nothing commits a fresh
-        // `@slug` draft before this — `new` writes it and stops there, the
-        // same way `pull` used to. A no-op if it's already committed.
-        for slug in resolved.keys() {
-            let pending_item = by_slug[slug.as_str()];
-            let filename = format!("{}.{}.md", pending_item.slug, pending_item.item_type);
-            commit_paths(view, &[&filename], &format!("new {slug}"))?;
-        }
-        resolve_batch(view, &resolved)?;
-        for id in resolved.values() {
-            fetch_and_commit(view, id, provider, config)?;
         }
     }
 
@@ -785,6 +803,7 @@ fn link_failure(provider: &dyn Provider, id: &str, phrase: &str, other: &str) ->
 /// parent — both only ever travel at creation, and finding means something
 /// already existed before this run touched it.
 fn resolve_one(
+    view: &Path,
     pending: &item::PendingItem,
     provider_type: &ItemType,
     real_parent: Option<&str>,
@@ -795,82 +814,89 @@ fn resolve_one(
     if let Some(id) = provider.find_by_title(&config.jira_project_key, jira_type, label, &pending.title)? {
         return Ok((id, false));
     }
-    let body_adf = if pending.body.trim().is_empty() { None } else { Some(to_adf(&pending.body, provider)?) };
+    let draft = format!("{}.{}.md", pending.slug, pending.item_type);
+    let body = settle_canonical(view, &draft, &pending.body, provider, config)?;
+    let body_adf = if body.trim().is_empty() { None } else { Some(to_adf(&body, provider)?) };
     let id = provider.create_item(&config.jira_project_key, jira_type, label, &pending.title, real_parent, body_adf.as_deref())?;
     Ok((id, true))
 }
 
+/// The body that goes out, in the form it comes back in: when converting it
+/// to the provider's format and back changes it — a bold cut around a code
+/// span — the file is rewritten to that form first, in a commit of its own
+/// signed as the tool, so what was changed to send it is there to see in
+/// git, and what comes back matches what the view has.
+fn settle_canonical(view: &Path, filename: &str, body: &str, provider: &dyn Provider, config: &ProjectConfig) -> Result<String> {
+    if body.trim().is_empty() {
+        return Ok(body.to_string());
+    }
+    let canonical = to_markdown(&to_adf(body, provider)?, provider, config)?.markdown;
+    if canonical == body {
+        return Ok(canonical);
+    }
+    let path = view.join(filename);
+    let text = std::fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
+    let (frontmatter, _) = body::split_frontmatter(&text);
+    std::fs::write(&path, format!("{frontmatter}{canonical}")).with_context(|| format!("writing {}", path.display()))?;
+    commit_paths(view, &[filename], &format!("forma canónica de {}", filename.trim_end_matches(".md")))?;
+    Ok(canonical)
+}
 fn push_one(view: &Path, local: &ItemSummary, provider: &dyn Provider, config: &ProjectConfig) -> Result<PushOutcome> {
     let filename = format!("{}.{}.md", local.id, local.item_type);
     let outcome = |result| PushOutcome { id: local.id.clone(), result };
 
-    let Some(head) = head_text(view, &filename)? else {
+    let Some(recorded) = ledger::provider_text(view, &filename)? else {
         return Ok(outcome(PushResult::NeverPulled));
     };
-
     let working_path = view.join(&filename);
     let working = std::fs::read_to_string(&working_path).with_context(|| format!("reading {}", working_path.display()))?;
-    if working == head {
+    if working == recorded {
         return Ok(outcome(PushResult::Unchanged));
     }
 
-    // Ask again before writing: what the provider has *right now*, rendered
-    // the same way a fresh `pull` would, has to still match the last
-    // commit — not the working copy, which is expected to differ by
-    // exactly the edit this call is trying to send.
+    // Ask again before writing: what the provider has right now has to still
+    // be what its ref last recorded — the ADF against the ADF, which sees
+    // what the markdown can't, like a table's rows numbered after the pull.
+    // If it moved, nothing is written: what it has is recorded, and the view
+    // rebased onto it, for a person to look at before pushing again.
     let remote = provider.item(&local.id)?;
     let (remote_text, losses) = render_pulled_text(&remote, provider, config)?;
-    if remote_text != head {
+    let recorded_adf = ledger::provider_text(view, &format!(".provider/{}.adf.json", local.id))?;
+    if remote_text != recorded || !body::same_adf(remote.body_adf.as_deref(), recorded_adf.as_deref())? {
+        record_item(view, &local.id, provider, config, &format!("pull {}", local.id))?;
+        rebase_or_explain(view)?;
         return Ok(outcome(PushResult::Stale));
     }
 
     // The header only changes by command. Nothing of the item goes — not
-    // even a body edit next to it: the commit that records a send is
-    // rebuilt from the provider, and would take the header edit with it.
+    // even a body edit next to it: what records the send comes from the
+    // provider, and would take the header edit with it.
     let edits = header_edits(&local.id, &local.item_type, &working, &remote)?;
     if !edits.is_empty() {
         return Ok(outcome(PushResult::HeaderClash(edits)));
     }
 
-    let (_, head_body) = body::split_frontmatter(&head);
+    let (_, recorded_body) = body::split_frontmatter(&recorded);
     let (_, working_body) = body::split_frontmatter(&working);
-    let body_changed = working_body != head_body;
-
     let mut body_sent = false;
     let mut body_refused = None;
-    let mut sent_adf = None;
-    if body_changed {
+    if working_body != recorded_body {
         // Canonicity is decided on the provider's ADF as it is right now —
-        // just confirmed to still be what this view last pulled — and never
-        // on the committed markdown, which can come back from its own trip
-        // unchanged while the ADF behind it doesn't. Only a body read from
-        // some ADF can have losses.
+        // just confirmed to still be what its ref recorded. Only a body read
+        // from some ADF can have losses.
         if let Some(real) = remote.body_adf.as_deref().filter(|_| !losses.is_empty()) {
             body_refused = Some(BodyRefused { losses, diff: body::adf_diff(real, &to_adf(working_body, provider)?)? });
         } else {
-            let adf = to_adf(working_body, provider)?;
-            provider.update_body(&local.id, &adf)?;
+            let body = settle_canonical(view, &filename, working_body, provider, config)?;
+            provider.update_body(&local.id, &to_adf(&body, provider)?)?;
             body_sent = true;
-            sent_adf = Some(adf);
+            // What the provider has after the write is recorded, and the
+            // view rebased onto it: the view's own commit of the edit goes
+            // away, because the provider's ref now holds the same change.
+            record_item(view, &local.id, provider, config, &format!("push {}", local.id))?;
+            rebase_or_explain(view)?;
         }
     }
-
-    // The new baseline is rendered fresh from the provider's own fields,
-    // the body swapped in only when it was actually confirmed sent. A
-    // refused body edit never gets to look committed.
-    let committed = Item {
-        jira_type: remote.jira_type.clone(),
-        title: remote.title.clone(),
-        status: remote.status.clone(),
-        parent: remote.parent.clone(),
-        body_adf: if body_sent { sent_adf } else { remote.body_adf.clone() },
-        links: remote.links.clone(),
-        labels: remote.labels.clone(),
-        attachments: remote.attachments.clone(),
-    };
-    let (new_text, _) = render_pulled_text(&committed, provider, config)?;
-    std::fs::write(&working_path, &new_text).with_context(|| format!("writing {}", working_path.display()))?;
-    commit_paths(view, &[&filename], &format!("push {}", local.id))?;
 
     Ok(outcome(PushResult::Written { body: body_sent, body_refused }))
 }

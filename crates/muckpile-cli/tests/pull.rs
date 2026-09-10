@@ -12,23 +12,21 @@ use std::path::Path;
 use std::process::Command;
 
 fn scaffold(root: &Path) {
-    std::fs::create_dir_all(root.join(".muckpile")).unwrap();
+    muckpile_core::ledger::init(root).unwrap();
     std::fs::create_dir_all(root.join("base")).unwrap();
     std::fs::create_dir_all(root.join("backlog/sprint")).unwrap();
-    std::fs::create_dir_all(root.join("to-work/ACC-355")).unwrap();
+    muckpile_core::ledger::open_view(root, "to-work/ACC-355").unwrap();
     std::fs::write(
         root.join("muckpile.toml"),
         "provider = \"jira-rest\"\njira_base_url = \"https://x.atlassian.net\"\njira_project_key = \"ACC\"\ncommit_prefix = \"acc\"\n\n[item_type]\ntask = \"Tarea\"\nquestion = { type = \"Tarea\", label = \"question\" }\n",
     )
     .unwrap();
-    git(root, &["init", "-q"]);
-    git(root, &["config", "user.email", "test@test"]);
-    git(root, &["config", "user.name", "test"]);
 }
 
-fn git(repo: &Path, args: &[&str]) {
-    let status = Command::new("git").arg("-C").arg(repo).args(args).status().unwrap();
-    assert!(status.success(), "git {:?} failed", args);
+fn git(repo: &Path, args: &[&str]) -> String {
+    let out = Command::new("git").arg("-C").arg(repo).args(args).output().unwrap();
+    assert!(out.status.success(), "git {:?} failed", args);
+    String::from_utf8(out.stdout).unwrap()
 }
 
 fn head_count(repo: &Path) -> usize {
@@ -56,21 +54,71 @@ fn writes_the_view_s_own_item_with_no_argument() {
     assert!(text.starts_with("---\ntitle: Vistas de trabajo\nstatus: En curso\n---\n"), "{text}");
 }
 
+/// What was pulled is recorded on the view's provider ref — the ref only
+/// ever moved by what the provider said — and the view rebased onto it:
+/// neither ahead nor behind.
 #[test]
-fn leaves_a_git_record_of_what_was_pulled() {
+fn records_what_was_pulled_on_the_provider_s_ref_and_rebases_the_view() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    let config = load_project_config(root).unwrap();
+    let provider = FakeProvider::new();
+    let adf = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"hola"}]}]}"#;
+    provider.seed_item("ACC-355", "Tarea", "Vistas de trabajo", "En curso", None, Some(adf));
+
+    let view = root.join("to-work/ACC-355");
+    let path = pull(root, &view, None, &provider, &config).unwrap().path;
+
+    let recorded = muckpile_core::ledger::provider_text(&view, "ACC-355.task.md").unwrap();
+    assert_eq!(recorded, Some(std::fs::read_to_string(&path).unwrap()));
+    assert_eq!(muckpile_core::ledger::provider_text(&view, ".provider/ACC-355.adf.json").unwrap().as_deref(), Some(adf), "the ADF, as the provider returned it");
+    assert!(git(&view, &["status", "-sb"]).starts_with("## to-work/ACC-355...provider/to-work/ACC-355\n"), "neither ahead nor behind");
+    assert_eq!(git(&view, &["log", "-1", "--format=%an %s", "provider/to-work/ACC-355"]).trim(), "muckpile pull ACC-355");
+}
+
+/// Pulling rebases the view: an edit nobody committed would have to be set
+/// aside and put back, so pull refuses — commit it or drop it first.
+#[test]
+fn refuses_a_view_with_uncommitted_edits() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     scaffold(root);
     let config = load_project_config(root).unwrap();
     let provider = FakeProvider::new();
     provider.seed_item("ACC-355", "Tarea", "Vistas de trabajo", "En curso", None, None);
-
     let view = root.join("to-work/ACC-355");
-    let path = pull(root, &view, None, &provider, &config).unwrap().path;
+    pull(root, &view, None, &provider, &config).unwrap();
+    std::fs::write(view.join("ACC-355.task.md"), "---\ntitle: a medio editar\nstatus: En curso\n---\n").unwrap();
 
-    assert_eq!(head_count(&view), 1, "the fetched item should land as its own commit");
-    let committed = muckpile_core::head_text(&view, "ACC-355.task.md").unwrap();
-    assert_eq!(committed, Some(std::fs::read_to_string(&path).unwrap()));
+    let err = pull(root, &view, None, &provider, &config).unwrap_err();
+
+    assert!(err.to_string().contains("sin commitear"), "{err}");
+}
+
+/// A person's own commit survives a pull: it's replayed on top of what the
+/// provider has now.
+#[test]
+fn a_person_s_commit_is_replayed_on_top_of_what_the_provider_has_now() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    let config = load_project_config(root).unwrap();
+    let provider = FakeProvider::new();
+    let adf = |t: &str| format!(r#"{{"version":1,"type":"doc","content":[{{"type":"paragraph","content":[{{"type":"text","text":"{t}"}}]}}]}}"#);
+    provider.seed_item("ACC-355", "Tarea", "Vistas", "En curso", None, Some(&adf("uno")));
+    let view = root.join("to-work/ACC-355");
+    pull(root, &view, None, &provider, &config).unwrap();
+    std::fs::write(view.join("notas.md"), "mías\n").unwrap();
+    git(&view, &["add", "notas.md"]);
+    git(&view, &["-c", "user.name=Ana", "-c", "user.email=ana@x", "commit", "-qm", "notas"]);
+
+    provider.seed_item("ACC-355", "Tarea", "Vistas", "Finalizada", None, Some(&adf("uno")));
+    pull(root, &view, None, &provider, &config).unwrap();
+
+    assert!(std::fs::read_to_string(view.join("ACC-355.task.md")).unwrap().contains("status: Finalizada"));
+    assert_eq!(std::fs::read_to_string(view.join("notas.md")).unwrap(), "mías\n");
+    assert!(git(&view, &["status", "-sb"]).contains("[ahead 1]"));
 }
 
 #[test]
@@ -84,9 +132,10 @@ fn pulling_the_same_state_again_does_not_add_an_empty_commit() {
 
     let view = root.join("to-work/ACC-355");
     pull(root, &view, None, &provider, &config).unwrap();
+    let before = head_count(&view);
     pull(root, &view, None, &provider, &config).unwrap();
 
-    assert_eq!(head_count(&view), 1, "nothing changed on the second pull");
+    assert_eq!(head_count(&view), before, "nothing changed on the second pull");
 }
 
 #[test]
@@ -294,8 +343,8 @@ fn brings_each_comment_into_the_thread_with_the_one_it_replies_to() {
     assert_eq!(root_msg, "---\nauthor: Ana\nauthor_id: Ana-id\ncreated: 2026-09-02T13:06:47.823-0300\n---\nuna pregunta\n");
     let reply = std::fs::read_to_string(view.join("ACC-355_data/thread/42224.md")).unwrap();
     assert!(reply.contains("\nin-reply-to: 42180\n"), "{reply}");
-    let committed = muckpile_core::head_text(&view, "ACC-355_data/thread/42224.md").unwrap();
-    assert_eq!(committed, Some(reply), "the thread lands in the same pull commit");
+    let recorded = muckpile_core::ledger::provider_text(&view, "ACC-355_data/thread/42224.md").unwrap();
+    assert_eq!(recorded, Some(reply), "the thread is recorded with the item");
 }
 
 /// A comment an AI wrote starts with `ai: <model>`, the model as code; the
@@ -370,7 +419,7 @@ fn a_local_draft_in_files_is_left_alone() {
     provider.seed_attachment("ACC-355", "44892", "captura.png", b"png bytes");
     let view = root.join("to-work/ACC-355");
     std::fs::create_dir_all(view.join("ACC-355_data/files")).unwrap();
-    std::fs::write(view.join("ACC-355_data/files/borrador-adr.md"), "no decidido").unwrap();
+    std::fs::write(view.join("ACC-355_data/files/borrador-adr.md"), "no decidido").unwrap(); // never added: the view's own
 
     pull(root, &view, None, &provider, &config).unwrap();
 
@@ -392,8 +441,9 @@ fn a_type_changed_on_the_provider_renames_the_file() {
     provider.seed_item("ACC-355", "Tarea", "Vistas", "Abierta", None, None);
     let view = root.join("to-work/ACC-355");
     pull(root, &view, None, &provider, &config).unwrap();
-    std::fs::write(view.join("ACC-100.task.md"), "---\ntitle: y\nstatus: Abierta\n---\nDepends on [Vistas](ACC-355.task.md).\n").unwrap();
-    muckpile_core::commit_paths(&view, &["ACC-100.task.md"], "pull ACC-100").unwrap();
+    let body = format!(r#"{{"version":1,"type":"doc","content":[{{"type":"paragraph","content":[{{"type":"text","text":"Depends on "}},{{"type":"inlineCard","attrs":{{"url":"{}"}}}}]}}]}}"#, provider.item_url("ACC-355"));
+    provider.seed_item("ACC-100", "Tarea", "y", "Abierta", None, Some(&body));
+    pull(root, &view, Some("ACC-100"), &provider, &config).unwrap();
     let before = head_count(&view);
 
     provider.seed_item("ACC-355", "Epic", "Vistas", "Abierta", None, None);
@@ -402,7 +452,7 @@ fn a_type_changed_on_the_provider_renames_the_file() {
     assert_eq!(path, view.join("ACC-355.epic.md"));
     assert!(!view.join("ACC-355.task.md").exists(), "never two files for the same item");
     let other = std::fs::read_to_string(view.join("ACC-100.task.md")).unwrap();
-    assert!(other.contains("[Vistas](ACC-355.epic.md)"), "{other}");
+    assert!(other.contains("[ACC-355](ACC-355.epic.md)"), "{other}");
     assert_eq!(head_count(&view), before + 1, "one pull commit");
     let status = std::process::Command::new("git").arg("-C").arg(&view).args(["status", "--porcelain", "--", "."]).output().unwrap();
     assert_eq!(String::from_utf8_lossy(&status.stdout), "", "nothing in the view left out of the commit");
