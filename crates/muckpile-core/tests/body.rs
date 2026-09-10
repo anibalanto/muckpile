@@ -1,9 +1,9 @@
 //! The body travels to the provider as ADF and what gets saved is what comes
-//! back, not what was typed — so the round-trip has to converge, and
-//! `canonical` has to agree with whatever `push` later decides is safe to
-//! edit.
+//! back, not what was typed — so whether a body can be edited locally is
+//! decided on the provider's ADF, by whether it survives the trip through
+//! markdown and back.
 
-use muckpile_core::body::{canonical, line_diff, prune_marks, split_frontmatter};
+use muckpile_core::body::{adf_diff, line_diff, prune_marks, split_frontmatter, JiraAdfMarkdownFilter, Loss};
 
 const ITEM: &str = "---\ntitle: With structure\nstatus: Open\n---\n\n# Title\n\nWith *italic*, **bold** and `SNAKE_CASE` inside a code span.\n\n| Field | Owner |\n|---|---|\n| `status` | provider |\n\n> A blockquote.\n\n- a list\n- with two items\n";
 
@@ -23,20 +23,6 @@ fn text_without_frontmatter_keeps_it_empty() {
 }
 
 #[test]
-fn canonical_reproduces_the_frontmatter_byte_for_byte() {
-    let (fm, _) = split_frontmatter(ITEM);
-    let out = canonical(ITEM).unwrap();
-    assert!(out.starts_with(fm), "the frontmatter has to come back untouched");
-}
-
-#[test]
-fn canonical_is_a_fixed_point() {
-    let once = canonical(ITEM).unwrap();
-    let twice = canonical(&once).unwrap();
-    assert_eq!(once, twice, "canonicalizing twice is the same as once");
-}
-
-#[test]
 fn structure_survives_into_the_adf() {
     let adf = muckpile_core::body::body_to_adf(ITEM).unwrap();
     for node in ["heading", "table", "blockquote", "bulletList"] {
@@ -44,10 +30,83 @@ fn structure_survives_into_the_adf() {
     }
 }
 
+/// Wraps a list of ADF block nodes, written as JSON, in a document.
+fn doc(blocks: &str) -> String {
+    format!(r#"{{"version":1,"type":"doc","content":[{blocks}]}}"#)
+}
+
+const PARAGRAPH: &str = r#"{"type":"paragraph","content":[{"type":"text","text":"With "},{"type":"text","text":"SNAKE_CASE","marks":[{"type":"code"}]},{"type":"text","text":" inside a code span."}]}"#;
+
+/// Jira keeps a numbered-rows flag on the table itself; markdown has no
+/// syntax for it, and the converter says so.
+const NUMBERED_TABLE: &str = r#"{"type":"table","attrs":{"isNumberColumnEnabled":true,"layout":"default"},"content":[
+    {"type":"tableRow","content":[{"type":"tableHeader","attrs":{},"content":[{"type":"paragraph","content":[{"type":"text","text":"field"}]}]}]},
+    {"type":"tableRow","content":[{"type":"tableCell","attrs":{},"content":[{"type":"paragraph","content":[{"type":"text","text":"status"}]}]}]}]}"#;
+
 #[test]
-fn snake_case_inside_a_code_span_survives() {
-    let out = canonical(ITEM).unwrap();
-    assert!(out.contains("`SNAKE_CASE`"));
+fn a_plain_body_is_canonical() {
+    let filtered = JiraAdfMarkdownFilter::filter(&doc(PARAGRAPH)).unwrap();
+    assert_eq!(filtered.losses, vec![]);
+    assert!(filtered.markdown.contains("`SNAKE_CASE`"), "{}", filtered.markdown);
+}
+
+/// The three things the converter normalizes on reading ADF are
+/// equivalences, not losses: an empty `attrs` on every table cell, a
+/// paragraph's `localId`, and the space a bold run keeps at its edge when a
+/// code span cuts it.
+#[test]
+fn what_the_converter_normalizes_is_not_a_loss() {
+    let adf = doc(r#"
+        {"type":"paragraph","attrs":{"localId":"a1b2"},"content":[
+          {"type":"text","text":"The first endpoint is ","marks":[{"type":"strong"}]},
+          {"type":"text","text":"reach","marks":[{"type":"code"}]},
+          {"type":"text","text":", and it fails.","marks":[{"type":"strong"}]}]},
+        {"type":"table","content":[
+          {"type":"tableRow","content":[{"type":"tableHeader","attrs":{},"content":[{"type":"paragraph","content":[{"type":"text","text":"field"}]}]}]},
+          {"type":"tableRow","content":[{"type":"tableCell","attrs":{},"content":[{"type":"paragraph","content":[{"type":"text","text":"status"}]}]}]}]}"#);
+    assert_eq!(JiraAdfMarkdownFilter::filter(&adf).unwrap().losses, vec![]);
+}
+
+/// The table's markdown is exactly the one an unnumbered table gives — so a
+/// check that goes markdown to ADF and back to markdown lets it through, and
+/// the numbering is gone after the next write.
+#[test]
+fn a_table_with_numbered_rows_is_not_canonical() {
+    let filtered = JiraAdfMarkdownFilter::filter(&doc(NUMBERED_TABLE)).unwrap();
+    assert!(
+        filtered.losses.iter().any(|l| matches!(l, Loss::Lossy(w) if w.contains("numbered"))),
+        "{:?}",
+        filtered.losses
+    );
+}
+
+/// Leading whitespace in a paragraph has nowhere to live in markdown: it
+/// comes back trimmed, with no warning from the converter. What catches it is
+/// comparing the document, not the warnings.
+#[test]
+fn a_document_that_comes_back_different_is_not_canonical_even_without_a_warning() {
+    let adf = doc(r#"{"type":"paragraph","content":[{"type":"text","text":"  indented"}]}"#);
+    assert_eq!(JiraAdfMarkdownFilter::filter(&adf).unwrap().losses, vec![Loss::Differs]);
+}
+
+#[test]
+fn the_diff_against_the_real_adf_shows_what_writing_the_draft_would_lose() {
+    let real = doc(NUMBERED_TABLE);
+    let draft = JiraAdfMarkdownFilter::filter(&real).unwrap().markdown;
+    let diff = adf_diff(&real, &draft).unwrap();
+    assert!(diff.lines().any(|l| l.starts_with('-') && l.contains("isNumberColumnEnabled")), "{diff}");
+}
+
+/// The empty `attrs` Jira puts on every cell isn't a difference: the real
+/// ADF is compared in the converter's canonical form.
+#[test]
+fn the_diff_against_the_real_adf_leaves_out_what_the_converter_normalizes() {
+    let real = doc(r#"{"type":"table","content":[
+        {"type":"tableRow","content":[{"type":"tableHeader","attrs":{},"content":[{"type":"paragraph","content":[{"type":"text","text":"field"}]}]}]},
+        {"type":"tableRow","content":[{"type":"tableCell","attrs":{},"content":[{"type":"paragraph","content":[{"type":"text","text":"status"}]}]}]}]}"#);
+    let draft = JiraAdfMarkdownFilter::filter(&real).unwrap().markdown;
+    let diff = adf_diff(&real, &draft).unwrap();
+    assert!(!diff.lines().any(|l| l.starts_with('-') || l.starts_with('+')), "{diff}");
 }
 
 /// ADF cannot combine `code` with `strong` or `em` — Jira rejects the whole

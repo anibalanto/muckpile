@@ -1,7 +1,7 @@
 //! Converting an item's body to and from the provider's rich-text format
 //! (ADF), and deciding whether a body can be edited locally at all.
 
-use amdc::{convert, format::Options, Format};
+use amdc::{convert, format::Options, Format, WarningKind};
 use anyhow::{Context, Result};
 
 /// Frontmatter and body. The frontmatter never passes through the converter:
@@ -50,8 +50,7 @@ pub fn prune_marks(node: &mut serde_json::Value) {
 pub fn body_to_adf(body: &str) -> Result<String> {
     let out = convert(body, Format::Gfm, Format::Adf, &Options::default())
         .context("converting the body to ADF")?;
-    let mut doc: serde_json::Value = serde_json::from_str(&out.text)
-        .with_context(|| format!("the ADF the converter produced isn't JSON: {}", out.text))?;
+    let mut doc = as_json(&out.text)?;
     prune_marks(&mut doc);
     Ok(serde_json::to_string(&doc)?)
 }
@@ -61,6 +60,89 @@ pub fn adf_to_body(adf: &str) -> Result<String> {
     let out = convert(adf, Format::Adf, Format::Gfm, &Options::default())
         .context("converting the ADF to markdown")?;
     Ok(out.text)
+}
+
+/// Why a body read from the provider can't be edited locally.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Loss {
+    /// The converter could only approximate a construct, and said so — named
+    /// the way the converter names it: `"numbered table column"`.
+    Lossy(String),
+    /// Back through markdown, the document isn't the one the converter reads
+    /// the provider's ADF as, and nothing warned about it.
+    Differs,
+}
+
+/// A body read from the provider: its markdown, and every reason editing
+/// that markdown locally would lose something — none when it's canonical.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Filtered {
+    pub markdown: String,
+    pub losses: Vec<Loss>,
+}
+
+impl Filtered {
+    pub fn is_canonical(&self) -> bool {
+        self.losses.is_empty()
+    }
+}
+
+/// From the provider's ADF to markdown, deciding on the way whether the body
+/// is canonical: whether its markdown converts back to the same document.
+///
+/// "The same" is the converter's own reading of the ADF — ADF to ADF — not
+/// the ADF as the provider stored it, and compared as JSON. What the
+/// converter normalizes on reading (an empty `attrs`, a paragraph's
+/// `localId`, a space at the edge of an emphasis run) is an equivalence, so
+/// it never counts as a difference; that knowledge lives in the converter,
+/// and there are no rules of its own here. A `Lossy` warning on either leg
+/// is a loss even when the JSON happens to agree.
+pub struct JiraAdfMarkdownFilter;
+
+impl JiraAdfMarkdownFilter {
+    pub fn filter(adf: &str) -> Result<Filtered> {
+        let options = Options::default();
+        let markdown = convert(adf, Format::Adf, Format::Gfm, &options).context("converting the ADF to markdown")?;
+        let back = convert(&markdown.text, Format::Gfm, Format::Adf, &options).context("converting the markdown back to ADF")?;
+
+        let mut losses: Vec<Loss> = markdown
+            .warnings
+            .iter()
+            .chain(&back.warnings)
+            .filter(|w| w.kind == WarningKind::Lossy)
+            .map(|w| match &w.detail {
+                Some(detail) => Loss::Lossy(format!("{} ({detail})", w.construct)),
+                None => Loss::Lossy(w.construct.clone()),
+            })
+            .collect();
+        // A warning already names what changed; `Differs` is for when
+        // something did and nothing said so.
+        if losses.is_empty() && as_json(&back.text)? != converter_canonical(adf)? {
+            losses.push(Loss::Differs);
+        }
+        Ok(Filtered { markdown: markdown.text, losses })
+    }
+}
+
+/// The provider's ADF as the converter reads it — ADF to ADF.
+fn converter_canonical(adf: &str) -> Result<serde_json::Value> {
+    let out = convert(adf, Format::Adf, Format::Adf, &Options::default()).context("reading the ADF")?;
+    as_json(&out.text)
+}
+
+fn as_json(adf: &str) -> Result<serde_json::Value> {
+    serde_json::from_str(adf).with_context(|| format!("the ADF the converter produced isn't JSON: {adf}"))
+}
+
+/// What sending `draft` would do to the provider's body: a line diff of the
+/// provider's ADF against the draft as it would be sent, both as indented
+/// JSON. The provider's side is in the converter's canonical form, so what
+/// the converter normalizes on reading — an empty `attrs` on every table
+/// cell — doesn't bury the difference that matters.
+pub fn adf_diff(real_adf: &str, draft: &str) -> Result<String> {
+    let real = serde_json::to_string_pretty(&converter_canonical(real_adf)?)?;
+    let sent = serde_json::to_string_pretty(&as_json(&body_to_adf(draft)?)?)?;
+    Ok(line_diff(&real, &sent))
 }
 
 /// The canonical form of a file's body: markdown to ADF and back, with the
