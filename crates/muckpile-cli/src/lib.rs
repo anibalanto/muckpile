@@ -218,3 +218,40 @@ pub fn list(view: &Path, filter: &ListFilter, categories: &BTreeMap<String, Stri
     }
     Ok(items)
 }
+
+/// One item's local fields against the provider's current ones — never the
+/// body (that's canonicity's call, decision 10, and `push`'s problem, not
+/// this read-only comparison's).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ItemStatus {
+    pub id: String,
+    pub changed: bool,
+    pub local_title: String,
+    pub remote_title: String,
+    pub local_status: String,
+    pub remote_status: String,
+    pub local_parent: Option<String>,
+    pub remote_parent: Option<String>,
+}
+
+/// Compares every item already pulled into `view` against the provider,
+/// live — never writes, local or remote. What `push` still needs on top of
+/// this is deciding what to do about a difference; this only finds one.
+pub fn status(view: &Path, provider: &dyn Provider) -> Result<Vec<ItemStatus>> {
+    list_summaries(view)?
+        .into_iter()
+        .map(|local| {
+            let remote = provider.item(&local.id)?;
+            Ok(ItemStatus {
+                changed: local.title != remote.title || local.status != remote.status || local.parent != remote.parent,
+                id: local.id,
+                local_title: local.title,
+                remote_title: remote.title,
+                local_status: local.status,
+                remote_status: remote.status,
+                local_parent: local.parent,
+                remote_parent: remote.parent,
+            })
+        })
+        .collect()
+}

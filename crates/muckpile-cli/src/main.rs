@@ -19,8 +19,9 @@ fn main() -> Result<()> {
         [cmd, id, status] if cmd == "transition" => run_transition(id, status),
         [cmd, sub] if cmd == "states" && sub == "discover" => run_states_discover(),
         [cmd, rest @ ..] if cmd == "list" => run_list(rest),
+        [cmd, view] if cmd == "status" => run_status(view),
         _ => bail!(
-            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>]"
+            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista>"
         ),
     }
 }
@@ -128,6 +129,36 @@ fn run_list(args: &[String]) -> Result<()> {
         println!("{}  {}  {}  {}", item.id, item.item_type, item.status, item.title);
     }
     Ok(())
+}
+
+fn run_status(view_arg: &str) -> Result<()> {
+    let (root, cwd) = standing_in_a_project()?;
+    let config = load_project_config(&root)?;
+    let provider = build_provider(&root, &config)?;
+    let view = cwd.join(view_arg);
+
+    for item in muckpile_cli::status(&view, provider.as_ref())? {
+        if !item.changed {
+            println!("{}: sin cambios", item.id);
+            continue;
+        }
+        let mut diffs = Vec::new();
+        if item.local_title != item.remote_title {
+            diffs.push(format!("title \"{}\" -> \"{}\"", item.local_title, item.remote_title));
+        }
+        if item.local_status != item.remote_status {
+            diffs.push(format!("status \"{}\" -> \"{}\"", item.local_status, item.remote_status));
+        }
+        if item.local_parent != item.remote_parent {
+            diffs.push(format!("parent {} -> {}", display_parent(&item.local_parent), display_parent(&item.remote_parent)));
+        }
+        println!("{}: {}", item.id, diffs.join(", "));
+    }
+    Ok(())
+}
+
+fn display_parent(parent: &Option<String>) -> &str {
+    parent.as_deref().unwrap_or("(ninguno)")
 }
 
 fn standing_in_a_project() -> Result<(PathBuf, PathBuf)> {
