@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `4bb1145`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `12e5cae`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -108,7 +108,7 @@ Lo único que se cae es la razón original de que existiera un hook para esto: q
 | Por cada ítem creado o encontrado, un commit `new @<slug>` o `found @<slug>` en la ref del proveedor, con lo que devolvió | `pendiente` | Hoy `fetch_and_commit` commitea `pull <id>` en la misma rama que la vista |
 | La vista se rebasea sobre ese commit antes de renombrar | `pendiente` | Hoy se renombra primero (`resolve_batch`) y se trae después |
 | Qué pasa cuando no se puede resolver un pendiente del que otro depende | `falta spec` | Lo decide el código: lo que depende no se intenta, y su archivo queda como estaba (`PushResult::ResolveFailed`) |
-| Qué recibe un ítem que se encontró en vez de crearse | `falta spec` | Lo decide el código: nunca el cuerpo ni el `parent` del borrador, que sólo viajan al crear (`resolve_one`) |
+| Qué recibe un ítem que se encontró en vez de crearse | `falta spec` | Lo decide el código: nunca el cuerpo, el `parent` ni las relaciones del borrador, que sólo viajan al crear (`resolve_one`, `resolve_pending`). Tiene un borde: si un `push` creó el ítem y un link falló, el reintento lo encuentra y el link no se vuelve a intentar — queda sólo en el mensaje del primer `push` |
 
 ### 5. Sync por comparación local, no por compare-and-swap en un servidor
 
@@ -252,13 +252,13 @@ backlog/sprint/22_Las_vistas/  backlog/sprint/23_Las_questions/     ← no hay a
 - **`<id>_data/`, el directorio de datos del ítem**, sibling a su archivo, para cualquier tipo: `thread/` con un mensaje por archivo y el anidado en `in-reply-to`; `files/` con el borrador del artefacto que, al cerrarse la pregunta, se muda a la capa que lo gobierna. Es el mismo directorio que `ACC-334`/`ACC-335`/`ACC-336` especifican para worklist bajo el nombre `<id>/` desnudo — `muckpile` lo escribe como `<id>_data/` por la razón de la decisión 6: evitar la colisión con el nombre de la vista cuando coinciden.
 - La decisión 4 se aplica entera acá: el directorio viaja con el renombre — `@algo_data/` pasa a `ACC-231_data/` en el mismo commit que `@algo.question.md` pasa a `ACC-231.question.md`.
 
-**Avance: 4/7.**
+**Avance: 5/7.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
 | Tipo `question` (`<id>.question.md`) | `cerrada` | `TYPES`; `new` ↔ fila `new` |
 | `new question --blocks <id>` escribe `relation.blocks` | `cerrada` | `new` ↔ fila `new` |
-| `blocks` llega al proveedor | `diverge` | Un `push` que resuelve la `question` la crea sin el link, y como el header se rearma desde el proveedor, que no lo tiene, `relation.blocks` desaparece del archivo. Crearlo espera a que la dirección de `create_link` esté confirmada (decisión 8) |
+| `blocks` llega al proveedor | `cerrada` | `resolve_pending` ↔ esta decisión: al crear un borrador, crea cada relación que su header declara —`relation.blocks` incluida, con un `@slug` del mismo lote ya traducido a su id—; la que falla sale como `PushResult::RelationFailed`, con el `link` que la reintenta |
 | `relation.*` baja con `pull`: todos los links, en las dos puntas, con la clave de la decisión 12 | `cerrada` | `relations` ↔ decisión 12: una clave por frase, `_` por espacio, ids ordenados; `link_from_own_side` ↔ decisión 12: cada link leído desde el lado del ítem, con la forma medida en `ACC` |
 | `<id>_data/thread/` y `files/`, traídos por `pull` | `pendiente` | `show` lista `<id>_data/` si alguien lo puso a mano; nada lo crea ni lo trae |
 | `_data/` viaja con el renombre del `@slug` | `cerrada` | `rename_one` lo mueve en el mismo commit; bilink de la decisión 4 |
