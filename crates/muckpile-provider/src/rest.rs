@@ -198,7 +198,8 @@ impl Provider for JiraRest {
             bail!("{title:?}: no queda nada con qué buscar después de reducirlo para JQL");
         }
         let jql = format!("project = {project_key} AND issuetype = \"{jira_type}\" AND summary ~ \"{needle}\"");
-        let path = format!("/rest/api/3/search?jql={}&fields=summary", url_encode(&jql));
+        // `/search` without `/jql` answers 410 Gone: the provider retired it.
+        let path = format!("/rest/api/3/search/jql?jql={}&fields=summary&maxResults=100", url_encode(&jql));
         let v = self.call("GET", &path, None)?;
         let issues = v.get("issues").and_then(|i| i.as_array()).ok_or_else(|| anyhow!("no `issues` in the search response"))?;
         // The JQL is deliberately imprecise (`~` is full-text, not literal):

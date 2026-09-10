@@ -323,7 +323,9 @@ fn find_by_title_matches_the_exact_summary_among_the_results() {
 
     let captured = rx.recv().unwrap();
     assert_eq!(captured.method, "GET");
-    assert!(captured.path.starts_with("/rest/api/3/search?jql="), "{}", captured.path);
+    // `/rest/api/3/search` answers 410 Gone — measured against the real
+    // instance on 2026-09-10; `/search/jql` is what replaced it.
+    assert!(captured.path.starts_with("/rest/api/3/search/jql?jql="), "{}", captured.path);
     assert!(captured.path.contains("project"), "{}", captured.path);
 }
 
