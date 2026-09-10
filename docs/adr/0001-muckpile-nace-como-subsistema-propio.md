@@ -411,7 +411,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 | Dimensión | Estado | Evidencia |
 |---|---|---|
 | Identificadores y comentarios en inglés | `cumple` | — |
-| Ningún comentario cita un ADR, una spec o un ítem | `no cumple` | 13 comentarios dicen `decision N`: 8 en `muckpile-cli/src/lib.rs`, 1 en `muckpile-core/src/states.rs`, 1 en `muckpile-provider/src/link.rs`, 3 en `muckpile-provider/src/provider.rs` |
+| Ningún comentario cita un ADR, una spec o un ítem | `no cumple` | 19 comentarios dicen `decision N`. En el código, 13: 8 en `muckpile-cli/src/lib.rs`, 1 en `muckpile-core/src/states.rs`, 1 en `muckpile-provider/src/link.rs`, 3 en `muckpile-provider/src/provider.rs`. En los tests, 6 doc-comments de módulo: `new.rs`, `states_discover.rs` y `transition.rs` de `muckpile-cli`, `identity.rs` y `states.rs` de `muckpile-core`, `link.rs` de `muckpile-provider` |
 | El idioma de lo que ve el usuario | `falta spec` | Los mensajes y los errores están todos en castellano; esta decisión fija el idioma del código, no el de la salida |
 
 ---
