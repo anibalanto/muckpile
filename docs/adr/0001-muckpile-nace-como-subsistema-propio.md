@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `2965352`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `7195b0c`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -477,7 +477,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **El h1 es cuerpo, como cualquier otra línea.** En `ACC` casi toda descripción arranca con un h1 que repite el título —medido el 2026-09-10 sobre los últimos 100 ítems: 97 arrancan con un h1, y en 5 ya no coincide con el `summary`, porque se cambió de un lado y no del otro—. Es la convención de worklist, subida tal cual a Jira. `muckpile` no la sigue ni la limpia: el título es `summary`, un campo aparte, y lo que diga un h1 es contenido de la descripción.
 
-**Avance: 3/7.**
+**Avance: 4/7.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -486,7 +486,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 | `unlink <a> <frase> <b>` | `pendiente` | — |
 | `link` y `unlink` aceptan la frase con `_` | `pendiente` | `link` compara la frase tal cual, con espacios |
 | `push` no sube nada del header: un header editado a mano choca, el ítem no se manda, y `push` sugiere el comando | `cerrada` | `header_edits` ↔ esta decisión: cada campo y cada relación que el archivo dice distinto del proveedor; `push_one` ↔ fila `push`: si hay alguno, `PushResult::HeaderClash` y nada más. El comando sugerido lo arma `main.rs` |
-| Después de escribir, el comando hace lo que un `pull` del ítem en la vista | `diverge` | `transition` y `link` no tocan la vista: el `push` siguiente ve lo que escribieron como un cambio del otro lado, y no pisa |
+| Después de escribir, el comando hace lo que un `pull` del ítem en la vista | `cerrada` | `catch_up` ↔ esta decisión: si la vista tiene el ítem, lo trae y lo commitea; si el archivo, o algo ya trackeado en su `_data/`, tiene cambios sin commitear, no toca nada y dice que la vista queda atrás —un borrador sin commitear en `files/` no estorba: sólo se escribe lo que viene del proveedor—. Lo llaman `title`, `transition`, `link` —en sus dos puntas—, `comment` y `attach`. Probado el 2026-09-10 con el binario en `ACC-360`: después de `title`, la vista quedó al día y el `push` siguiente dijo "sin cambios" |
 | Si el proveedor cambia el tipo de un ítem, `pull` renombra el archivo y reescribe los links al nombre viejo | `cerrada` | `retype` ↔ esta decisión: mueve el archivo y reescribe cada link al nombre viejo, sin commitear; `fetch_and_commit` lo llama cuando el tipo que baja no es el del archivo, y lo commitea en el mismo `pull` |
 
 ---
