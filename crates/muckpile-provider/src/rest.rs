@@ -159,6 +159,34 @@ impl Provider for JiraRest {
         }
     }
 
+    /// `parentId` goes as the number the comments endpoint hands back.
+    fn add_comment(&self, key: &str, body_adf: &str, parent: Option<&str>) -> Result<String> {
+        let body: serde_json::Value = serde_json::from_str(body_adf).context("the comment to send isn't JSON")?;
+        let mut payload = serde_json::json!({ "body": body });
+        if let Some(parent) = parent {
+            payload["parentId"] = parent.parse::<u64>().map(serde_json::Value::from).unwrap_or_else(|_| parent.into());
+        }
+        let v = self.call("POST", &format!("/rest/api/3/issue/{key}/comment"), Some(payload))?;
+        v.get("id").and_then(|i| i.as_str()).map(str::to_string).ok_or_else(|| anyhow!("the comment came back without an id: {v}"))
+    }
+
+    /// A multipart upload, with `X-Atlassian-Token: no-check` — without it
+    /// the provider refuses the request as a possible forgery.
+    fn add_attachment(&self, key: &str, filename: &str, bytes: &[u8]) -> Result<Attachment> {
+        let path = format!("/rest/api/3/issue/{key}/attachments");
+        let url = format!("{}{path}", self.base);
+        let (status, text) = http_multipart(&url, &self.creds.basic_auth(), filename, bytes).with_context(|| format!("talking to {url}"))?;
+        if !(200..300).contains(&status) {
+            bail!("POST {path} returned {status}: {text}");
+        }
+        let v: serde_json::Value = serde_json::from_str(&text).with_context(|| format!("POST {path} returned {status} and it wasn't JSON: {text}"))?;
+        let a = v.as_array().and_then(|a| a.first()).ok_or_else(|| anyhow!("POST {path} returned no attachment: {text}"))?;
+        Ok(Attachment {
+            id: a.get("id").and_then(|i| i.as_str()).ok_or_else(|| anyhow!("an attachment without id: {a}"))?.to_string(),
+            filename: a.get("filename").and_then(|f| f.as_str()).unwrap_or(filename).to_string(),
+        })
+    }
+
     /// With `redirect=false` the provider answers with the file itself —
     /// measured: without it, a 303 toward another host.
     fn attachment_content(&self, attachment_id: &str) -> Result<Vec<u8>> {
@@ -328,6 +356,30 @@ fn http_bytes(url: &str, auth: &str) -> Result<(u16, Vec<u8>)> {
     match ureq::get(url).set("Authorization", auth).call() {
         Ok(r) => Ok((r.status(), read(r)?)),
         Err(ureq::Error::Status(status, r)) => Ok((status, read(r)?)),
+        Err(e) => Err(anyhow!("{e}")),
+    }
+}
+
+/// One file as `multipart/form-data`, the field named `file` — the shape the
+/// attachments endpoint takes.
+fn http_multipart(url: &str, auth: &str, filename: &str, bytes: &[u8]) -> Result<(u16, String)> {
+    let boundary = "muckpile-attachment-boundary";
+    let mut body = format!(
+        "--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{}\"\r\nContent-Type: application/octet-stream\r\n\r\n",
+        filename.replace('"', "\\\"")
+    )
+    .into_bytes();
+    body.extend_from_slice(bytes);
+    body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+    let res = ureq::post(url)
+        .set("Authorization", auth)
+        .set("Accept", "application/json")
+        .set("X-Atlassian-Token", "no-check")
+        .set("Content-Type", &format!("multipart/form-data; boundary={boundary}"))
+        .send_bytes(&body);
+    match res {
+        Ok(r) => Ok((r.status(), r.into_string().unwrap_or_default())),
+        Err(ureq::Error::Status(status, r)) => Ok((status, r.into_string().unwrap_or_default())),
         Err(e) => Err(anyhow!("{e}")),
     }
 }

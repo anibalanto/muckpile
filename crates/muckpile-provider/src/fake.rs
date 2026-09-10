@@ -15,6 +15,7 @@ pub struct FakeProvider {
     link_types: RefCell<Vec<LinkType>>,
     links_created: RefCell<Vec<(String, String, String)>>,
     next_keys: RefCell<VecDeque<(String, String)>>,
+    next_id: RefCell<u64>,
 }
 
 /// What `FakeProvider` holds per item — a superset of what any one `Provider`
@@ -41,6 +42,7 @@ impl FakeProvider {
             link_types: RefCell::new(Vec::new()),
             links_created: RefCell::new(Vec::new()),
             next_keys: RefCell::new(VecDeque::new()),
+            next_id: RefCell::new(1),
         }
     }
 
@@ -152,6 +154,13 @@ impl FakeProvider {
         item.links = links.iter().map(|(phrase, other)| ItemLink { phrase: phrase.to_string(), other: other.to_string() }).collect();
     }
 
+    /// An id for a comment or an attachment made here, never repeated.
+    fn fresh_id(&self) -> String {
+        let mut next = self.next_id.borrow_mut();
+        *next += 1;
+        format!("9{next:04}")
+    }
+
     pub fn status_of(&self, key: &str) -> Option<String> {
         self.items.borrow().get(key).map(|i| i.status.clone())
     }
@@ -207,6 +216,29 @@ impl Provider for FakeProvider {
         let items = self.items.borrow();
         let Some(i) = items.get(key) else { bail!("no such item: {key}") };
         Ok(i.comments.clone())
+    }
+
+    fn add_comment(&self, key: &str, body_adf: &str, parent: Option<&str>) -> Result<String> {
+        let id = self.fresh_id();
+        let mut items = self.items.borrow_mut();
+        let Some(item) = items.get_mut(key) else { bail!("no such item: {key}") };
+        item.comments.push(Comment {
+            id: id.clone(),
+            author: "fake".into(),
+            author_id: "fake-id".into(),
+            created: "2026-09-10T00:00:00.000-0300".into(),
+            parent: parent.map(str::to_string),
+            body_adf: body_adf.to_string(),
+        });
+        Ok(id)
+    }
+
+    fn add_attachment(&self, key: &str, filename: &str, bytes: &[u8]) -> Result<Attachment> {
+        let attachment = Attachment { id: self.fresh_id(), filename: filename.to_string() };
+        let mut items = self.items.borrow_mut();
+        let Some(item) = items.get_mut(key) else { bail!("no such item: {key}") };
+        item.attachments.push((attachment.clone(), bytes.to_vec()));
+        Ok(attachment)
     }
 
     fn attachment_content(&self, attachment_id: &str) -> Result<Vec<u8>> {

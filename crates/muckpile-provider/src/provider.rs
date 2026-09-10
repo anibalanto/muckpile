@@ -86,6 +86,13 @@ pub trait Provider {
     /// The bytes of one attachment.
     fn attachment_content(&self, attachment_id: &str) -> Result<Vec<u8>>;
 
+    /// Adds a comment, as ADF — a reply to `parent` when there is one — and
+    /// returns its id.
+    fn add_comment(&self, key: &str, body_adf: &str, parent: Option<&str>) -> Result<String>;
+
+    /// Attaches a file to the item, under `filename`.
+    fn add_attachment(&self, key: &str, filename: &str, bytes: &[u8]) -> Result<Attachment>;
+
     /// The board's currently open sprints.
     fn open_sprints(&self, board_id: u64) -> Result<Vec<Sprint>>;
 

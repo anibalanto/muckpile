@@ -479,3 +479,51 @@ fn attachment_content_asks_for_the_bytes_without_a_redirect() {
     assert_eq!(bytes, b"the bytes");
     assert_eq!(rx.recv().unwrap().path, "/rest/api/3/attachment/content/44892?redirect=false");
 }
+
+/// Measured on a throwaway item, ACC-360, on 2026-09-10: the POST takes
+/// `parentId`, as the number the comments endpoint hands back.
+#[test]
+fn add_comment_posts_the_body_and_the_comment_it_replies_to() {
+    let (base, rx) = one_shot(201, r#"{"id":"42581","parentId":42580}"#);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+    let adf = r#"{"version":1,"type":"doc","content":[]}"#;
+
+    let id = provider.add_comment("ACC-360", adf, Some("42580")).unwrap();
+
+    assert_eq!(id, "42581");
+    let captured = rx.recv().unwrap();
+    assert_eq!((captured.method.as_str(), captured.path.as_str()), ("POST", "/rest/api/3/issue/ACC-360/comment"));
+    let body: serde_json::Value = serde_json::from_str(&captured.body).unwrap();
+    assert_eq!(body["parentId"], serde_json::json!(42580));
+    assert_eq!(body["body"]["type"], "doc");
+}
+
+#[test]
+fn add_comment_with_no_parent_sends_none() {
+    let (base, rx) = one_shot(201, r#"{"id":"42580"}"#);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    provider.add_comment("ACC-360", r#"{"version":1,"type":"doc","content":[]}"#, None).unwrap();
+
+    let body: serde_json::Value = serde_json::from_str(&rx.recv().unwrap().body).unwrap();
+    assert!(body.get("parentId").is_none(), "{body}");
+}
+
+/// Measured on ACC-360: a multipart POST, with `X-Atlassian-Token: no-check`
+/// — without it the provider refuses the upload as a possible forgery.
+#[test]
+fn add_attachment_uploads_the_file_as_multipart() {
+    let (base, rx) = one_shot(200, r#"[{"id":"45078","filename":"prueba.txt","size":5}]"#);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    let attachment = provider.add_attachment("ACC-360", "prueba.txt", b"hola\n").unwrap();
+
+    assert_eq!(attachment, Attachment { id: "45078".into(), filename: "prueba.txt".into() });
+    let captured = rx.recv().unwrap();
+    assert_eq!((captured.method.as_str(), captured.path.as_str()), ("POST", "/rest/api/3/issue/ACC-360/attachments"));
+    let raw = captured.raw.to_lowercase();
+    assert!(raw.contains("x-atlassian-token: no-check"), "{}", captured.raw);
+    assert!(raw.contains("content-type: multipart/form-data; boundary="), "{}", captured.raw);
+    assert!(captured.raw.contains("filename=\"prueba.txt\""), "{}", captured.raw);
+    assert!(captured.raw.contains("hola\n"), "{}", captured.raw);
+}

@@ -25,12 +25,14 @@ fn main() -> Result<()> {
         [cmd, view] if cmd == "push" => run_push(view),
         [cmd, a, phrase, b] if cmd == "link" => run_link(a, phrase, b),
         [cmd, id, new_title] if cmd == "title" => run_title(id, new_title),
+        [cmd, id, file, rest @ ..] if cmd == "comment" => run_comment(id, file, rest),
+        [cmd, id, file] if cmd == "attach" => run_attach(id, file),
         [cmd, item_type, title, rest @ ..] if cmd == "new" => run_new(item_type, title, rest),
         [cmd, id] if cmd == "show" => run_show(id, false),
         [cmd, id, flag] if cmd == "show" && flag == "--local" => run_show(id, true),
         [cmd, sub, repo, rest @ ..] if cmd == "code-work" && sub == "add" => run_code_work_add(repo, rest),
         _ => bail!(
-            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile push <vista> | muckpile link <a> <frase> <b> | muckpile title <id> <título> | muckpile new <tipo> <título> [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
+            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile push <vista> | muckpile link <a> <frase> <b> | muckpile title <id> <título> | muckpile comment <id> <archivo> [--reply-to <id>] (--ai <modelo> | --i-human) | muckpile attach <id> <archivo> | muckpile new <tipo> <título> [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
         ),
     }
 }
@@ -257,6 +259,40 @@ fn run_title(id: &str, new_title: &str) -> Result<()> {
     let provider = build_provider(&root, &config)?;
     muckpile_cli::title(id, new_title, provider.as_ref())?;
     println!("{id}: título cambiado a \"{new_title}\"");
+    Ok(())
+}
+
+fn run_comment(id: &str, file: &str, flags: &[String]) -> Result<()> {
+    let (mut reply_to, mut model, mut human) = (None, None, false);
+    let mut rest = flags.iter();
+    while let Some(flag) = rest.next() {
+        match flag.as_str() {
+            "--reply-to" => reply_to = Some(rest.next().context("--reply-to necesita el id de un comentario")?.as_str()),
+            "--ai" => model = Some(rest.next().context("--ai necesita el modelo")?.as_str()),
+            "--i-human" => human = true,
+            other => bail!("{other}: flag desconocido para comment"),
+        }
+    }
+    let author = match (model, human) {
+        (Some(_), true) => bail!("--ai y --i-human a la vez: un comentario lo escribió uno de los dos"),
+        (Some(model), false) => Some(muckpile_cli::Author::Ai(model)),
+        (None, true) => Some(muckpile_cli::Author::Human),
+        (None, false) => None,
+    };
+    let (root, cwd) = standing_in_a_project()?;
+    let config = load_project_config(&root)?;
+    let provider = build_provider(&root, &config)?;
+    let comment_id = muckpile_cli::comment(id, &cwd.join(file), reply_to, author, provider.as_ref())?;
+    println!("{id}: comentario {comment_id} agregado");
+    Ok(())
+}
+
+fn run_attach(id: &str, file: &str) -> Result<()> {
+    let (root, cwd) = standing_in_a_project()?;
+    let config = load_project_config(&root)?;
+    let provider = build_provider(&root, &config)?;
+    let attachment = muckpile_cli::attach(id, &cwd.join(file), provider.as_ref())?;
+    println!("{id}: {} adjuntado ({})", attachment.filename, attachment.id);
     Ok(())
 }
 

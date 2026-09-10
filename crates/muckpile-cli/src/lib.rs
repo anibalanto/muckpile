@@ -775,6 +775,55 @@ pub fn title(id: &str, new_title: &str, provider: &dyn Provider) -> Result<()> {
     provider.update_title(id, new_title)
 }
 
+/// Who wrote a comment — every comment says, one way or the other.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Author<'a> {
+    /// A model, named: it goes at the top of the comment, where anyone
+    /// reading the provider sees it and `pull` reads it back.
+    Ai(&'a str),
+    /// A person, declared by whoever runs the command: nothing is added.
+    Human,
+}
+
+/// Sends the markdown in `file` as a comment on `id` — a reply to
+/// `reply_to` when given — and returns the new comment's id. Refused unless
+/// it says who wrote it, so a comment with no model on top is never one
+/// that forgot to say.
+pub fn comment(id: &str, file: &Path, reply_to: Option<&str>, author: Option<Author>, provider: &dyn Provider) -> Result<String> {
+    if !is_valid_id(id) {
+        bail!("{id}: no es un id válido");
+    }
+    if let Some(parent) = reply_to {
+        if parent.is_empty() || !parent.chars().all(|c| c.is_ascii_digit()) {
+            bail!("{parent}: no es el id de un comentario");
+        }
+    }
+    let Some(author) = author else {
+        bail!("decí quién lo escribió: --ai <modelo> o --i-human");
+    };
+    let text = std::fs::read_to_string(file).with_context(|| format!("reading {}", file.display()))?;
+    let markdown = match author {
+        Author::Ai(model) => {
+            if model.trim().is_empty() || model.contains(['`', '\n']) {
+                bail!("{model:?}: no es un nombre de modelo que se pueda leer de vuelta");
+            }
+            format!("ai: `{model}`\n\n{text}")
+        }
+        Author::Human => text,
+    };
+    provider.add_comment(id, &body_to_adf(&markdown)?, reply_to)
+}
+
+/// Uploads `file` as an attachment of `id`, under its own name.
+pub fn attach(id: &str, file: &Path, provider: &dyn Provider) -> Result<Attachment> {
+    if !is_valid_id(id) {
+        bail!("{id}: no es un id válido");
+    }
+    let filename = file.file_name().map(|n| n.to_string_lossy().into_owned()).with_context(|| format!("{}: no es un archivo", file.display()))?;
+    let bytes = std::fs::read(file).with_context(|| format!("reading {}", file.display()))?;
+    provider.add_attachment(id, &filename, &bytes)
+}
+
 /// What `show` prints — frontmatter plus body, live or local, and the
 /// `<id>_data/` listing (decision 7) alongside either, since that directory
 /// is local filesystem state regardless of where the rest came from.
