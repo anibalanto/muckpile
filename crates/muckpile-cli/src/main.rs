@@ -355,11 +355,16 @@ fn run_link(a: &str, phrase: &str, b: &str) -> Result<()> {
 }
 
 fn run_unlink(a: &str, phrase: &str, b: &str) -> Result<()> {
-    let (root, _cwd) = standing_in_a_project()?;
+    let (root, cwd) = standing_in_a_project()?;
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
     match muckpile_cli::unlink(a, phrase, b, provider.as_ref())? {
-        UnlinkOutcome::Removed { type_name } => println!("{a} {phrase} {b}  ({type_name}) — quitada"),
+        UnlinkOutcome::Removed { type_name } => {
+            println!("{a} {phrase} {b}  ({type_name}) — quitada");
+            // A link shows on both of its ends.
+            catch_up_view(&cwd, a, provider.as_ref(), &config)?;
+            catch_up_view(&cwd, b, provider.as_ref(), &config)?;
+        }
         UnlinkOutcome::NoSuchPhrase { available } => {
             println!("\"{phrase}\": no es una frase de relación del proveedor — disponibles: {}", available.join(", "));
         }
