@@ -38,9 +38,17 @@ pub fn to_work(root: &Path, cwd: &Path, id: &str) -> Result<PathBuf> {
 /// is local until the first `push` resolves it (decision 4). `blocks`
 /// declares the one relation a fresh item can carry, `relation.blocks`
 /// (decision 7's `question`, though nothing here restricts it to that type).
-pub fn new(dir: &Path, item_type: &str, title: &str, blocks: Option<&str>) -> Result<PathBuf> {
+/// `parent` names the item it hangs from — a real id, or another draft's
+/// `@slug`, which `push` translates once that draft has its id. Both travel
+/// with the rest of the header when the item is created, and never after.
+pub fn new(dir: &Path, item_type: &str, title: &str, parent: Option<&str>, blocks: Option<&str>) -> Result<PathBuf> {
     if !TYPES.contains(&item_type) {
         bail!("{item_type}: tipo desconocido — {}", TYPES.join(", "));
+    }
+    if let Some(parent) = parent {
+        if !is_valid_id(parent) {
+            bail!("{parent}: no es un id válido");
+        }
     }
     if let Some(blocks) = blocks {
         if !is_valid_id(blocks) {
@@ -55,6 +63,9 @@ pub fn new(dir: &Path, item_type: &str, title: &str, blocks: Option<&str>) -> Re
     }
 
     let mut text = format!("---\ntitle: {title}\n");
+    if let Some(parent) = parent {
+        text.push_str(&format!("parent: {parent}\n"));
+    }
     if let Some(blocks) = blocks {
         text.push_str(&format!("relation.blocks: {blocks}\n"));
     }

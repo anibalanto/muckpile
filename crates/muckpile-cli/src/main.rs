@@ -33,7 +33,7 @@ fn main() -> Result<()> {
         [cmd, id, flag] if cmd == "show" && flag == "--local" => run_show(id, true),
         [cmd, sub, repo, rest @ ..] if cmd == "code-work" && sub == "add" => run_code_work_add(repo, rest),
         _ => bail!(
-            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile push <vista> | muckpile link <a> <frase> <b> | muckpile title <id> <título> | muckpile parent <id> <padre> | muckpile comment <id> <archivo> [--reply-to <id>] (--ai <modelo> | --i-human) | muckpile attach <id> <archivo> | muckpile new <tipo> <título> [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
+            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile push <vista> | muckpile link <a> <frase> <b> | muckpile title <id> <título> | muckpile parent <id> <padre> | muckpile comment <id> <archivo> [--reply-to <id>] (--ai <modelo> | --i-human) | muckpile attach <id> <archivo> | muckpile new <tipo> <título> [--parent <id>] [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
         ),
     }
 }
@@ -354,12 +354,14 @@ fn run_link(a: &str, phrase: &str, b: &str) -> Result<()> {
 }
 
 fn run_new(item_type: &str, title: &str, flags: &[String]) -> Result<()> {
+    let mut parent = None;
     let mut blocks = None;
     let mut i = 0;
     while i < flags.len() {
         let flag = &flags[i];
         let value = flags.get(i + 1).with_context(|| format!("{flag}: falta el valor"))?;
         match flag.as_str() {
+            "--parent" => parent = Some(value.as_str()),
             "--blocks" => blocks = Some(value.as_str()),
             _ => bail!("{flag}: opción desconocida"),
         }
@@ -367,7 +369,7 @@ fn run_new(item_type: &str, title: &str, flags: &[String]) -> Result<()> {
     }
 
     let cwd = std::env::current_dir()?;
-    let path = muckpile_cli::new(&cwd, item_type, title, blocks)?;
+    let path = muckpile_cli::new(&cwd, item_type, title, parent, blocks)?;
     let name = path.file_name().context("el path creado no tiene nombre")?.to_string_lossy();
     println!("{name} creado");
     Ok(())

@@ -380,6 +380,22 @@ fn translates_an_in_batch_parent_to_the_freshly_resolved_id() {
 }
 
 #[test]
+fn a_draft_new_wrote_with_a_parent_is_created_under_it() {
+    let dir = git_view();
+    let view = dir.path();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-339", "Épica", "La épica", "En curso", None, None);
+    provider.queue_create("ACC-403", "Tareas por hacer");
+    muckpile_cli::new(view, "task", "La tarea", Some("ACC-339"), None).unwrap();
+
+    push(view, &provider, &config()).unwrap();
+
+    assert_eq!(provider.parent_of("ACC-403").as_deref(), Some("ACC-339"));
+    let committed = std::fs::read_to_string(view.join("ACC-403.task.md")).unwrap();
+    assert!(committed.contains("parent: ACC-339\n"), "{committed}");
+}
+
+#[test]
 fn a_slug_with_no_configured_item_type_fails_without_touching_the_rest() {
     let dir = git_view();
     let view = dir.path();
