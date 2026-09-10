@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture e8b58d0754d95580c3619e7f6d61707b
+    accepted:
+    - agree:
+      - anibal
+      link: capture e8b58d0754d95580c3619e7f6d61707b
+      hash: f21fe0c9c4d9a454a9c43a1ab36b46a9eb384bf2bc1295d6690ff9714a058c55
+    name: sprint-fetch-spec
+  1:
+    link: capture 332d81d6c806597d48fb756b3bdf2cad
+    accepted:
+    - agree:
+      - anibal
+      link: capture 332d81d6c806597d48fb756b3bdf2cad
+      hash: aee1955b21c4d9bd3bb9e7ec527076abe3757475eb551a16a4aacba73ef24489
+      hash_ast: 274488a22bcbb9fefeca764b2df0bb112a477d046f3508dd6d1da1afe9a5d2f6
+      n: declined
+    name: sprint-fetch-impl

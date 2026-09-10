@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture 44adc2f6894c7ebf5e8eb291d6efecf5
+    accepted:
+    - agree:
+      - anibal
+      link: capture 44adc2f6894c7ebf5e8eb291d6efecf5
+      hash: 096d9df82c23bb9e24dfa6e611da4d2cb88220526e87e8eec6b28a8aa9622ce0
+    name: truncated-sprint-name-spec
+  1:
+    link: capture 3c6116d6a26eeba63dca406defa3a118
+    accepted:
+    - agree:
+      - anibal
+      link: capture 3c6116d6a26eeba63dca406defa3a118
+      hash: 0b9398d92f8720e00634536db1f970703e0a94451a01ff36871c74bdb7538c5c
+      hash_ast: 5d6e9deb537ef43629d9d146a69d655fb7008f6f68879f137a0996c6dcaa0541
+      n: declined
+    name: legible-name-impl
