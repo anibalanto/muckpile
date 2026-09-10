@@ -321,8 +321,9 @@ fn git(view: &Path, args: &[&str]) -> Result<()> {
 /// governs `view`, if any of them actually differ from what's already
 /// committed — a no-op, returning `false`, otherwise. `git add -A` with no
 /// pathspec stages the *whole* repository, not just `view`'s subtree
-/// (measured): naming `paths` explicitly is what keeps this from sweeping in
-/// another view's unrelated, still-uncommitted edit.
+/// (measured), and a bare `git commit` takes whatever else is already
+/// staged: naming `paths` on both is what keeps this from sweeping in
+/// another view's uncommitted edit, or something a person staged by hand.
 pub fn commit_paths(view: &Path, paths: &[&str], message: &str) -> Result<bool> {
     if paths.is_empty() || status_of(view, paths)?.trim().is_empty() {
         return Ok(false);
@@ -331,7 +332,9 @@ pub fn commit_paths(view: &Path, paths: &[&str], message: &str) -> Result<bool> 
     let mut add_args = vec!["add", "--"];
     add_args.extend(paths);
     git(view, &add_args)?;
-    git(view, &["commit", "-q", "-m", message])?;
+    let mut commit_args = vec!["commit", "-q", "-m", message, "--"];
+    commit_args.extend(paths);
+    git(view, &commit_args)?;
     Ok(true)
 }
 
@@ -434,20 +437,35 @@ pub fn rename_one(view: &Path, old_slug: &str, new_id: &str) -> Result<Vec<Strin
         }
     }
 
-    git(view, &["mv", src.file_name().unwrap().to_str().unwrap(), &dst_name])?;
+    let src_name = src.file_name().unwrap().to_str().unwrap().to_string();
+    git(view, &["mv", &src_name, &dst_name])?;
+    let mut paths = vec![src_name, dst_name];
 
     let old_data = format!("{old_slug}_data");
     if view.join(&old_data).is_dir() {
-        git(view, &["mv", &old_data, &format!("{new_id}_data")])?;
+        let new_data = format!("{new_id}_data");
+        git(view, &["mv", &old_data, &new_data])?;
+        paths.extend([old_data, new_data]);
     }
+    paths.extend(touched.iter().cloned());
 
-    git(view, &["add", "-A"])?;
     let msg = if touched.is_empty() {
         format!("rename {old_slug} -> {new_id}")
     } else {
         format!("rename {old_slug} -> {new_id} ({} refs)", touched.len())
     };
-    git(view, &["commit", "-q", "-m", &msg])?;
+    // `git mv` already staged the moves; the rewritten references still
+    // need adding. The commit names every path — only what this rename
+    // touched, never another view's uncommitted edit, nor something a
+    // person staged by hand.
+    if !touched.is_empty() {
+        let mut add_args = vec!["add", "--"];
+        add_args.extend(touched.iter().map(String::as_str));
+        git(view, &add_args)?;
+    }
+    let mut commit_args = vec!["commit", "-q", "-m", msg.as_str(), "--"];
+    commit_args.extend(paths.iter().map(String::as_str));
+    git(view, &commit_args)?;
     Ok(touched)
 }
 

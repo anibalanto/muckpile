@@ -267,3 +267,28 @@ fn a_type_change_rewrites_only_the_links_to_the_old_file() {
     assert!(out.contains("[this](ACC-3555.task.md)"), "a longer id is another item: {out}");
     assert!(out.contains("parent: ACC-355\n") && out.contains("`ACC-355`"), "{out}");
 }
+
+/// The rename commit carries the rename and the references it rewrote —
+/// never an edit another view left uncommitted, nor something staged by hand.
+#[test]
+fn a_rename_commits_only_what_it_touched() {
+    let dir = git_repo();
+    let repo = dir.path();
+    std::fs::create_dir_all(repo.join("other-view")).unwrap();
+    std::fs::create_dir_all(repo.join("view")).unwrap();
+    write(repo, "other-view/ACC-9.task.md", "---\ntitle: untouched\n---\n");
+    write(repo, "view/slug-a.task.md", "---\ntitle: A\n---\n");
+    write(repo, "view/ACC-1.task.md", "---\ntitle: B\nparent: slug-a\n---\n");
+    run(repo, &["add", "-A"]);
+    run(repo, &["commit", "-qm", "seed"]);
+    write(repo, "other-view/ACC-9.task.md", "---\ntitle: mid-edit\n---\n");
+    write(repo, "other-view/staged.md", "staged by hand\n");
+    run(repo, &["add", "other-view/staged.md"]);
+
+    muckpile_core::rename_one(&repo.join("view"), "slug-a", "ACC-100").unwrap();
+
+    let out = Command::new("git").arg("-C").arg(repo).args(["show", "--name-only", "--no-renames", "--format=", "HEAD"]).output().unwrap();
+    let mut committed: Vec<String> = String::from_utf8(out.stdout).unwrap().lines().map(str::to_string).collect();
+    committed.sort();
+    assert_eq!(committed, vec!["view/ACC-1.task.md", "view/ACC-100.task.md", "view/slug-a.task.md"]);
+}

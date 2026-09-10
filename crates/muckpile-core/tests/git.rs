@@ -88,6 +88,26 @@ fn does_not_sweep_in_an_unrelated_dirty_file_elsewhere_in_the_repo() {
     assert!(!status.is_empty(), "the unrelated edit must still be uncommitted: {status:?}");
 }
 
+/// Something already staged elsewhere — by a person, halfway through their
+/// own commit — stays staged and out of this one.
+#[test]
+fn does_not_sweep_in_something_already_staged_elsewhere() {
+    let dir = git_repo();
+    let repo = dir.path();
+    std::fs::create_dir_all(repo.join("other-view")).unwrap();
+    std::fs::write(repo.join("other-view/ACC-9.task.md"), "staged by hand\n").unwrap();
+    run(repo, &["add", "other-view/ACC-9.task.md"]);
+
+    std::fs::create_dir_all(repo.join("my-view")).unwrap();
+    std::fs::write(repo.join("my-view/ACC-1.task.md"), "---\ntitle: x\nstatus: Open\n---\n").unwrap();
+    muckpile_core::commit_paths(&repo.join("my-view"), &["ACC-1.task.md"], "pull ACC-1").unwrap();
+
+    let out = Command::new("git").arg("-C").arg(repo).args(["show", "--name-only", "--format=", "HEAD"]).output().unwrap();
+    assert_eq!(String::from_utf8(out.stdout).unwrap(), "my-view/ACC-1.task.md\n");
+    let out = Command::new("git").arg("-C").arg(repo).args(["diff", "--cached", "--name-only"]).output().unwrap();
+    assert_eq!(String::from_utf8(out.stdout).unwrap(), "other-view/ACC-9.task.md\n", "still staged");
+}
+
 #[test]
 fn head_text_is_none_before_anything_is_committed() {
     let dir = git_repo();
