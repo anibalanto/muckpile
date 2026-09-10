@@ -292,7 +292,7 @@ El choque de hoy, bajo este modelo, no es un `add/add` que exige `--force`: es u
 | Comando | Qué hace | Ejemplo |
 |---|---|---|
 | `new` | Escribe `@slug.<tipo>.md` local — sin red. El slug sale de slugificar el título entero, sin tope de largo — la misma regla que `worklist new` ya documenta. `<tipo>` incluye `question`, con su relación al ítem que bloquea. | `$ muckpile new question "¿el rol se hereda de la capa de arriba?" --blocks ACC-229`<br>`@el-rol-se-hereda-de-la-capa-de-arriba.question.md creado` |
-| `show` | Frontmatter, cuerpo, y el directorio `<id>/` si existe — del proveedor en vivo o de la copia local con `--local`. | `$ muckpile show ACC-355` |
+| `show` | Frontmatter, cuerpo, y el listado de `<id>_data/` si existe (decisión 6) — del proveedor en vivo o de la copia local con `--local`. | `$ muckpile show ACC-355` |
 | `list` | Ítems por vista, sprint, estado (el string real, sin traducir), categoría (`new`/`indeterminate`/`done`, de Jira) o padre. | `$ muckpile list backlog/sprint/22_Las_vistas --state "Finalizada"`<br>`$ muckpile list backlog/sprint/22_Las_vistas --category done` |
 | `sprint fetch` | Trae los sprints abiertos del proyecto y crea una carpeta vacía por cada uno bajo `backlog/sprint/`, con el nombre slugificado — para tab-completar y para tener contra qué correr `pull`. Nunca borra una carpeta que ya tiene algo adentro. | `$ muckpile sprint fetch` |
 | `states discover` | Lista en vivo los estados del workflow y su categoría (`statusCategory` de Jira), y cachea `{nombre -> categoría}` en `<proyecto>.states.toml` — regenerable, nunca editado a mano. | `$ muckpile states discover` |
