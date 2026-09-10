@@ -14,7 +14,10 @@ fn main() -> Result<()> {
         [cmd, id] if cmd == "pull" => run_pull(Some(id)),
         [cmd, sub] if cmd == "sprint" && sub == "fetch" => run_sprint_fetch(),
         [cmd, id, status] if cmd == "transition" => run_transition(id, status),
-        _ => bail!("uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado>"),
+        [cmd, sub] if cmd == "states" && sub == "discover" => run_states_discover(),
+        _ => bail!(
+            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover"
+        ),
     }
 }
 
@@ -65,6 +68,21 @@ fn run_transition(id: &str, target_status: &str) -> Result<()> {
             println!("{id}: no hay transición hacia \"{target_status}\" — disponibles: {}", available.join(", "));
         }
     }
+    Ok(())
+}
+
+fn run_states_discover() -> Result<()> {
+    let (root, _cwd) = standing_in_a_project()?;
+    let config = load_project_config(&root)?;
+    let provider = build_provider(&root, &config)?;
+    let project = root.file_name().context("la raíz del proyecto no tiene nombre")?.to_string_lossy().into_owned();
+    let states = muckpile_cli::states_discover(&root, &project, provider.as_ref(), &config)?;
+
+    println!("{project}: {} estado(s)", states.len());
+    for (name, category) in &states {
+        println!("  {name}    {category}");
+    }
+    println!("cacheado en {project}.states.toml");
     Ok(())
 }
 

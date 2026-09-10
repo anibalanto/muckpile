@@ -1,8 +1,9 @@
 //! The real transport: Jira's REST API, reached directly — one port, not
 //! three transports each covering for what the other two can't do.
 
-use crate::provider::{Item, Provider, Sprint, Transition};
+use crate::provider::{Item, Provider, Sprint, Status, Transition};
 use anyhow::{anyhow, bail, Context, Result};
+use std::collections::BTreeMap;
 
 /// What proves the request is this account. Never written to disk as a
 /// whole — only the token's environment variable name is, and the value is
@@ -106,6 +107,29 @@ impl Provider for JiraRest {
                 })
             })
             .collect())
+    }
+
+    fn project_statuses(&self, project_key: &str) -> Result<Vec<Status>> {
+        let v = self.call("GET", &format!("/rest/api/3/project/{project_key}/statuses"), None)?;
+        let issue_types = v.as_array().ok_or_else(|| anyhow!("the response for {project_key} isn't a list of issue types"))?;
+
+        // A status is shared verbatim by every issue type that offers it —
+        // measured against ACC/701 — so a map keyed by name, last write
+        // wins, is exactly the dedup this needs.
+        let mut by_name: BTreeMap<String, String> = BTreeMap::new();
+        for issue_type in issue_types {
+            let Some(statuses) = issue_type.get("statuses").and_then(|s| s.as_array()) else { continue };
+            for s in statuses {
+                let (Some(name), Some(category)) = (
+                    s.get("name").and_then(|n| n.as_str()),
+                    s.get("statusCategory").and_then(|c| c.get("key")).and_then(|k| k.as_str()),
+                ) else {
+                    continue;
+                };
+                by_name.insert(name.to_string(), category.to_string());
+            }
+        }
+        Ok(by_name.into_iter().map(|(name, category)| Status { name, category }).collect())
     }
 }
 

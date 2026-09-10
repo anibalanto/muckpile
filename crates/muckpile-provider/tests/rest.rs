@@ -2,7 +2,7 @@
 //! body — against a local, in-process mock. Never touches the real
 //! provider: this is exactly what the automated suite is allowed to touch.
 
-use muckpile_provider::provider::{Provider, Sprint, Transition};
+use muckpile_provider::provider::{Provider, Sprint, Status, Transition};
 use muckpile_provider::rest::{Credentials, JiraRest};
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -166,6 +166,39 @@ fn open_sprints_hits_the_board_s_sprint_endpoint_and_lists_names_and_dates_verba
     let captured = rx.recv().unwrap();
     assert_eq!(captured.method, "GET");
     assert!(captured.path.starts_with("/rest/agile/1.0/board/701/sprint"), "{}", captured.path);
+}
+
+/// Shape measured against the real ACC/701 project on 2026-09-10: six issue
+/// types, each repeating the same three statuses verbatim.
+#[test]
+fn project_statuses_dedupes_the_same_status_repeated_across_issue_types() {
+    let response = r#"[
+        {"name":"Subtask","statuses":[
+            {"name":"Tareas por hacer","statusCategory":{"key":"new"}},
+            {"name":"Finalizada","statusCategory":{"key":"done"}}
+        ]},
+        {"name":"Epic","statuses":[
+            {"name":"Tareas por hacer","statusCategory":{"key":"new"}},
+            {"name":"Finalizada","statusCategory":{"key":"done"}}
+        ]}
+    ]"#;
+    let (base, rx) = one_shot(200, response);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    let mut statuses = provider.project_statuses("ACC").unwrap();
+    statuses.sort_by(|a, b| a.name.cmp(&b.name));
+
+    assert_eq!(
+        statuses,
+        vec![
+            Status { name: "Finalizada".into(), category: "done".into() },
+            Status { name: "Tareas por hacer".into(), category: "new".into() },
+        ]
+    );
+
+    let captured = rx.recv().unwrap();
+    assert_eq!(captured.method, "GET");
+    assert_eq!(captured.path, "/rest/api/3/project/ACC/statuses");
 }
 
 #[test]

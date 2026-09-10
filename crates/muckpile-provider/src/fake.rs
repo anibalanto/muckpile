@@ -3,7 +3,7 @@
 //! has its place, exploratory and by hand, never inside a suite that runs on
 //! every `cargo test`.
 
-use crate::provider::{self, Provider, Sprint, Transition};
+use crate::provider::{self, Provider, Sprint, Status, Transition};
 use anyhow::{bail, Result};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -11,6 +11,7 @@ use std::collections::HashMap;
 pub struct FakeProvider {
     items: RefCell<HashMap<String, Entry>>,
     sprints: RefCell<Vec<Sprint>>,
+    statuses: RefCell<Vec<Status>>,
 }
 
 /// What `FakeProvider` holds per item — a superset of what any one `Provider`
@@ -26,7 +27,14 @@ struct Entry {
 
 impl FakeProvider {
     pub fn new() -> Self {
-        FakeProvider { items: RefCell::new(HashMap::new()), sprints: RefCell::new(Vec::new()) }
+        FakeProvider { items: RefCell::new(HashMap::new()), sprints: RefCell::new(Vec::new()), statuses: RefCell::new(Vec::new()) }
+    }
+
+    /// Seeds the project's workflow statuses as `(name, category)` pairs,
+    /// ignoring which project key asks.
+    pub fn seed_statuses(&self, statuses: &[(&str, &str)]) {
+        *self.statuses.borrow_mut() =
+            statuses.iter().map(|(name, category)| Status { name: name.to_string(), category: category.to_string() }).collect();
     }
 
     /// Seeds the board's open sprints as `(name, created)` pairs, ignoring
@@ -102,5 +110,9 @@ impl Provider for FakeProvider {
 
     fn open_sprints(&self, _board_id: u64) -> Result<Vec<Sprint>> {
         Ok(self.sprints.borrow().clone())
+    }
+
+    fn project_statuses(&self, _project_key: &str) -> Result<Vec<Status>> {
+        Ok(self.statuses.borrow().clone())
     }
 }

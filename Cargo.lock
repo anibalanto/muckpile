@@ -328,6 +328,7 @@ dependencies = [
  "muckpile-core",
  "muckpile-provider",
  "tempfile",
+ "toml",
 ]
 
 [[package]]

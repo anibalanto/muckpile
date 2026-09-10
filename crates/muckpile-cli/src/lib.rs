@@ -6,8 +6,10 @@ use anyhow::{bail, Context, Result};
 use muckpile_core::body::adf_to_body;
 use muckpile_core::is_valid_id;
 use muckpile_core::project::{classify, require_root, Position, ProjectConfig};
+use muckpile_core::states::write_states_cache;
 use muckpile_provider::provider::{Provider, Sprint};
 use muckpile_provider::transition::{transition as provider_transition, Outcome};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 /// Assembles a working view: `<root>/to-work/<id>/`, empty. Fetching the
@@ -176,4 +178,16 @@ pub fn transition(id: &str, target_status: &str, provider: &dyn Provider) -> Res
         bail!("{id}: no es un id válido");
     }
     provider_transition(provider, id, target_status)
+}
+
+/// Lists the project's workflow statuses, live, and caches `{name ->
+/// category}` at `<root>/<project>.states.toml` — so `--category` filters
+/// (not this slice) never have to ask the provider again, and so a person
+/// can copy a status name from the cache instead of typing it from memory.
+pub fn states_discover(root: &Path, project: &str, provider: &dyn Provider, config: &ProjectConfig) -> Result<BTreeMap<String, String>> {
+    let statuses = provider.project_statuses(&config.jira_project_key)?;
+    let states: BTreeMap<String, String> = statuses.into_iter().map(|s| (s.name, s.category)).collect();
+    let path = root.join(format!("{project}.states.toml"));
+    write_states_cache(&path, &states)?;
+    Ok(states)
 }

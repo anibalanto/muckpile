@@ -43,6 +43,21 @@ pub trait Provider {
 
     /// The board's currently open sprints.
     fn open_sprints(&self, board_id: u64) -> Result<Vec<Sprint>>;
+
+    /// Every status the project's workflow uses today, one per name — a
+    /// status can be offered by more than one issue type, but its category
+    /// never differs between them on the same project (measured against
+    /// ACC/701: three statuses, shared verbatim across six issue types).
+    fn project_statuses(&self, project_key: &str) -> Result<Vec<Status>>;
+}
+
+/// A workflow status, as the provider names and categorizes it. `category`
+/// is the provider's own key (`new`/`indeterminate`/`done` on Jira) — fixed
+/// and independent of `name`'s language, unlike `name` itself (decision 8).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Status {
+    pub name: String,
+    pub category: String,
 }
 
 /// A sprint, as the provider names and dates it — a project's own naming
