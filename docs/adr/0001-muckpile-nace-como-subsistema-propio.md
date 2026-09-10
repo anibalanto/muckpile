@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `98194dc`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `4bb1145`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -300,7 +300,7 @@ $ muckpile link ACC-229 "is blocked by" ACC-338
 
 Las dos líneas declaran la misma arista — `ACC-229` bloqueada por `ACC-338` —, dichas desde cada punta. `muckpile` no necesita saber que son la misma relación: le alcanza con que una de las dos frases matchee un tipo, en cualquier dirección.
 
-**Avance: 4/6.**
+**Avance: 5/6.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -309,7 +309,7 @@ Las dos líneas declaran la misma arista — `ACC-229` bloqueada por `ACC-338` �
 | `states discover` cachea `{nombre -> categoría}` | `cerrada` | `states_discover` ↔ fila `states discover` |
 | `list --state` y `--category` | `cerrada` | `list` ↔ fila `list` |
 | `link` con la frase del proveedor, en cualquier dirección | `cerrada` | `link` ↔ fila `link` |
-| El link se crea en la dirección que dice la frase, contra el proveedor real | `diverge` | Medido por lectura el 2026-09-10 en `ACC`: en el objeto link, el que bloquea es `inwardIssue` —`GET /issueLink/54926` da `inwardIssue: ACC-340`, `outwardIssue: ACC-338` para "ACC-340 blocks ACC-338"—, y `JiraRest::create_link` manda el que bloquea como `outwardIssue`. Si el POST lleva la misma forma que el GET, `link ACC-338 blocks ACC-229` deja en el board "ACC-229 blocks ACC-338". Falta confirmarlo con una escritura; la suite no puede verlo: el fake guarda lo que el trait dice, y el test del REST fija la forma actual |
+| El link se crea en la dirección que dice la frase, contra el proveedor real | `cerrada` | `JiraRest::create_link` ↔ esta decisión. Medido el 2026-09-10 con dos ítems descartables, `ACC-358` y `ACC-359`, borrados después: un `Blocks` mandado con el que bloquea como `outwardIssue` volvió al revés. El que dice la frase de ida va en `inwardIssue`: los campos nombran las puntas del objeto link, no la frase de cada una |
 
 ### 9. La configuración: `muckpile.toml`, y un archivo aparte para lo que no es de todos
 
