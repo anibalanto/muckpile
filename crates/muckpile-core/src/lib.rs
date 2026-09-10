@@ -104,7 +104,9 @@ pub fn rewrite_references(text: &str, old_slug: &str, old_type: &str, new_id: &s
     out = replace_link(&link_re, &out, &mut changed, new_id, old_type);
 
     // 2. frontmatter: `parent: <slug>` and any `relation.<name>:` list or
-    // bare value — `depends`, `blocks`, or whatever comes after, generically.
+    // bare value — the name is the provider's own phrase with `_` for each
+    // space, so it can carry a capital or an accent: anything but a space or
+    // the colon that ends it.
     if let Some(fm_end) = frontmatter_end(&out) {
         let (fm, rest) = out.split_at(fm_end);
         let mut fm = fm.to_string();
@@ -119,7 +121,7 @@ pub fn rewrite_references(text: &str, old_slug: &str, old_type: &str, new_id: &s
             changed = true;
         }
 
-        let rel_re = Regex::new(r"(relation\.[a-zA-Z_]+:\s*)(\[[^\]]*\]|[^\n]+)").unwrap();
+        let rel_re = Regex::new(r"(relation\.[^\s:]+:\s*)(\[[^\]]*\]|[^\n]+)").unwrap();
         let slug_re = boundary(&regex::escape(old_slug));
         fm = rel_re
             .replace_all(&fm, |caps: &regex::Captures| {
@@ -204,7 +206,7 @@ pub fn read_frontmatter_refs(text: &str) -> HashSet<String> {
     if let Some(c) = parent_re.captures(fm) {
         refs.insert(c[1].to_string());
     }
-    let rel_re = Regex::new(r"relation\.[a-zA-Z_]+:\s*(\[[^\]]*\]|\S+)").unwrap();
+    let rel_re = Regex::new(r"relation\.[^\s:]+:\s*(\[[^\]]*\]|\S+)").unwrap();
     let id_re = Regex::new(r"@?[A-Za-z0-9_-]+").unwrap();
     for c in rel_re.captures_iter(fm) {
         for id in id_re.find_iter(&c[1]) {

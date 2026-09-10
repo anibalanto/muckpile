@@ -138,6 +138,26 @@ fn a_blocks_relation_is_rewritten_like_any_other() {
     assert!(out.contains("relation.blocks: [ACC-229]"), "{out:?}");
 }
 
+/// A relation's key is the provider's phrase with `_` for each space, and
+/// nothing else changed — so it can carry an accent or a capital, and it's
+/// still a relation.
+#[test]
+fn a_relation_whose_key_is_a_phrase_with_accents_is_rewritten() {
+    let text = "---\ntitle: x\nrelation.está_bloqueada_por: [slug-x]\n---\n\nbody\n";
+    let (out, changed) = muckpile_core::rewrite_references(text, "slug-x", "task", "ACC-229");
+    assert!(changed);
+    assert!(out.contains("relation.está_bloqueada_por: [ACC-229]"), "{out:?}");
+}
+
+#[test]
+fn the_refs_of_a_relation_whose_key_is_a_phrase_are_read() {
+    let text = "---\ntitle: x\nrelation.is_blocked_by: [@a, ACC-9]\nrelation.Está_Clonada_por: [@b]\n---\n";
+    let refs = muckpile_core::read_frontmatter_refs(text);
+    for id in ["@a", "ACC-9", "@b"] {
+        assert!(refs.contains(id), "{id} missing from {refs:?}");
+    }
+}
+
 #[test]
 fn renaming_the_parent_keeps_the_newline() {
     let text = "---\ntitle: X\nparent: 1\n---\n\n# X\n\nbody\n";
