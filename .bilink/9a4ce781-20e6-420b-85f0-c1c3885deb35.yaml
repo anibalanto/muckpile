@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture 23dc8955eedf7af56c0c073bc3ded06b
+    accepted:
+    - agree:
+      - anibal
+      link: capture 23dc8955eedf7af56c0c073bc3ded06b
+      hash: 6a9e00560ecc782a76c111e7c7c300509a97731847d4222828a06c204dd4ab8a
+    name: transition-spec
+  1:
+    link: capture 7d967c7fddffd623a9ea81252f90e140
+    accepted:
+    - agree:
+      - anibal
+      link: capture 7d967c7fddffd623a9ea81252f90e140
+      hash: 9a2291b4c20ff61b826a90eefd7e9e363ad81219df38a2e53f1aca5b397f5e27
+      hash_ast: 32486566fecee54e65530ba50ad1da95fde4b9af55723aa24a47f4072f2c9f1e
+      n: declined
+    name: transition-impl
