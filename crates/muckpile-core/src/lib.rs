@@ -273,6 +273,60 @@ fn git(view: &Path, args: &[&str]) -> Result<()> {
     Ok(())
 }
 
+/// Commits exactly `paths` (relative to `view`) into whatever git repository
+/// governs `view`, if any of them actually differ from what's already
+/// committed — a no-op, returning `false`, otherwise. `git add -A` with no
+/// pathspec stages the *whole* repository, not just `view`'s subtree
+/// (measured): naming `paths` explicitly is what keeps this from sweeping in
+/// another view's unrelated, still-uncommitted edit.
+pub fn commit_paths(view: &Path, paths: &[&str], message: &str) -> Result<bool> {
+    if paths.is_empty() || status_of(view, paths)?.trim().is_empty() {
+        return Ok(false);
+    }
+
+    let mut add_args = vec!["add", "--"];
+    add_args.extend(paths);
+    git(view, &add_args)?;
+    git(view, &["commit", "-q", "-m", message])?;
+    Ok(true)
+}
+
+fn status_of(view: &Path, paths: &[&str]) -> Result<String> {
+    let mut args = vec!["status", "--porcelain", "--"];
+    args.extend(paths);
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(view)
+        .args(&args)
+        .output()
+        .with_context(|| format!("running git {:?}", args))?;
+    if !out.status.success() {
+        bail!("git {:?} failed with {}", args, out.status);
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+/// The content `path` (relative to `view`) had at the tip of whatever git
+/// repository governs `view` — `None` when there's no commit yet, or none
+/// that ever carried this path. The caller can't tell those two apart from
+/// this alone, and doesn't need to: both mean "nothing to compare against".
+pub fn head_text(view: &Path, path: &str) -> Result<Option<String>> {
+    // `HEAD:<path>` resolves from the repository root, not from `-C`'s
+    // directory — measured. The leading `./` is what makes it relative to
+    // `view`, the same way `git show HEAD:./file` already means "the file
+    // named `file` right here".
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(view)
+        .args(["show", &format!("HEAD:./{path}")])
+        .output()
+        .with_context(|| format!("running git show HEAD:./{path}"))?;
+    if !out.status.success() {
+        return Ok(None);
+    }
+    Ok(Some(String::from_utf8_lossy(&out.stdout).into_owned()))
+}
+
 /// Every file a reference can be written in, under `view`: the `.md` items,
 /// recursively — a view can nest a sprint's worth of them — but never
 /// `code-work/`, which is a worktree of the external project's own repo and
