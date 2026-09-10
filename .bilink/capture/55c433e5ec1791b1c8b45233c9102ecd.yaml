@@ -1,0 +1,4 @@
+file: crates/muckpile-core/src/body.rs
+query: |-
+  (impl_item
+    type: (type_identifier) @n0 (#eq? @n0 "JiraAdfMarkdownFilter")) @target

@@ -1,13 +1,13 @@
 kind: governs
 endpoint:
   0:
-    link: capture 25da143e1e4fe94eef9d2195eab499de
+    link: capture e86ee0f210f359b43560be57566fb77e
     accepted:
     - agree:
       - anibal
-      link: capture 25da143e1e4fe94eef9d2195eab499de
-      hash: 582d0e013f2728db79550240e3cb9af27e5b99d45987c320b5e08e54ae63c912
-    name: push-row
+      link: capture e86ee0f210f359b43560be57566fb77e
+      hash: d399d6dcde45cc4d73b2406b612cfaebffc82dcfb67ead97b62f7264df9086fa
+    name: canonicity-spec
   1:
     link: capture 31535b5f714d57ffb8fdbab35db097b9
     accepted:
