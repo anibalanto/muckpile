@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `13895bb`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `2962d0c`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -275,7 +275,7 @@ SGE-7699_data/
 
 **`--ai <modelo>` dice que el comentario lo escribió una IA, y cuál.** `comment` lo pone como dato al principio del comentario —un primer párrafo `ai: <modelo>`, con el modelo como código—, y así lo ve cualquiera en Jira. `pull` lo reconoce y lo pasa al header del archivo, `ai: <modelo>`, fuera del cuerpo.
 
-**Avance: 5/11.**
+**Avance: 7/11.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -283,11 +283,11 @@ SGE-7699_data/
 | `new question --blocks <id>` escribe `relation.blocks` | `cerrada` | `new` ↔ fila `new` |
 | `blocks` llega al proveedor | `cerrada` | `resolve_pending` ↔ esta decisión: al crear un borrador, crea cada relación que su header declara —`relation.blocks` incluida, con un `@slug` del mismo lote ya traducido a su id—; la que falla sale como `PushResult::RelationFailed`, con el `link` que la reintenta |
 | `relation.*` baja con `pull`: todos los links, en las dos puntas, con la clave de la decisión 12 | `cerrada` | `relations` ↔ decisión 12: una clave por frase, `_` por espacio, ids ordenados; `link_from_own_side` ↔ decisión 12: cada link leído desde el lado del ítem, con la forma medida en `ACC` |
-| `thread/` baja con `pull`: un archivo por comentario, `in-reply-to` desde el `parentId` | `pendiente` | `show` lista `<id>_data/` si alguien lo puso a mano; nada lo crea ni lo trae |
-| `files/` baja con `pull`: un archivo por adjunto, sin borrar lo que no escribió | `pendiente` | — |
+| `thread/` baja con `pull`: un archivo por comentario, `in-reply-to` desde el `parentId` | `cerrada` | `render_comment` ↔ esta decisión: el header y el cuerpo de cada comentario; `JiraRest::comments` ↔ esta decisión: el endpoint propio, de a páginas, con el `parentId` como número. Probado el 2026-09-10 con el binario contra `SGE-7699`: `42180.md`, y `42224.md` con `in-reply-to: 42180`, en el mismo commit que el ítem |
+| `files/` baja con `pull`: un archivo por adjunto, sin borrar lo que no escribió | `cerrada` | `write_files` ↔ esta decisión; `JiraRest::attachment_content` pide `redirect=false`, medido: sin él, un 303 hacia otro host. Probado contra `SGE-7699`: el PNG bajó con sus 34828 bytes. Un borde: un comentario o un adjunto borrado en Jira deja su archivo, porque `pull` todavía no borra nada — lo resuelve la ref del proveedor (decisión 5) |
 | `comment <id> <archivo>`, con `--reply-to` | `pendiente` | Que el POST de un comentario acepte `parentId` falta medirlo, con una escritura |
 | `attach <id> <archivo>` | `pendiente` | — |
-| `--ai <modelo>`: dato al principio del comentario, y `pull` lo pasa al header | `pendiente` | — |
+| `--ai <modelo>`: dato al principio del comentario, y `pull` lo pasa al header | `pendiente` | `pull` ya lo pasa al header (`split_ai`, en `render_comment`); falta `comment`, que lo escribe |
 | `_data/` viaja con el renombre del `@slug` | `cerrada` | `rename_one` lo mueve en el mismo commit; bilink de la decisión 4 |
 | Cómo se muda `files/` cuando la pregunta cierra | `falta spec` | La pregunta que dejó `ACC-335`: quién mueve el borrador a la capa que lo gobierna, y qué pasa si la pregunta cierra y el borrador se queda |
 
