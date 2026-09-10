@@ -1,5 +1,5 @@
 //! `~/.config/muckpile/identity.toml`: the machine-local half of a project's
-//! configuration (decision 9) — which account, and where its token lives.
+//! configuration — which account, and where its token lives.
 //! Never the token itself: only the name of the variable that holds it.
 
 use muckpile_core::identity::load_identity;

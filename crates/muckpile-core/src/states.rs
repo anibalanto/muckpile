@@ -1,5 +1,5 @@
 //! `<project>.states.toml` — what `states discover` caches: the workflow's
-//! own status names mapped to their provider category (decision 8). Sibling
+//! own status names mapped to their provider category. Sibling
 //! to `muckpile.toml`, regenerable, never edited by hand.
 
 use anyhow::{Context, Result};

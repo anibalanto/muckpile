@@ -1,4 +1,4 @@
-//! `transition` replaces `start`/`done`/`close`/`drop` (decision 8) — the
+//! `transition` replaces `start`/`done`/`close`/`drop` — the
 //! deciding-and-firing logic already lives in `muckpile-provider::transition`;
 //! this slice is only the id validation the other CLI commands already do.
 

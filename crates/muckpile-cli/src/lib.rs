@@ -72,9 +72,9 @@ pub fn to_work(root: &Path, cwd: &Path, id: &str) -> Result<PathBuf> {
 }
 
 /// Writes `@<slug>.<type>.md` into `dir` — no network, no provider: the id
-/// is local until the first `push` resolves it (decision 4). `blocks`
-/// declares the one relation a fresh item can carry, `relation.blocks`
-/// (decision 7's `question`, though nothing here restricts it to that type).
+/// is local until the first `push` resolves it. `blocks` declares the one
+/// relation a fresh item can carry, `relation.blocks` (the one a `question`
+/// exists to declare, though nothing here restricts it to that type).
 /// `parent` names the item it hangs from — a real id, or another draft's
 /// `@slug`, which `push` translates once that draft has its id. Both travel
 /// with the rest of the header when the item is created, and never after.
@@ -479,7 +479,7 @@ fn date_only(iso: &str) -> &str {
     &iso[..10.min(iso.len())]
 }
 
-/// Replaces `start`/`done`/`close`/`drop` (decision 8): fires the workflow's
+/// Replaces `start`/`done`/`close`/`drop`: fires the workflow's
 /// own transition leading to `target_status`, deciding by `to` — never by
 /// guessing whether a transition's own name is the status it leads to. The
 /// deciding logic lives in `muckpile-provider`; this only adds the id check
@@ -491,11 +491,11 @@ pub fn transition(id: &str, target_status: &str, provider: &dyn Provider) -> Res
     provider_transition(provider, id, target_status)
 }
 
-/// Replaces `depends`/`blocks` as muckpile's own vocabulary (decision 8,
-/// extended from status to relationships): `phrase` is one of the
-/// provider's own — the deciding-and-firing logic lives in
-/// `muckpile-provider`; this only adds the id checks every other command
-/// already applies to arguments coming from argv.
+/// Replaces `depends`/`blocks` as muckpile's own vocabulary, the way
+/// `transition` does for status: `phrase` is one of the provider's own —
+/// the deciding-and-firing logic lives in `muckpile-provider`; this only
+/// adds the id checks every other command already applies to arguments
+/// coming from argv.
 pub fn link(a: &str, phrase: &str, b: &str, provider: &dyn Provider) -> Result<LinkOutcome> {
     if !is_valid_id(a) {
         bail!("{a}: no es un id válido");
@@ -559,7 +559,7 @@ pub fn list(view: &Path, filter: &ListFilter, categories: &BTreeMap<String, Stri
 }
 
 /// One item's local fields against the provider's current ones — never the
-/// body (that's canonicity's call, decision 10, and `push`'s problem, not
+/// body (that's canonicity's call, and `push`'s problem, not
 /// this read-only comparison's).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ItemStatus {
@@ -1024,7 +1024,7 @@ pub fn attach(id: &str, file: &Path, provider: &dyn Provider) -> Result<Attachme
 }
 
 /// What `show` prints — frontmatter plus body, live or local, and the
-/// `<id>_data/` listing (decision 7) alongside either, since that directory
+/// `<id>_data/` listing alongside either, since that directory
 /// is local filesystem state regardless of where the rest came from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Show {
@@ -1059,8 +1059,8 @@ pub fn show_local(dir: &Path, id: &str) -> Result<Show> {
 }
 
 /// The names under `<dir>/<id>_data/`, or empty when there's no such
-/// directory — nothing writes into it yet (decision 7's `thread`/`files`
-/// aren't implemented), so this only ever reports what a person put there.
+/// directory — `thread` and `files` once `pull` has written a comment or an
+/// attachment there, and anything a person put there alongside them.
 fn data_files(dir: &Path, id: &str) -> Result<Vec<String>> {
     let data_dir = dir.join(format!("{id}_data"));
     if !data_dir.is_dir() {

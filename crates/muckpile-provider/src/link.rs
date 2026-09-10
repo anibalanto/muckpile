@@ -1,8 +1,7 @@
 //! Deciding which of the provider's own relationship types matches a
 //! requested phrase, and firing it in the right direction. No vocabulary of
 //! muckpile's own — a phrase is either a type's `outward` or `inward`
-//! wording, verbatim, the same idea `transition` already applies to status
-//! (decision 8).
+//! wording, verbatim, the same idea `transition` already applies to status.
 
 use crate::provider::{LinkType, Provider};
 use anyhow::Result;

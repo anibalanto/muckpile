@@ -19,7 +19,7 @@ pub struct Transition {
 }
 
 /// An item's fields, exactly as the provider holds them — no translation:
-/// `status` and `jira_type` are the provider's own strings (decision 8).
+/// `status` and `jira_type` are the provider's own strings.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Item {
     pub jira_type: String,
@@ -116,7 +116,7 @@ pub trait Provider {
     /// Every relationship type the provider offers, instance-wide — measured
     /// against the real Jira instance behind ACC: eleven types, none named
     /// `Depends`, so `depends`/`blocks` was never going to be muckpile's own
-    /// vocabulary to keep (decision 8 extended from status to this).
+    /// vocabulary to keep, any more than a status name was.
     fn link_types(&self) -> Result<Vec<LinkType>>;
 
     /// Creates one link of `type_name` — `outward_key`'s issue plays that
@@ -178,7 +178,7 @@ pub struct LinkType {
 
 /// A workflow status, as the provider names and categorizes it. `category`
 /// is the provider's own key (`new`/`indeterminate`/`done` on Jira) — fixed
-/// and independent of `name`'s language, unlike `name` itself (decision 8).
+/// and independent of `name`'s language, unlike `name` itself.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Status {
     pub name: String,

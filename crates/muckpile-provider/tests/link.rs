@@ -1,6 +1,6 @@
 //! Deciding which of the provider's own relationship types matches a
 //! requested phrase, and firing it in the right direction — no vocabulary
-//! of muckpile's own (decision 8, extended from status to this).
+//! of muckpile's own, for relationships any more than for status.
 
 use muckpile_provider::fake::FakeProvider;
 use muckpile_provider::link::{link, unlink, Outcome, UnlinkOutcome};

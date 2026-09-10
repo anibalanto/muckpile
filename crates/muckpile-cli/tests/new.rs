@@ -1,7 +1,7 @@
 //! `new` writes `@<slug>.<type>.md` local — no network, no provider. The
 //! slug comes from slugifying the title; `--blocks` is the only relation it
-//! can declare at creation (decision 7's `question`), and `--parent` the item
-//! it hangs from.
+//! can declare at creation (the one a `question` exists to declare), and
+//! `--parent` the item it hangs from.
 
 use muckpile_cli::new;
 use std::path::Path;

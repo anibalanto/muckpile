@@ -1,6 +1,6 @@
 //! `states discover` lists the workflow's own statuses and caches
 //! `{name -> category}` in `<project>.states.toml` — regenerable, never
-//! edited by hand (decision 8).
+//! edited by hand.
 
 use muckpile_cli::states_discover;
 use muckpile_core::project::load_project_config;

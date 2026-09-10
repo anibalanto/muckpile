@@ -1,5 +1,5 @@
 //! `<project>.states.toml` — the cache `states discover` writes: {name ->
-//! category}, regenerable, never edited by hand (decision 8).
+//! category}, regenerable, never edited by hand.
 
 use muckpile_core::states::{read_states_cache, write_states_cache};
 use std::collections::BTreeMap;
