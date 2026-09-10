@@ -175,6 +175,15 @@ $ muckpile list backlog/sprint/22_Las_vistas --state "Finalizada"
 
 `states discover` cachea `{nombre real -> categoría}` en `<proyecto>.states.toml`, aparte del `muckpile.toml` compartido: regenerable en cualquier momento, nunca editado a mano. Con eso, filtrar por categoría (`--category done`) no reabre la decisión 8 — sigue sin haber un `done` de `muckpile`, hay un `done` de Jira, cacheado para no preguntarlo cada vez.
 
+**Y la misma idea vale para una relación entre ítems, no sólo para un estado.** `depends`/`blocks` iba a ser el vocabulario propio de `link` — hasta medir contra la instancia real detrás de `ACC`: `GET /rest/api/3/issueLinkType` es una lista de todo el Jira, no del proyecto, y trae once tipos (`Blocks`, `Relates`, `Duplicate`, `Cloners`, entre otros); ninguno se llama `Depends`. Inventarle una traducción a `link` hubiera sido la misma trampa que esta decisión ya evitó para los estados. `link` pide una frase, no un nombre de tipo propio: cada tipo trae dos, una de ida (`outward`, `"blocks"`) y una de vuelta (`inward`, `"is blocked by"`), y decide por cuál de las dos matchea — el mismo mecanismo que `transition` ya usa para decidir por `to` en vez de por el nombre de la transición.
+
+```
+$ muckpile link ACC-338 blocks ACC-229
+$ muckpile link ACC-229 "is blocked by" ACC-338
+```
+
+Las dos líneas declaran la misma arista — `ACC-338` bloqueada por `ACC-229` —, dichas desde cada punta. `muckpile` no necesita saber que son la misma relación: le alcanza con que una de las dos frases matchee un tipo, en cualquier dirección.
+
 ### 9. La configuración: `muckpile.toml`, y un archivo aparte para lo que no es de todos
 
 **Dos archivos, porque dos audiencias.** Lo que es igual para cualquiera que trabaje en un proyecto —remoto y rama de cada repo del proyecto, tipo de issue por tipo de ítem, el prefijo de commit— puede compartirse. La identidad de quien corre `muckpile` —qué cuenta de Jira, qué variable de entorno tiene el token— es de cada máquina, porque la decisión 4 ya estableció que la credencial es por máquina y no una cuenta de servicio única. Meter las dos cosas en un solo archivo obliga a elegir entre filtrar un email en algo compartido o hacer que cada persona edite un archivo que comparte con el resto.
@@ -293,7 +302,7 @@ El choque de hoy, bajo este modelo, no es un `add/add` que exige `--force`: es u
 | `push` | Primero resuelve los `@slug` pendientes que la vista toca —busca, crea, renombra archivo y directorio, reescribe referencias, un commit—; después escribe lo editado. Antes de escribir, vuelve a preguntar: si el proveedor cambió desde el último `pull`, no pisa. El cuerpo, además, sólo se sube si es canónico (decisión 10) — si no, se niega y ofrece el diff. | `$ muckpile push backlog/sprint/22_Las_vistas`<br>`ACC-355: cambió del otro lado desde tu último pull — no se escribió nada`<br>`ACC-360: el cuerpo no es canónico — no se sube. Diff: …` |
 | `status` | Compara local contra el proveedor en vivo, sin escribir. | `$ muckpile status backlog/sprint/22_Las_vistas` |
 | `transition` | Reemplaza a `start`/`done`/`close`/`drop` — no hay vocabulario propio que darles (decisión 8). Lista las transiciones del ítem, busca la que lleva al estado pedido, la ejecuta. | `$ muckpile transition ACC-355 "Finalizada"` |
-| `link` | Declara una relación entre dos ítems — `depends`, `blocks` — en el momento. | `$ muckpile link ACC-338 blocks ACC-229` |
+| `link` | Declara una relación entre dos ítems, en el momento — sin vocabulario propio (decisión 8): la frase es una de las dos que el proveedor ya usa para ese tipo, de ida (`outward`) o de vuelta (`inward`). | `$ muckpile link ACC-338 blocks ACC-229`<br>`$ muckpile link ACC-229 "is blocked by" ACC-338` |
 
 Doce comandos contra los veintitrés de hoy (once de `worklist`, doce de `worklist-server`). Lo que no está en la tabla — `install-hooks`, `check-push`, `assign-keys`, `bootstrap`, `reconcile`, `removes`, `push-states`, `create-or-find`, `provider set-status`, `window-open`, `propagate`, `adopt` — no falta: era la maquinaria de la asimetría que la decisión 1 saca. `bootstrap`/`reconcile`/`adopt` sí tienen equivalente, pero no como comando aparte: son `pull` con una consulta que trae de a muchos — `muckpile pull backlog --query "project = ACC AND sprint is empty"`.
 
@@ -313,6 +322,5 @@ Doce comandos contra los veintitrés de hoy (once de `worklist`, doce de `workli
 
 **Lo que este ADR no decide:**
 - Si `.muckpile/` —uno por proyecto, según decisión 6— necesita algún metadato propio además de lo que git ya da.
-- El vocabulario completo de relaciones más allá de `depends` y `blocks` — qué otros tipos hacen falta, si alguno.
 - Cómo el workflow del proveedor hace cumplir `blocks` en la práctica — decisión 7/8 dice que es su responsabilidad y no la de `muckpile`, pero no dice cómo se configura eso en un board real.
 - Si el formato de archivo de un ítem (`<id>.<tipo>.md`, frontmatter con `title`/`status`/`parent`/`relation.*`) se conserva tal cual — este ADR asume que sí, porque nada de lo de arriba lo obliga a cambiar.
