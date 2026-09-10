@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 2aea453b9f01cbfaf2ae1287f50c7a78
-      hash: ae23856febe3ff29e327d282bbc8cd24542dd83ba15c8b46e497ab3896bb3ccf
+      hash: 94bffa3eb06a4c4ce2a81a6ef52455cccaed7d73b37c9837291eb06fc8f7c019
     name: header-spec
   1:
     link: capture 5cc6359664634400a7020e93cc21c319
