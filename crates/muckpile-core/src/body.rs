@@ -75,3 +75,46 @@ pub fn canonical(text: &str) -> Result<String> {
     let (frontmatter, body) = split_frontmatter(text);
     Ok(format!("{frontmatter}{}", adf_to_body(&body_to_adf(body)?)?))
 }
+
+/// A line-by-line diff of `before` against `after`, `git diff`-flavored but
+/// with no external tool behind it: ` ` for a line kept, `-` for one only in
+/// `before`, `+` for one only in `after`. Meant for a person to read before
+/// applying an edit by hand somewhere this system won't write to directly —
+/// so it only ever needs to explain the difference, not to be reapplied by
+/// a machine.
+pub fn line_diff(before: &str, after: &str) -> String {
+    let a: Vec<&str> = before.lines().collect();
+    let b: Vec<&str> = after.lines().collect();
+
+    // Longest common subsequence, by length, over the two line arrays —
+    // classic DP table, cheap here since an item's body is never large.
+    let mut lcs = vec![vec![0usize; b.len() + 1]; a.len() + 1];
+    for i in (0..a.len()).rev() {
+        for j in (0..b.len()).rev() {
+            lcs[i][j] = if a[i] == b[j] { lcs[i + 1][j + 1] + 1 } else { lcs[i + 1][j].max(lcs[i][j + 1]) };
+        }
+    }
+
+    let mut out = Vec::new();
+    let (mut i, mut j) = (0, 0);
+    while i < a.len() && j < b.len() {
+        if a[i] == b[j] {
+            out.push(format!("  {}", a[i]));
+            i += 1;
+            j += 1;
+        } else if lcs[i + 1][j] >= lcs[i][j + 1] {
+            out.push(format!("- {}", a[i]));
+            i += 1;
+        } else {
+            out.push(format!("+ {}", b[j]));
+            j += 1;
+        }
+    }
+    for line in &a[i..] {
+        out.push(format!("- {line}"));
+    }
+    for line in &b[j..] {
+        out.push(format!("+ {line}"));
+    }
+    out.join("\n")
+}

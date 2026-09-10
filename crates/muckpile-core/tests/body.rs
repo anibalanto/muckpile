@@ -3,7 +3,7 @@
 //! `canonical` has to agree with whatever `push` later decides is safe to
 //! edit.
 
-use muckpile_core::body::{canonical, prune_marks, split_frontmatter};
+use muckpile_core::body::{canonical, line_diff, prune_marks, split_frontmatter};
 
 const ITEM: &str = "---\ntitle: With structure\nstatus: Open\n---\n\n# Title\n\nWith *italic*, **bold** and `SNAKE_CASE` inside a code span.\n\n| Field | Owner |\n|---|---|\n| `status` | provider |\n\n> A blockquote.\n\n- a list\n- with two items\n";
 
@@ -97,6 +97,30 @@ fn pruning_reaches_inside_a_list() {
     let s = serde_json::to_string(&v).unwrap();
     assert!(s.contains("bulletList"), "the case was never exercised: {s}");
     assert!(!s.contains("\"strong\""), "a strong survived inside the list: {s}");
+}
+
+#[test]
+fn line_diff_marks_unchanged_lines_with_no_prefix() {
+    let diff = line_diff("a\nb\nc\n", "a\nb\nc\n");
+    assert_eq!(diff, "  a\n  b\n  c");
+}
+
+#[test]
+fn line_diff_marks_a_replaced_line_as_removed_then_added() {
+    let diff = line_diff("a\nb\nc\n", "a\nB\nc\n");
+    assert_eq!(diff, "  a\n- b\n+ B\n  c");
+}
+
+#[test]
+fn line_diff_marks_a_dropped_line_as_removed_only() {
+    let diff = line_diff("a\nb\nc\n", "a\nc\n");
+    assert_eq!(diff, "  a\n- b\n  c");
+}
+
+#[test]
+fn line_diff_marks_an_inserted_line_as_added_only() {
+    let diff = line_diff("a\nc\n", "a\nb\nc\n");
+    assert_eq!(diff, "  a\n+ b\n  c");
 }
 
 #[test]
