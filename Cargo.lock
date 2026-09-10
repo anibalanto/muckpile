@@ -26,8 +26,7 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 [[package]]
 name = "atlassian-markdown-converter"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41996d31bb6a96c4ba81f2033337adb8e200a71f199511b251dc1932c7c9f318"
+source = "git+https://github.com/anibalanto/atlassian-markdown-converter?rev=91407e50340bf1a18befb4a60c74ca2d0c25ba89#91407e50340bf1a18befb4a60c74ca2d0c25ba89"
 dependencies = [
  "pulldown-cmark",
  "quick-xml",

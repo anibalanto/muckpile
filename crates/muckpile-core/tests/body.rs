@@ -135,3 +135,33 @@ fn prune_marks_drops_em_and_strong_next_to_code() {
         node["marks"].as_array().unwrap().iter().filter_map(|m| m["type"].as_str()).collect();
     assert_eq!(marks, vec!["code"]);
 }
+
+/// Jira stores a bold sentence cut by an inline code span as two strong runs,
+/// the space left inside the first — measured on real items. Written as
+/// `**text **`, CommonMark doesn't close the bold and it comes back as
+/// literal asterisks.
+#[test]
+fn a_bold_run_cut_by_code_reads_back_as_bold() {
+    let adf = r#"{"version":1,"type":"doc","content":[{"type":"paragraph","content":[
+        {"type":"text","text":"The first endpoint is ","marks":[{"type":"strong"}]},
+        {"type":"text","text":"reach","marks":[{"type":"code"}]},
+        {"type":"text","text":", and it fails.","marks":[{"type":"strong"}]}]}]}"#;
+    let md = muckpile_core::body::adf_to_body(adf).unwrap();
+    assert_eq!(md.trim_end(), "**The first endpoint is** `reach`**, and it fails.**");
+}
+
+/// Markdown tables can't span cells; the table has to travel whole instead of
+/// coming back with its merged cell split.
+#[test]
+fn a_table_with_merged_cells_survives_the_trip_through_markdown() {
+    let adf = r#"{"version":1,"type":"doc","content":[{"type":"table","content":[
+        {"type":"tableRow","content":[
+          {"type":"tableHeader","attrs":{"colspan":2},"content":[
+            {"type":"paragraph","content":[{"type":"text","text":"mode"}]}]}]},
+        {"type":"tableRow","content":[
+          {"type":"tableCell","content":[{"type":"paragraph","content":[{"type":"text","text":"dev"}]}]},
+          {"type":"tableCell","content":[{"type":"paragraph","content":[{"type":"text","text":"iap"}]}]}]}]}]}"#;
+    let md = muckpile_core::body::adf_to_body(adf).unwrap();
+    let back = muckpile_core::body::body_to_adf(&md).unwrap();
+    assert!(back.contains("\"colspan\":2"), "the span was lost:\n{md}");
+}
