@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `2d25a58`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `da1da80`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -99,14 +99,14 @@ Lo único que se cae es la razón original de que existiera un hook para esto: q
 
 **El orden 3 → 4 no es un detalle.** Si la vista renombrara antes de rebasear, tendría un `ACC-360.task.md` escrito por su lado y la ref del proveedor otro, y el rebase chocaría — el mismo `add/add` de la sección "Contexto", con el mismo remedio mal ofrecido.
 
-**Avance: 3/8.**
+**Avance: 4/8.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
 | `new` escribe `@slug` local, sin red | `cerrada` | `new` ↔ fila `new` de la interfaz |
 | Se busca por título antes de crear | `cerrada` | `resolve_pending` ↔ esta decisión; la búsqueda misma es `resolve_one`, y el transporte `JiraRest::find_by_title` ↔ esta decisión. Medido el 2026-09-10: buscaba en `/rest/api/3/search`, que el proveedor retiró —responde 410—, así que contra Jira real todo `@slug` fallaba al resolverse; ahora busca en `/search/jql`. Los demás endpoints que lee el transporte responden 200 |
 | Orden topológico sobre las referencias del lote | `cerrada` | `topo_order`, llamado desde `resolve_pending` — el bilink es de la función que orquesta, no de `topo_order` |
-| Renombre, `_data/` y reescritura de referencias en un solo commit | `diverge` | Por ítem sí (`rename_one`), pero un `push` que resuelve N pendientes deja 3·N commits: `new`, `rename` y `pull` por cada uno. Y `rename_one` commitea con `git add -A`, que agarra el repo entero —ediciones sin commitear de otras vistas incluidas—, cuando `commit_paths` existe justamente para no hacer eso |
+| Renombre, `_data/` y reescritura de referencias en un solo commit | `cerrada` | `rename_one` ↔ esta decisión: un commit por ítem, con el archivo, su `_data/` y las referencias que reescribió, y nada más —ni la edición sin commitear de otra vista, ni algo que una persona dejó en staging—. Que un `push` deje además un commit `new` y uno `pull` por ítem es el orden viejo, y lo reemplazan las dos dimensiones de abajo |
 | Por cada ítem creado o encontrado, un commit `new @<slug>` o `found @<slug>` en la ref del proveedor, con lo que devolvió | `pendiente` | Hoy `fetch_and_commit` commitea `pull <id>` en la misma rama que la vista |
 | La vista se rebasea sobre ese commit antes de renombrar | `pendiente` | Hoy se renombra primero (`resolve_batch`) y se trae después |
 | Qué pasa cuando no se puede resolver un pendiente del que otro depende | `falta spec` | Lo decide el código: lo que depende no se intenta, y su archivo queda como estaba (`PushResult::ResolveFailed`) |
