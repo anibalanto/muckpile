@@ -9,7 +9,7 @@ use muckpile_core::item::{self, list_summaries, parse_full, read_full, ItemSumma
 use muckpile_core::project::{classify, require_root, ItemType, Position, ProjectConfig};
 use muckpile_core::states::write_states_cache;
 use muckpile_core::{
-    commit_paths, find_file, head_text, is_valid_id, read_frontmatter_refs, read_relations, resolve_batch, retype, slugify_title, topo_order, MARKER, TYPES,
+    commit_paths, find_file, head_text, is_valid_id, read_frontmatter_refs, read_relations, resolve_batch, retype, status_lines, slugify_title, topo_order, MARKER, TYPES,
 };
 use muckpile_provider::link::{link as provider_link, Outcome as LinkOutcome};
 use muckpile_provider::provider::{Attachment, Comment, Item, ItemLink, Provider, Sprint};
@@ -233,6 +233,40 @@ fn relations(links: &[ItemLink]) -> BTreeMap<String, Vec<String>> {
         ids.sort();
     }
     by_key
+}
+
+/// What catching a view up after a command did.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CatchUp {
+    /// The view doesn't hold the item: the command only wrote to the
+    /// provider.
+    NotHere,
+    /// The item — its file and its `_data/` — was brought up to what the
+    /// provider has now, and committed, as a `pull` would.
+    CaughtUp,
+    /// Something of the item's is uncommitted, and bringing it up would
+    /// rewrite it: the view stays behind until the next `pull`. Why, to say.
+    Behind(String),
+}
+
+/// After a command writes to the provider, what a `pull` of that item in
+/// `view` would do — so the next `push` doesn't take the command's own write
+/// for a change on the other side. Refused, and left behind, when the item's
+/// file has any uncommitted change, or a file already tracked in its
+/// `_data/` does: those are what it rewrites. A draft nobody committed in
+/// `files/` isn't in the way — only what comes from the provider is written.
+pub fn catch_up(view: &Path, id: &str, provider: &dyn Provider, config: &ProjectConfig) -> Result<CatchUp> {
+    let Ok((path, _)) = find_file(view, id) else { return Ok(CatchUp::NotHere) };
+    let file = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    if !status_lines(view, &[&file])?.is_empty() {
+        return Ok(CatchUp::Behind(format!("{file} tiene cambios sin commitear")));
+    }
+    let data = format!("{id}_data");
+    if status_lines(view, &[&data])?.iter().any(|line| !line.starts_with("??")) {
+        return Ok(CatchUp::Behind(format!("{data}/ tiene cambios sin commitear")));
+    }
+    fetch_and_commit(view, id, provider, config)?;
+    Ok(CatchUp::CaughtUp)
 }
 
 /// A body or a comment from the provider, as markdown. First, each card —

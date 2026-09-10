@@ -3,7 +3,7 @@ use muckpile_core::body::Loss;
 use muckpile_core::identity::load_identity;
 use muckpile_core::project::{find_project_root, load_project_config, ProjectConfig};
 use muckpile_core::states::read_states_cache;
-use muckpile_cli::{HeaderEdit, ListFilter, PushResult};
+use muckpile_cli::{CatchUp, HeaderEdit, ListFilter, PushResult};
 use muckpile_provider::link::Outcome as LinkOutcome;
 use muckpile_provider::provider::Provider;
 use muckpile_provider::rest::{Credentials, JiraRest};
@@ -108,12 +108,13 @@ fn run_sprint_fetch() -> Result<()> {
 }
 
 fn run_transition(id: &str, target_status: &str) -> Result<()> {
-    let (root, _cwd) = standing_in_a_project()?;
+    let (root, cwd) = standing_in_a_project()?;
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
     match muckpile_cli::transition(id, target_status, provider.as_ref())? {
         Outcome::Applied { transition_name } => {
             println!("{id}: transición \"{transition_name}\" -> {target_status}");
+            catch_up_view(&cwd, id, provider.as_ref(), &config)?;
         }
         Outcome::NoSuchTransition { available } => {
             println!("{id}: no hay transición hacia \"{target_status}\" — disponibles: {}", available.join(", "));
@@ -254,11 +255,23 @@ fn run_push(view_arg: &str) -> Result<()> {
 }
 
 fn run_title(id: &str, new_title: &str) -> Result<()> {
-    let (root, _cwd) = standing_in_a_project()?;
+    let (root, cwd) = standing_in_a_project()?;
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
     muckpile_cli::title(id, new_title, provider.as_ref())?;
     println!("{id}: título cambiado a \"{new_title}\"");
+    catch_up_view(&cwd, id, provider.as_ref(), &config)
+}
+
+/// Brings `id` up to what the provider has now in the view `cwd` stands in,
+/// after a command wrote it — and says so, or says why the view stays
+/// behind. Nothing to say when the view doesn't hold the item.
+fn catch_up_view(cwd: &Path, id: &str, provider: &dyn Provider, config: &ProjectConfig) -> Result<()> {
+    match muckpile_cli::catch_up(cwd, id, provider, config)? {
+        CatchUp::NotHere => {}
+        CatchUp::CaughtUp => println!("  {id}: vista al día"),
+        CatchUp::Behind(why) => println!("  {id}: la vista queda atrás hasta el próximo pull — {why}"),
+    }
     Ok(())
 }
 
@@ -284,7 +297,7 @@ fn run_comment(id: &str, file: &str, flags: &[String]) -> Result<()> {
     let provider = build_provider(&root, &config)?;
     let comment_id = muckpile_cli::comment(id, &cwd.join(file), reply_to, author, provider.as_ref())?;
     println!("{id}: comentario {comment_id} agregado");
-    Ok(())
+    catch_up_view(&cwd, id, provider.as_ref(), &config)
 }
 
 /// Shows `phrase` on the terminal and reads the answer from it — the
@@ -309,15 +322,20 @@ fn run_attach(id: &str, file: &str) -> Result<()> {
     let provider = build_provider(&root, &config)?;
     let attachment = muckpile_cli::attach(id, &cwd.join(file), provider.as_ref())?;
     println!("{id}: {} adjuntado ({})", attachment.filename, attachment.id);
-    Ok(())
+    catch_up_view(&cwd, id, provider.as_ref(), &config)
 }
 
 fn run_link(a: &str, phrase: &str, b: &str) -> Result<()> {
-    let (root, _cwd) = standing_in_a_project()?;
+    let (root, cwd) = standing_in_a_project()?;
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
     match muckpile_cli::link(a, phrase, b, provider.as_ref())? {
-        LinkOutcome::Applied { type_name } => println!("{a} {phrase} {b}  ({type_name})"),
+        LinkOutcome::Applied { type_name } => {
+            println!("{a} {phrase} {b}  ({type_name})");
+            // A link shows on both of its ends.
+            catch_up_view(&cwd, a, provider.as_ref(), &config)?;
+            catch_up_view(&cwd, b, provider.as_ref(), &config)?;
+        }
         LinkOutcome::NoSuchPhrase { available } => {
             println!("\"{phrase}\": no es una frase de relación del proveedor — disponibles: {}", available.join(", "));
         }

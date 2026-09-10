@@ -338,6 +338,13 @@ pub fn commit_paths(view: &Path, paths: &[&str], message: &str) -> Result<bool> 
     Ok(true)
 }
 
+/// `git status --porcelain` for `paths` (relative to `view`), one entry per
+/// line — `?? ` for a path git doesn't track, anything else for a change to
+/// one it does. Empty when all of them match what's committed.
+pub fn status_lines(view: &Path, paths: &[&str]) -> Result<Vec<String>> {
+    Ok(status_of(view, paths)?.lines().map(str::to_string).collect())
+}
+
 fn status_of(view: &Path, paths: &[&str]) -> Result<String> {
     let mut args = vec!["status", "--porcelain", "--"];
     args.extend(paths);
