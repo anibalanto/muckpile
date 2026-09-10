@@ -143,6 +143,39 @@ pub fn rewrite_references(text: &str, old_slug: &str, old_type: &str, new_id: &s
     (out, changed)
 }
 
+/// Rewrites, in `text`, every link to `<id>.<old_type>.md` into
+/// `<id>.<new_type>.md`, keeping the `../` that may lead it. Only links:
+/// `parent`, `relation.*` and ids in prose name the id, which a type change
+/// keeps.
+pub fn rewrite_type_references(text: &str, id: &str, old_type: &str, new_type: &str) -> (String, bool) {
+    let mut changed = false;
+    let link_re = boundary(&format!(r"\]\((?:\.\./)*{}\.{}\.md", regex::escape(id), regex::escape(old_type)));
+    let out = replace_link(&link_re, text, &mut changed, id, new_type);
+    (out, changed)
+}
+
+/// Moves `<id>.<old_type>.md` to `<id>.<new_type>.md` in `view` and rewrites
+/// every link to the old name — without committing: the caller commits it
+/// together with whatever it's recording. Returns every path touched,
+/// relative to `view`, the old name and the new one included.
+pub fn retype(view: &Path, id: &str, old_type: &str, new_type: &str) -> Result<Vec<String>> {
+    let old_name = format!("{id}.{old_type}.md");
+    let new_name = format!("{id}.{new_type}.md");
+    let mut touched = Vec::new();
+    for path in markdown_files(view) {
+        let text = std::fs::read_to_string(&path)?;
+        let (new_text, changed) = rewrite_type_references(&text, id, old_type, new_type);
+        if changed {
+            std::fs::write(&path, new_text)?;
+            touched.push(path.strip_prefix(view).unwrap_or(&path).to_string_lossy().to_string());
+        }
+    }
+    std::fs::rename(view.join(&old_name), view.join(&new_name)).with_context(|| format!("renaming {old_name} to {new_name}"))?;
+    touched.push(old_name);
+    touched.push(new_name);
+    Ok(touched)
+}
+
 fn replace_boundary(re: &Regex, text: &str, changed: &mut bool, new_head: &str) -> String {
     replace_boundary_inner(re, text, changed, new_head, false)
 }

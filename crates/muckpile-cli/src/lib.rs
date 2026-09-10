@@ -9,7 +9,7 @@ use muckpile_core::item::{self, list_summaries, parse_full, read_full, ItemSumma
 use muckpile_core::project::{classify, require_root, ItemType, Position, ProjectConfig};
 use muckpile_core::states::write_states_cache;
 use muckpile_core::{
-    commit_paths, find_file, head_text, is_valid_id, read_frontmatter_refs, read_relations, resolve_batch, slugify_title, topo_order, MARKER, TYPES,
+    commit_paths, find_file, head_text, is_valid_id, read_frontmatter_refs, read_relations, resolve_batch, retype, slugify_title, topo_order, MARKER, TYPES,
 };
 use muckpile_provider::link::{link as provider_link, Outcome as LinkOutcome};
 use muckpile_provider::provider::{Attachment, Comment, Item, ItemLink, Provider, Sprint};
@@ -103,10 +103,20 @@ fn fetch_and_commit(dir: &Path, id: &str, provider: &dyn Provider, config: &Proj
         .with_context(|| format!("{}: sin tipo de item para él en muckpile.toml", item.jira_type))?;
     let (text, losses) = render_pulled_text(&item)?;
 
+    // The provider may have changed the item's type since the last pull:
+    // the file follows, renamed in this same commit, and never stays behind
+    // as a second file for the same item.
+    let mut written = Vec::new();
+    if let Ok((_, old_type)) = find_file(dir, id) {
+        if old_type != item_type {
+            written.extend(retype(dir, id, &old_type, item_type)?);
+        }
+    }
+
     let filename = format!("{id}.{item_type}.md");
     let path = dir.join(&filename);
     std::fs::write(&path, &text).with_context(|| format!("writing {}", path.display()))?;
-    let mut written = vec![filename];
+    written.push(filename);
     written.extend(write_thread(dir, id, provider)?);
     written.extend(write_files(dir, id, &item.attachments, provider)?);
 

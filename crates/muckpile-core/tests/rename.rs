@@ -253,3 +253,17 @@ fn renaming_a_marked_id_does_not_eat_the_marker_or_touch_its_neighbors() {
     assert!(b.contains("mentions @a1 in passing"), "nor its loose mention: {b}");
     assert!(repo.join("@a1.task.md").exists());
 }
+
+/// A type change keeps the id and changes only the file's name, so what
+/// moves is a link's destination — `parent`, `relation.*` and ids in prose
+/// name the id, which stays.
+#[test]
+fn a_type_change_rewrites_only_the_links_to_the_old_file() {
+    let text = "---\ntitle: x\nparent: ACC-355\n---\nSee [the story](ACC-355.task.md), [again](../ACC-355.task.md), and `ACC-355`; not [this](ACC-3555.task.md).\n";
+    let (out, changed) = muckpile_core::rewrite_type_references(text, "ACC-355", "task", "user-story");
+    assert!(changed);
+    assert!(out.contains("[the story](ACC-355.user-story.md)"), "{out}");
+    assert!(out.contains("[again](../ACC-355.user-story.md)"), "{out}");
+    assert!(out.contains("[this](ACC-3555.task.md)"), "a longer id is another item: {out}");
+    assert!(out.contains("parent: ACC-355\n") && out.contains("`ACC-355`"), "{out}");
+}

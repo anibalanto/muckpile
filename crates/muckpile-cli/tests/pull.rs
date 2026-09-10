@@ -376,3 +376,34 @@ fn a_local_draft_in_files_is_left_alone() {
 
     assert_eq!(std::fs::read_to_string(view.join("ACC-355_data/files/borrador-adr.md")).unwrap(), "no decidido");
 }
+
+/// The provider changed the item's type: the file is renamed, links to its
+/// old name follow, and it's all one pull commit — never two files for the
+/// same item.
+#[test]
+fn a_type_changed_on_the_provider_renames_the_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    let toml = std::fs::read_to_string(root.join("muckpile.toml")).unwrap();
+    std::fs::write(root.join("muckpile.toml"), format!("{toml}epic = \"Epic\"\n")).unwrap();
+    let config = load_project_config(root).unwrap();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-355", "Tarea", "Vistas", "Abierta", None, None);
+    let view = root.join("to-work/ACC-355");
+    pull(root, &view, None, &provider, &config).unwrap();
+    std::fs::write(view.join("ACC-100.task.md"), "---\ntitle: y\nstatus: Abierta\n---\nDepends on [Vistas](ACC-355.task.md).\n").unwrap();
+    muckpile_core::commit_paths(&view, &["ACC-100.task.md"], "pull ACC-100").unwrap();
+    let before = head_count(&view);
+
+    provider.seed_item("ACC-355", "Epic", "Vistas", "Abierta", None, None);
+    let path = pull(root, &view, None, &provider, &config).unwrap().path;
+
+    assert_eq!(path, view.join("ACC-355.epic.md"));
+    assert!(!view.join("ACC-355.task.md").exists(), "never two files for the same item");
+    let other = std::fs::read_to_string(view.join("ACC-100.task.md")).unwrap();
+    assert!(other.contains("[Vistas](ACC-355.epic.md)"), "{other}");
+    assert_eq!(head_count(&view), before + 1, "one pull commit");
+    let status = std::process::Command::new("git").arg("-C").arg(&view).args(["status", "--porcelain", "--", "."]).output().unwrap();
+    assert_eq!(String::from_utf8_lossy(&status.stdout), "", "nothing in the view left out of the commit");
+}
