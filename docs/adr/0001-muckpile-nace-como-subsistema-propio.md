@@ -62,6 +62,8 @@ Esto se lleva puesto, con su nombre: `install-hooks`, `check-push`, `assign-keys
 
 **Y "reemplazo, no migración" no es sólo una postura — para `ACC` es literal.** No hay estado local que traer: el ledger de `muckpile` (decisión 5) arranca del estado vivo de Jira el día que el proyecto se configura, igual que cualquier otro. Lo único que se queda exclusivamente del lado de `worklist` es su propio historial de `rename`/`normalize:`, que nadie necesita para arrancar limpio.
 
+**Y el estado vivo trae los errores de worklist, tal cual.** Medido el 2026-09-10 con lecturas sobre `ACC`: de las 49 relaciones que worklist declara con `relation.depends`, Jira tiene 36 al revés —`ACC-108` depende de `ACC-107`, y el board dice que `ACC-108` bloquea a `ACC-107`—, ninguna al derecho, y a 13 les falta el link. Es el mismo error que tenía `create_link` (decisión 8): los campos del objeto link de Jira nombran sus puntas, no la frase de cada una. `muckpile` las baja como están, porque bajar es leer lo que el proveedor dice; arreglarlas es escribir en el board, con `unlink` y `link`, y eso es una decisión aparte.
+
 **Avance: no aplica — esta decisión no tiene dimensión de código.** Hecha del lado del repo: el impl es un git propio en `subsystems/muckpile/.stratum/impl/`, arrancado con este ADR, y el remoto está declarado en `.muckpile.toml`. "Reemplazo, no migración" tampoco pide código: ningún comando importa estado de worklist.
 
 ### 3. Una API propia encapsula al proveedor — hoy Jira REST, mañana un `muckpile-server`
