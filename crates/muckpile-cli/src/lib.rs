@@ -11,7 +11,7 @@ use muckpile_core::states::write_states_cache;
 use muckpile_core::{
     commit_paths, find_file, head_text, is_valid_id, read_frontmatter_refs, read_relations, resolve_batch, retype, status_lines, slugify_title, topo_order, MARKER, TYPES,
 };
-use muckpile_provider::link::{link as provider_link, Outcome as LinkOutcome};
+use muckpile_provider::link::{link as provider_link, unlink as provider_unlink, Outcome as LinkOutcome, UnlinkOutcome};
 use muckpile_provider::provider::{Attachment, Comment, Item, ItemLink, Provider, Sprint};
 use muckpile_provider::transition::{transition as provider_transition, Outcome};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -461,6 +461,20 @@ pub fn link(a: &str, phrase: &str, b: &str, provider: &dyn Provider) -> Result<L
         bail!("{b}: no es un id válido");
     }
     provider_link(provider, a, phrase, b)
+}
+
+/// Removes, on the provider, the relation `link` with the same arguments
+/// creates — the same phrase, taken the same two ways. The deciding and
+/// removing lives in `muckpile-provider`; this only adds the id checks
+/// every other command applies to arguments coming from argv.
+pub fn unlink(a: &str, phrase: &str, b: &str, provider: &dyn Provider) -> Result<UnlinkOutcome> {
+    if !is_valid_id(a) {
+        bail!("{a}: no es un id válido");
+    }
+    if !is_valid_id(b) {
+        bail!("{b}: no es un id válido");
+    }
+    provider_unlink(provider, a, phrase, b)
 }
 
 /// Lists the project's workflow statuses, live, and caches `{name ->
