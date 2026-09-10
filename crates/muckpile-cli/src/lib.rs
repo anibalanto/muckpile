@@ -4,6 +4,7 @@
 
 use anyhow::{bail, Context, Result};
 use muckpile_core::body::adf_to_body;
+use muckpile_core::codework::{add_worktree, derive_branch, ensure_cloned};
 use muckpile_core::item::{list_summaries, read_full, ItemSummary};
 use muckpile_core::project::{classify, require_root, Position, ProjectConfig};
 use muckpile_core::states::write_states_cache;
@@ -66,7 +67,7 @@ pub fn new(dir: &Path, item_type: &str, title: &str, blocks: Option<&str>) -> Re
 /// item added to that same view, not a new one. A sprint or a query are a
 /// different call this doesn't cover yet.
 pub fn pull(root: &Path, cwd: &Path, id: Option<&str>, provider: &dyn Provider, config: &ProjectConfig) -> Result<PathBuf> {
-    let own_id = view_id(root, cwd)?;
+    let own_id = work_view_id(root, cwd)?;
     let id = match id {
         Some(id) => {
             if !is_valid_id(id) {
@@ -95,21 +96,57 @@ pub fn pull(root: &Path, cwd: &Path, id: Option<&str>, provider: &dyn Provider, 
     Ok(path)
 }
 
-/// The id `pull` targets when called with none: the name of the `to-work/`
-/// view `cwd` stands exactly in, not one it's merely nested under —
-/// `code-work/<repo>/` inside it is a different repo's concern, not an item.
-fn view_id(root: &Path, cwd: &Path) -> Result<String> {
+/// The id of the `to-work/<id>/` view `cwd` stands exactly in, not one it's
+/// merely nested under — `code-work/<repo>/` inside it is a different
+/// repo's concern, not the view's own item. Shared by every command that
+/// only makes sense run from inside a view's own root.
+fn work_view_id(root: &Path, cwd: &Path) -> Result<String> {
     if classify(root, cwd) != Position::WorkView {
-        bail!("pull sin argumento corre parado en una vista de to-work/<id>/");
+        bail!("corré esto parado en una vista de to-work/<id>/");
     }
     let rel = cwd.strip_prefix(root).unwrap_or(cwd);
     let mut parts = rel.components();
     parts.next(); // "to-work"
     let id = parts.next().unwrap().as_os_str().to_string_lossy().into_owned();
     if parts.next().is_some() {
-        bail!("pull sin argumento corre en la raíz de la vista, no en {}", rel.display());
+        bail!("corré esto en la raíz de la vista, no en {}", rel.display());
     }
     Ok(id)
+}
+
+/// Adds `code-work/<repo>/` as a worktree of `<root>/base/<repo>/`, cloning
+/// the latter on demand — one repo at a time, run from inside the
+/// `to-work/<id>/` view it belongs to. `from` overrides the starting point
+/// for a fresh branch (a hotfix off `rc-??`); `branch` overrides the derived
+/// name entirely (a split front/back, or one that already exists under
+/// another name) — the two are independent, each optional on its own.
+pub fn code_work_add(
+    root: &Path,
+    cwd: &Path,
+    repo_name: &str,
+    from: Option<&str>,
+    branch_override: Option<&str>,
+    config: &ProjectConfig,
+) -> Result<PathBuf> {
+    let id = work_view_id(root, cwd)?;
+    let repo_config = config.repos.get(repo_name).with_context(|| format!("{repo_name}: no está en muckpile.toml"))?;
+
+    let base = root.join("base").join(repo_name);
+    ensure_cloned(&repo_config.remote, &base, &repo_config.branch)?;
+
+    let branch = match branch_override {
+        Some(b) => b.to_string(),
+        None => derive_branch(&id, &config.commit_prefix)?,
+    };
+    let from_branch = from.unwrap_or(&repo_config.branch);
+
+    let worktree_path = cwd.join("code-work").join(repo_name);
+    if worktree_path.exists() {
+        bail!("code-work/{repo_name}: ya existe");
+    }
+
+    add_worktree(&base, &worktree_path, &branch, from_branch)?;
+    Ok(worktree_path)
 }
 
 /// The muckpile type whose `muckpile.toml` mapping names `jira_type` — the

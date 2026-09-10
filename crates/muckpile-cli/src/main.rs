@@ -25,8 +25,9 @@ fn main() -> Result<()> {
         [cmd, item_type, title, rest @ ..] if cmd == "new" => run_new(item_type, title, rest),
         [cmd, id] if cmd == "show" => run_show(id, false),
         [cmd, id, flag] if cmd == "show" && flag == "--local" => run_show(id, true),
+        [cmd, sub, repo, rest @ ..] if cmd == "code-work" && sub == "add" => run_code_work_add(repo, rest),
         _ => bail!(
-            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile link <a> <frase> <b> | muckpile new <tipo> <título> [--blocks <id>] | muckpile show <id> [--local]"
+            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile link <a> <frase> <b> | muckpile new <tipo> <título> [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
         ),
     }
 }
@@ -222,6 +223,29 @@ fn run_show(id: &str, local: bool) -> Result<()> {
     }
     println!();
     println!("{}", show.body);
+    Ok(())
+}
+
+fn run_code_work_add(repo: &str, flags: &[String]) -> Result<()> {
+    let mut from = None;
+    let mut branch = None;
+    let mut i = 0;
+    while i < flags.len() {
+        let flag = &flags[i];
+        let value = flags.get(i + 1).with_context(|| format!("{flag}: falta el valor"))?;
+        match flag.as_str() {
+            "--from" => from = Some(value.as_str()),
+            "--branch" => branch = Some(value.as_str()),
+            _ => bail!("{flag}: opción desconocida"),
+        }
+        i += 2;
+    }
+
+    let (root, cwd) = standing_in_a_project()?;
+    let config = load_project_config(&root)?;
+    let worktree = muckpile_cli::code_work_add(&root, &cwd, repo, from, branch, &config)?;
+    let rel = worktree.strip_prefix(&root).unwrap_or(&worktree);
+    println!("{}/ creado", rel.display());
     Ok(())
 }
 
