@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 00a1dfefd8c144f52c3dd3d2ad64e146
-      hash: a2db533c1b34a5ad9b2b6a5a7042470830dfdd54719238f91caa8b98bc0f9b3c
+      hash: 4695b4621a7b212bb88c7d2b7eabdf312f408efbe44a74550f0cae34d5d3e8e6
     name: no-own-vocabulary-spec
   1:
     link: capture 16a6043bbabcaa80b23bac75b22dfcf4

@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture 0d882c6b8d5201d0f6cb630dd4c27f86
+    accepted:
+    - agree:
+      - anibal
+      link: capture 0d882c6b8d5201d0f6cb630dd4c27f86
+      hash: 5b2e63027cf4099f49233958c6896e3fddafa7485393a37dde57215020f8890b
+    name: own-port-spec
+  1:
+    link: capture a42c0e7ae571ae10d9b8c2a84876ec89
+    accepted:
+    - agree:
+      - anibal
+      link: capture a42c0e7ae571ae10d9b8c2a84876ec89
+      hash: 70884544961cc06444beb5c4f223297e5d861169170adada393cb0205b06b3f5
+      hash_ast: 85ea962e33341184b4009755c8627c64d23ddbf74123c1719bc24b87de544ed2
+      n: declined
+    name: build-provider

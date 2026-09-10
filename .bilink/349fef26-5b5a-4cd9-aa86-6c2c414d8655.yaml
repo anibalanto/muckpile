@@ -9,12 +9,12 @@ endpoint:
       hash: 4695b4621a7b212bb88c7d2b7eabdf312f408efbe44a74550f0cae34d5d3e8e6
     name: no-own-vocabulary-spec
   1:
-    link: capture aec8445bd8f382cdae902860849a10d9
+    link: capture 074c24a4fd8d081fdb82c70411f40a57
     accepted:
     - agree:
       - anibal
-      link: capture aec8445bd8f382cdae902860849a10d9
-      hash: 3ef877ca5929fa93f97e7b1df1419148e36a09085745931cd99b78018cc64a6a
-      hash_ast: 68104e4908e042a3d9b005050f7f896bbcd493e0ec67ac880714416f2cf6d4d3
+      link: capture 074c24a4fd8d081fdb82c70411f40a57
+      hash: 2770de3b7a46986db393568b043eebd1e51563fd07fdfd00cb2229c63a9ec633
+      hash_ast: d2123735fb8e44678d004f9312e51eb191554f33d4eb9b2da66eaf0e39ed0371
       n: declined
-    name: rest-delete-link
+    name: render-pulled-text

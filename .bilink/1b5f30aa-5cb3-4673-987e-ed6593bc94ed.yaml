@@ -9,12 +9,12 @@ endpoint:
       hash: d1633895f2d1ffe73c12296e63664e4a00ace2bcb9b63ace6e7696a4512b6e61
     name: config-spec
   1:
-    link: capture 8b28751e06527617d9d8b2c2d2aacb31
+    link: capture d14029ebed96da6a18a3d37dea3b3b9e
     accepted:
     - agree:
       - anibal
-      link: capture 8b28751e06527617d9d8b2c2d2aacb31
-      hash: 736370638c1be7aa94a06026051f6ec8cb163b47eac46e181b9c8b3c65422d53
-      hash_ast: 0c2c29201a53019668f1ea37af785e501d658ca7764a92e45dcfac1ac7f4b686
+      link: capture d14029ebed96da6a18a3d37dea3b3b9e
+      hash: 29ed98501b20c27835ff2fe0e18bf808f44754e23aaca7a9a5293114f9598cba
+      hash_ast: b76f266847868b0ded39c5a38b20a8bd8a24eccbe29833ad11082b84300c4b0d
       n: declined
-    name: check-item-types
+    name: load-project-config
