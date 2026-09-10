@@ -60,6 +60,15 @@ pub trait Provider {
     /// type's outward phrase toward `inward_key`'s (`outward_key` "blocks"
     /// `inward_key`, for `Blocks`).
     fn create_link(&self, type_name: &str, outward_key: &str, inward_key: &str) -> Result<()>;
+
+    /// Overwrites the item's title — the `summary` field — with exactly what
+    /// was written locally, no conversion.
+    fn update_title(&self, key: &str, title: &str) -> Result<()>;
+
+    /// Overwrites the item's body, as ADF. Only ever called with a body that
+    /// round-trips losslessly through this same conversion, so what lands
+    /// here is always something this system can read back exactly.
+    fn update_body(&self, key: &str, body_adf: &str) -> Result<()>;
 }
 
 /// A relationship type, named from both directions — e.g. Jira's `Blocks`:

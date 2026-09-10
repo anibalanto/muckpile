@@ -245,6 +245,37 @@ fn create_link_posts_the_type_name_and_both_keys_by_direction() {
 }
 
 #[test]
+fn update_title_puts_only_the_summary_field() {
+    let (base, rx) = one_shot(204, "");
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    provider.update_title("ACC-355", "Nuevo título").unwrap();
+
+    let captured = rx.recv().unwrap();
+    assert_eq!(captured.method, "PUT");
+    assert_eq!(captured.path, "/rest/api/3/issue/ACC-355");
+    let body: serde_json::Value = serde_json::from_str(&captured.body).unwrap();
+    assert_eq!(body["fields"]["summary"], "Nuevo título");
+    assert!(body["fields"].get("description").is_none(), "{body}");
+}
+
+#[test]
+fn update_body_puts_the_adf_as_the_description_field() {
+    let (base, rx) = one_shot(204, "");
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+    let adf = r#"{"type":"doc","version":1,"content":[]}"#;
+
+    provider.update_body("ACC-355", adf).unwrap();
+
+    let captured = rx.recv().unwrap();
+    assert_eq!(captured.method, "PUT");
+    assert_eq!(captured.path, "/rest/api/3/issue/ACC-355");
+    let body: serde_json::Value = serde_json::from_str(&captured.body).unwrap();
+    assert_eq!(body["fields"]["description"]["type"], "doc");
+    assert!(body["fields"].get("summary").is_none(), "{body}");
+}
+
+#[test]
 fn item_with_no_parent_or_description_leaves_both_absent() {
     let response = r#"{"fields":{"summary":"x","status":{"name":"Abierta"},"issuetype":{"name":"Tarea"}}}"#;
     let (base, rx) = one_shot(200, response);

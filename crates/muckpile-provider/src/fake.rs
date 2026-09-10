@@ -94,6 +94,14 @@ impl FakeProvider {
     pub fn status_of(&self, key: &str) -> Option<String> {
         self.items.borrow().get(key).map(|i| i.status.clone())
     }
+
+    pub fn title_of(&self, key: &str) -> Option<String> {
+        self.items.borrow().get(key).map(|i| i.title.clone())
+    }
+
+    pub fn body_adf_of(&self, key: &str) -> Option<String> {
+        self.items.borrow().get(key).and_then(|i| i.body_adf.clone())
+    }
 }
 
 impl Default for FakeProvider {
@@ -145,6 +153,20 @@ impl Provider for FakeProvider {
 
     fn create_link(&self, type_name: &str, outward_key: &str, inward_key: &str) -> Result<()> {
         self.links_created.borrow_mut().push((type_name.to_string(), outward_key.to_string(), inward_key.to_string()));
+        Ok(())
+    }
+
+    fn update_title(&self, key: &str, title: &str) -> Result<()> {
+        let mut items = self.items.borrow_mut();
+        let Some(item) = items.get_mut(key) else { bail!("no such item: {key}") };
+        item.title = title.to_string();
+        Ok(())
+    }
+
+    fn update_body(&self, key: &str, body_adf: &str) -> Result<()> {
+        let mut items = self.items.borrow_mut();
+        let Some(item) = items.get_mut(key) else { bail!("no such item: {key}") };
+        item.body_adf = Some(body_adf.to_string());
         Ok(())
     }
 }

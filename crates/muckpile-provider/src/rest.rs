@@ -156,6 +156,20 @@ impl Provider for JiraRest {
         self.call("POST", "/rest/api/3/issueLink", Some(body))?;
         Ok(())
     }
+
+    fn update_title(&self, key: &str, title: &str) -> Result<()> {
+        let body = serde_json::json!({ "fields": { "summary": title } });
+        self.call("PUT", &format!("/rest/api/3/issue/{key}"), Some(body))?;
+        Ok(())
+    }
+
+    fn update_body(&self, key: &str, body_adf: &str) -> Result<()> {
+        let adf: serde_json::Value =
+            serde_json::from_str(body_adf).with_context(|| format!("{key}: the body to send isn't JSON"))?;
+        let body = serde_json::json!({ "fields": { "description": adf } });
+        self.call("PUT", &format!("/rest/api/3/issue/{key}"), Some(body))?;
+        Ok(())
+    }
 }
 
 /// The only thing that touches `ureq`. A `4xx`/`5xx` isn't an `Err` here —
