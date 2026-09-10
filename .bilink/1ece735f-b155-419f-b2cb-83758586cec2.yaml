@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 971bd7a706d0b36c6ab25bcdbd833994
-      hash: 00bc43a8afe3e2a90bd5b050c1de8c347f99b5006d930cf49fbf01b0f654f46f
+      hash: ac24faf228b1789648ead117cfd616d9cdec2eb9e6b136c87de4f93cb2a4ec9a
     name: comment-spec
   1:
     link: capture 26e5060bd7ad45e4bf665a20d51d060f
@@ -14,7 +14,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 26e5060bd7ad45e4bf665a20d51d060f
-      hash: a74c35b533d0a22753d84ac88a8ae8ccb1968967c2cc381e68ef990f858a546d
-      hash_ast: fa006ffa4e5b5f91e402f7d30991b5045240cbc214914d047d821cbc71ceafc5
+      hash: 0a29c798e69a77eeab47b23fd853a900cd2aa7865a6cbbe4313e6f6d9e92bfc8
+      hash_ast: ccc09487a696d16fed3e4c2779150d188c68e47c0b5da37ec277d237a46787ae
       n: declined
     name: comment-impl
