@@ -50,6 +50,7 @@ pub fn close_empty_view(project: &Path, name: &str) -> Result<bool> {
         return Ok(false);
     }
     let ledger = project.join(LEDGER);
+    let name = &branch_name(name);
     git_in(&ledger, &["worktree", "remove", &view.to_string_lossy()], None)?;
     git_in(&ledger, &["branch", "-D", name], None)?;
     git_in(&ledger, &["update-ref", "-d", &provider_ref_of(name)], None)?;
@@ -67,6 +68,7 @@ pub fn open_view(project: &Path, name: &str) -> Result<PathBuf> {
     if view.exists() {
         bail!("{name}: ya existe");
     }
+    let name = &branch_name(name);
     let empty_tree = git_in(&ledger, &["hash-object", "-t", "tree", "-w", "--stdin"], Some(b""))?;
     let root = tool_git_in(&ledger, &["commit-tree", &empty_tree, "-m", &format!("vista {name}")], None)?;
     git_in(&ledger, &["update-ref", &provider_ref_of(name), &root], None)?;
@@ -78,6 +80,27 @@ pub fn open_view(project: &Path, name: &str) -> Result<PathBuf> {
     }
     git_in(&ledger, &["worktree", "add", "-q", &view.to_string_lossy(), name], None)?;
     Ok(view)
+}
+
+/// A view's name as a git branch: the same, with `_` wherever git refuses
+/// what's there — a `:`, a space, `~ ^ ? * [ \\`, a control character, `..`,
+/// `@{`, a part that starts with a dot or ends in `.lock`.
+fn branch_name(name: &str) -> String {
+    let parts: Vec<String> = name
+        .split('/')
+        .map(|part| {
+            let mut part: String = part.chars().map(|c| if c.is_control() || " ~^:?*[\\".contains(c) { '_' } else { c }).collect();
+            part = part.replace("..", "__").replace("@{", "_{");
+            if part.starts_with('.') {
+                part.replace_range(..1, "_");
+            }
+            if let Some(stem) = part.strip_suffix(".lock") {
+                part = format!("{stem}_lock");
+            }
+            part
+        })
+        .collect();
+    parts.join("/")
 }
 
 /// The branch `view` stands on — the view's own name.

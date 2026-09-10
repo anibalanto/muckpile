@@ -155,3 +155,22 @@ fn tracked_changes_are_edits_to_what_git_tracks() {
     std::fs::write(view.join("ACC-1.task.md"), "edited\n").unwrap();
     assert_eq!(ledger::tracked_changes(&view).unwrap(), vec!["ACC-1.task.md".to_string()]);
 }
+
+/// A sprint can be named with a `:` in it, which a folder takes and a git
+/// branch doesn't: the folder keeps the provider's name, and the branch and
+/// the provider's ref carry `_` where git refuses what's there.
+#[test]
+fn a_view_named_with_what_git_refuses_in_a_branch_still_opens() {
+    let (_dir, project) = project();
+    let name = "backlog/sprint/12_El_formato:_`accepted`_co_2026-09-06";
+
+    let view = ledger::open_view(&project, name).unwrap();
+
+    assert_eq!(view, project.join(name));
+    let branch = ledger::branch(&view).unwrap();
+    assert_eq!(branch, "backlog/sprint/12_El_formato__`accepted`_co_2026-09-06");
+    let valid = Command::new("git").args(["check-ref-format", "--branch", &branch]).output().unwrap();
+    assert!(valid.status.success());
+    assert!(git_out(&view, &["status", "-sb"]).starts_with(&format!("## {branch}...provider/{branch}")));
+    assert!(ledger::close_empty_view(&project, name).unwrap());
+}
