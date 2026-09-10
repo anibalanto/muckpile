@@ -1,0 +1,7 @@
+file: docs/adr/0001-muckpile-nace-como-subsistema-propio.md
+query: |-
+  (section
+    (atx_heading (inline) @n0 (#eq? @n0 "La interfaz"))
+    (pipe_table
+    (pipe_table_row
+    (pipe_table_cell) @n1 (#eq? @n1 "`push` ")) @target))
