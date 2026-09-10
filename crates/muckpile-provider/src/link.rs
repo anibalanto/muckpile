@@ -43,13 +43,17 @@ pub enum UnlinkOutcome {
 }
 
 /// Removes the link `link` with the same `a phrase b` creates: the same
-/// type, the same direction, the same two ways to write the phrase.
+/// type, the same direction, the same two ways to write the phrase. When the
+/// type says the same both ways — `Relates` — the phrase can't tell which
+/// end the link was made from, so the other direction is tried too.
 pub fn unlink(provider: &dyn Provider, a: &str, phrase: &str, b: &str) -> Result<UnlinkOutcome> {
     let types = provider.link_types()?;
     let Some(edge) = edge(&types, a, phrase, b) else {
         return Ok(UnlinkOutcome::NoSuchPhrase { available: phrases(&types) });
     };
-    if provider.delete_link(&edge.type_name, edge.outward_key, edge.inward_key)? {
+    let removed = provider.delete_link(&edge.type_name, edge.outward_key, edge.inward_key)?
+        || (edge.symmetric && provider.delete_link(&edge.type_name, edge.inward_key, edge.outward_key)?);
+    if removed {
         Ok(UnlinkOutcome::Removed { type_name: edge.type_name })
     } else {
         Ok(UnlinkOutcome::NoSuchLink { type_name: edge.type_name })
@@ -62,6 +66,9 @@ struct Edge<'k> {
     type_name: String,
     outward_key: &'k str,
     inward_key: &'k str,
+    /// The type says the same both ways, so the phrase alone doesn't say
+    /// which key plays which end.
+    symmetric: bool,
 }
 
 /// The first type among `types` whose outward or inward wording is
@@ -70,10 +77,11 @@ struct Edge<'k> {
 fn edge<'k>(types: &[LinkType], a: &'k str, phrase: &str, b: &'k str) -> Option<Edge<'k>> {
     let says = |wording: &str| wording == phrase || wording.replace(' ', "_") == phrase;
     types.iter().find_map(|t| {
+        let symmetric = t.outward == t.inward;
         if says(&t.outward) {
-            Some(Edge { type_name: t.name.clone(), outward_key: a, inward_key: b })
+            Some(Edge { type_name: t.name.clone(), outward_key: a, inward_key: b, symmetric })
         } else if says(&t.inward) {
-            Some(Edge { type_name: t.name.clone(), outward_key: b, inward_key: a })
+            Some(Edge { type_name: t.name.clone(), outward_key: b, inward_key: a, symmetric })
         } else {
             None
         }

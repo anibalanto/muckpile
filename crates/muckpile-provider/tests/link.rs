@@ -181,3 +181,36 @@ fn unlink_with_a_phrase_no_type_offers_lists_what_the_provider_does() {
     }
     assert_eq!(p.links_created().len(), 1);
 }
+
+/// A type that says the same both ways — `Relates` — can't tell from the
+/// phrase which end the link was made from; its header shows it the same
+/// on both ends. So `unlink` looks both ways.
+#[test]
+fn unlink_of_a_phrase_both_ends_share_finds_the_link_made_from_either_side() {
+    let p = FakeProvider::new();
+    p.seed_link_types(&[("Relates", "relates to", "relates to")]);
+    p.seed_item("ACC-1", "Tarea", "a", "Abierta", None, None);
+    p.seed_item("ACC-2", "Tarea", "b", "Abierta", None, None);
+    link(&p, "ACC-2", "relates to", "ACC-1").unwrap();
+
+    let outcome = unlink(&p, "ACC-1", "relates_to", "ACC-2").unwrap();
+
+    assert!(matches!(outcome, UnlinkOutcome::Removed { .. }));
+    assert!(p.links_created().is_empty());
+}
+
+/// Looking both ways is only for a phrase both ends share: `blocks` still
+/// names one direction, and the other isn't the same link.
+#[test]
+fn unlink_of_a_one_way_phrase_does_not_look_the_other_way() {
+    let p = FakeProvider::new();
+    p.seed_link_types(&[("Blocks", "blocks", "is blocked by")]);
+    p.seed_item("ACC-1", "Tarea", "a", "Abierta", None, None);
+    p.seed_item("ACC-2", "Tarea", "b", "Abierta", None, None);
+    link(&p, "ACC-2", "blocks", "ACC-1").unwrap();
+
+    let outcome = unlink(&p, "ACC-1", "blocks", "ACC-2").unwrap();
+
+    assert!(matches!(outcome, UnlinkOutcome::NoSuchLink { .. }));
+    assert_eq!(p.links_created().len(), 1);
+}
