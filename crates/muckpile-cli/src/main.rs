@@ -24,12 +24,13 @@ fn main() -> Result<()> {
         [cmd, view] if cmd == "status" => run_status(view),
         [cmd, view] if cmd == "push" => run_push(view),
         [cmd, a, phrase, b] if cmd == "link" => run_link(a, phrase, b),
+        [cmd, id, new_title] if cmd == "title" => run_title(id, new_title),
         [cmd, item_type, title, rest @ ..] if cmd == "new" => run_new(item_type, title, rest),
         [cmd, id] if cmd == "show" => run_show(id, false),
         [cmd, id, flag] if cmd == "show" && flag == "--local" => run_show(id, true),
         [cmd, sub, repo, rest @ ..] if cmd == "code-work" && sub == "add" => run_code_work_add(repo, rest),
         _ => bail!(
-            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile push <vista> | muckpile link <a> <frase> <b> | muckpile new <tipo> <título> [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
+            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile push <vista> | muckpile link <a> <frase> <b> | muckpile title <id> <título> | muckpile new <tipo> <título> [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
         ),
     }
 }
@@ -231,6 +232,15 @@ fn run_push(view_arg: &str) -> Result<()> {
             }
         }
     }
+    Ok(())
+}
+
+fn run_title(id: &str, new_title: &str) -> Result<()> {
+    let (root, _cwd) = standing_in_a_project()?;
+    let config = load_project_config(&root)?;
+    let provider = build_provider(&root, &config)?;
+    muckpile_cli::title(id, new_title, provider.as_ref())?;
+    println!("{id}: título cambiado a \"{new_title}\"");
     Ok(())
 }
 

@@ -655,6 +655,18 @@ fn push_one(view: &Path, local: &ItemSummary, provider: &dyn Provider) -> Result
     Ok(outcome(PushResult::Written { title: title_changed, body: body_sent, body_refused }))
 }
 
+/// The only way an item's title changes: written to the provider right
+/// away, with no conversion — `push` never sends a title edited by hand.
+pub fn title(id: &str, new_title: &str, provider: &dyn Provider) -> Result<()> {
+    if !is_valid_id(id) {
+        bail!("{id}: no es un id válido");
+    }
+    if new_title.trim().is_empty() {
+        bail!("el título no puede quedar vacío");
+    }
+    provider.update_title(id, new_title)
+}
+
 /// What `show` prints — frontmatter plus body, live or local, and the
 /// `<id>_data/` listing (decision 7) alongside either, since that directory
 /// is local filesystem state regardless of where the rest came from.
