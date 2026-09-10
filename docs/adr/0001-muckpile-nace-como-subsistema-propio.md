@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `79fea89`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `13895bb`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -378,14 +378,14 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **Un tipo de Jira que usan dos tipos de `muckpile` se distingue por una etiqueta, declarada.** En el ejemplo, `task` y `question` son las dos `"Tarea"`: `question` declara `label = "question"`, `new question` crea la Tarea con esa etiqueta, y `pull` baja una Tarea con la etiqueta como `.question.md` y una sin ella como `.task.md`. De los tipos que comparten un tipo de Jira, uno solo puede ir sin etiqueta —es el que baja por defecto—; si la tabla deja una Tarea sin forma de saber qué es, `muckpile.toml` no se carga, y dice por qué. La etiqueta queda a la vista en Jira: quien mire el board ve que es una pregunta. Medido el 2026-09-10: `ACC` no tiene un tipo propio para una pregunta, y ninguno de sus últimos 100 ítems usa etiquetas.
 
-**Avance: 1/4.**
+**Avance: 2/4.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
 | `muckpile.toml` por proyecto, compartible | `sin bilink` | `ProjectConfig` y `load_project_config`, en `project.rs` |
 | `identity.toml` por máquina: el email y el nombre de la variable | `cerrada` | `load_identity` ↔ esta decisión |
 | El token sólo se lee del entorno, nunca de un archivo | `sin bilink` | `build_provider` |
-| La tabla `item_type` al revés: de tipo de Jira a tipo de `muckpile`, con la etiqueta que distingue un tipo compartido | `diverge` | El código se queda con el primero en orden alfabético. Medido: con el ejemplo viejo, `pull` de una Tarea común escribe `SGE-1.question.md`. Ni `new` pone la etiqueta ni `pull` la lee |
+| La tabla `item_type` al revés: de tipo de Jira a tipo de `muckpile`, con la etiqueta que distingue un tipo compartido | `cerrada` | `ProjectConfig::muckpile_type_of` y `check_item_types` ↔ esta decisión: la etiqueta primero, el tipo sin etiqueta por defecto, y una tabla ambigua no se carga. `new question` la pone al crear y la búsqueda antes de crear la exige (`resolve_one`). Un borde: la búsqueda de un tipo sin etiqueta no excluye las etiquetas de los otros, así que un borrador `task` con el título exacto de una `question` existente la encontraría |
 
 ### 10. Editar el cuerpo local sólo si es seguro — canonicidad, no origen
 
@@ -440,7 +440,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 | Dimensión | Estado | Evidencia |
 |---|---|---|
 | Identificadores y comentarios en inglés | `cumple` | — |
-| Ningún comentario cita un ADR, una spec o un ítem | `no cumple` | 19 comentarios dicen `decision N`. En el código, 13: 8 en `muckpile-cli/src/lib.rs`, 1 en `muckpile-core/src/states.rs`, 1 en `muckpile-provider/src/link.rs`, 3 en `muckpile-provider/src/provider.rs`. En los tests, 6 doc-comments de módulo: `new.rs`, `states_discover.rs` y `transition.rs` de `muckpile-cli`, `identity.rs` y `states.rs` de `muckpile-core`, `link.rs` de `muckpile-provider` |
+| Ningún comentario cita un ADR, una spec o un ítem | `no cumple` | 18 comentarios dicen `decision N`. En el código, 12: 7 en `muckpile-cli/src/lib.rs`, 1 en `muckpile-core/src/states.rs`, 1 en `muckpile-provider/src/link.rs`, 3 en `muckpile-provider/src/provider.rs`. En los tests, 6 doc-comments de módulo: `new.rs`, `states_discover.rs` y `transition.rs` de `muckpile-cli`, `identity.rs` y `states.rs` de `muckpile-core`, `link.rs` de `muckpile-provider` |
 | El idioma de lo que ve el usuario | `falta spec` | Los mensajes y los errores están todos en castellano; esta decisión fija el idioma del código, no el de la salida |
 
 ### 12. El header cambia sólo por comando; el cuerpo se edita como texto
