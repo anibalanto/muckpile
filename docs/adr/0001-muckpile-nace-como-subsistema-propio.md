@@ -139,6 +139,10 @@ Git local es el registro de "qué es lo último que vi del proveedor", y lo llev
 
 **Un ítem que sale de una vista** —lo sacaron del sprint en el proveedor— lo borra el commit del proveedor. Si la vista lo había editado, el rebase choca, borrado de un lado y editado del otro, y lo resuelve quien trabaja: lo automático no decide por nadie qué pasa con una edición.
 
+**Los commits que hace `muckpile` los firma `muckpile`** —`muckpile <muckpile@localhost>`—: los de la ref del proveedor, y los que hace en la vista —un renombre, la forma canónica de un borrador—. Los de la persona los firma la persona, con su identidad de git. Así un `git log` dice qué trajo o hizo la herramienta y qué editó alguien, sin que nadie tenga que configurar nada para que `muckpile` pueda commitear.
+
+**Una vista nace vacía, de un commit sin archivos que es a la vez la punta de su rama y la de su ref del proveedor.** Nada que rebasear todavía: el primer `pull` trae el primer commit del proveedor, y la vista se rebasea encima.
+
 **Cada vista es un worktree de `.muckpile/`**, el git del proyecto (decisión 6), parado en la rama de la vista. `code-work/`, adentro de una vista de trabajo, queda excluido: es un worktree de otro repo.
 
 **Avance: 1/9.**
