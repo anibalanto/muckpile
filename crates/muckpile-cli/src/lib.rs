@@ -8,6 +8,7 @@ use muckpile_core::is_valid_id;
 use muckpile_core::item::{list_summaries, ItemSummary};
 use muckpile_core::project::{classify, require_root, Position, ProjectConfig};
 use muckpile_core::states::write_states_cache;
+use muckpile_provider::link::{link as provider_link, Outcome as LinkOutcome};
 use muckpile_provider::provider::{Provider, Sprint};
 use muckpile_provider::transition::{transition as provider_transition, Outcome};
 use std::collections::BTreeMap;
@@ -179,6 +180,21 @@ pub fn transition(id: &str, target_status: &str, provider: &dyn Provider) -> Res
         bail!("{id}: no es un id válido");
     }
     provider_transition(provider, id, target_status)
+}
+
+/// Replaces `depends`/`blocks` as muckpile's own vocabulary (decision 8,
+/// extended from status to relationships): `phrase` is one of the
+/// provider's own — the deciding-and-firing logic lives in
+/// `muckpile-provider`; this only adds the id checks every other command
+/// already applies to arguments coming from argv.
+pub fn link(a: &str, phrase: &str, b: &str, provider: &dyn Provider) -> Result<LinkOutcome> {
+    if !is_valid_id(a) {
+        bail!("{a}: no es un id válido");
+    }
+    if !is_valid_id(b) {
+        bail!("{b}: no es un id válido");
+    }
+    provider_link(provider, a, phrase, b)
 }
 
 /// Lists the project's workflow statuses, live, and caches `{name ->

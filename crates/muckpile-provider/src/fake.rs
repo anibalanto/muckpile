@@ -3,7 +3,7 @@
 //! has its place, exploratory and by hand, never inside a suite that runs on
 //! every `cargo test`.
 
-use crate::provider::{self, Provider, Sprint, Status, Transition};
+use crate::provider::{self, LinkType, Provider, Sprint, Status, Transition};
 use anyhow::{bail, Result};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -12,6 +12,8 @@ pub struct FakeProvider {
     items: RefCell<HashMap<String, Entry>>,
     sprints: RefCell<Vec<Sprint>>,
     statuses: RefCell<Vec<Status>>,
+    link_types: RefCell<Vec<LinkType>>,
+    links_created: RefCell<Vec<(String, String, String)>>,
 }
 
 /// What `FakeProvider` holds per item — a superset of what any one `Provider`
@@ -27,7 +29,28 @@ struct Entry {
 
 impl FakeProvider {
     pub fn new() -> Self {
-        FakeProvider { items: RefCell::new(HashMap::new()), sprints: RefCell::new(Vec::new()), statuses: RefCell::new(Vec::new()) }
+        FakeProvider {
+            items: RefCell::new(HashMap::new()),
+            sprints: RefCell::new(Vec::new()),
+            statuses: RefCell::new(Vec::new()),
+            link_types: RefCell::new(Vec::new()),
+            links_created: RefCell::new(Vec::new()),
+        }
+    }
+
+    /// Seeds the provider's own relationship types as `(name, outward,
+    /// inward)` triples.
+    pub fn seed_link_types(&self, types: &[(&str, &str, &str)]) {
+        *self.link_types.borrow_mut() = types
+            .iter()
+            .map(|(name, outward, inward)| LinkType { name: name.to_string(), outward: outward.to_string(), inward: inward.to_string() })
+            .collect();
+    }
+
+    /// Every link `create_link` was asked to make, as `(type, outward_key,
+    /// inward_key)` — what a test checks instead of a live board.
+    pub fn links_created(&self) -> Vec<(String, String, String)> {
+        self.links_created.borrow().clone()
     }
 
     /// Seeds the project's workflow statuses as `(name, category)` pairs,
@@ -114,5 +137,14 @@ impl Provider for FakeProvider {
 
     fn project_statuses(&self, _project_key: &str) -> Result<Vec<Status>> {
         Ok(self.statuses.borrow().clone())
+    }
+
+    fn link_types(&self) -> Result<Vec<LinkType>> {
+        Ok(self.link_types.borrow().clone())
+    }
+
+    fn create_link(&self, type_name: &str, outward_key: &str, inward_key: &str) -> Result<()> {
+        self.links_created.borrow_mut().push((type_name.to_string(), outward_key.to_string(), inward_key.to_string()));
+        Ok(())
     }
 }

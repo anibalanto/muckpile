@@ -3,6 +3,7 @@ use muckpile_core::identity::load_identity;
 use muckpile_core::project::{find_project_root, load_project_config, ProjectConfig};
 use muckpile_core::states::read_states_cache;
 use muckpile_cli::ListFilter;
+use muckpile_provider::link::Outcome as LinkOutcome;
 use muckpile_provider::provider::Provider;
 use muckpile_provider::rest::{Credentials, JiraRest};
 use muckpile_provider::transition::Outcome;
@@ -20,8 +21,9 @@ fn main() -> Result<()> {
         [cmd, sub] if cmd == "states" && sub == "discover" => run_states_discover(),
         [cmd, rest @ ..] if cmd == "list" => run_list(rest),
         [cmd, view] if cmd == "status" => run_status(view),
+        [cmd, a, phrase, b] if cmd == "link" => run_link(a, phrase, b),
         _ => bail!(
-            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista>"
+            "uso: muckpile to-work <id> | muckpile pull [id] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile link <a> <frase> <b>"
         ),
     }
 }
@@ -159,6 +161,19 @@ fn run_status(view_arg: &str) -> Result<()> {
 
 fn display_parent(parent: &Option<String>) -> &str {
     parent.as_deref().unwrap_or("(ninguno)")
+}
+
+fn run_link(a: &str, phrase: &str, b: &str) -> Result<()> {
+    let (root, _cwd) = standing_in_a_project()?;
+    let config = load_project_config(&root)?;
+    let provider = build_provider(&root, &config)?;
+    match muckpile_cli::link(a, phrase, b, provider.as_ref())? {
+        LinkOutcome::Applied { type_name } => println!("{a} {phrase} {b}  ({type_name})"),
+        LinkOutcome::NoSuchPhrase { available } => {
+            println!("\"{phrase}\": no es una frase de relación del proveedor — disponibles: {}", available.join(", "));
+        }
+    }
+    Ok(())
 }
 
 fn standing_in_a_project() -> Result<(PathBuf, PathBuf)> {

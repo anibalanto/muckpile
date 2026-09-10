@@ -2,7 +2,7 @@
 //! body — against a local, in-process mock. Never touches the real
 //! provider: this is exactly what the automated suite is allowed to touch.
 
-use muckpile_provider::provider::{Provider, Sprint, Status, Transition};
+use muckpile_provider::provider::{LinkType, Provider, Sprint, Status, Transition};
 use muckpile_provider::rest::{Credentials, JiraRest};
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -199,6 +199,49 @@ fn project_statuses_dedupes_the_same_status_repeated_across_issue_types() {
     let captured = rx.recv().unwrap();
     assert_eq!(captured.method, "GET");
     assert_eq!(captured.path, "/rest/api/3/project/ACC/statuses");
+}
+
+/// Shape measured against the real Jira instance on 2026-09-10: an
+/// instance-wide list, not per-project — `Blocks`/`Relates`/`Duplicate`
+/// among others, none named `Depends`.
+#[test]
+fn link_types_hits_the_instance_wide_endpoint_and_parses_both_phrases() {
+    let response = r#"{"issueLinkTypes":[
+        {"id":"10000","name":"Blocks","inward":"is blocked by","outward":"blocks"},
+        {"id":"10003","name":"Relates","inward":"relates to","outward":"relates to"}
+    ]}"#;
+    let (base, rx) = one_shot(200, response);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    let types = provider.link_types().unwrap();
+
+    assert_eq!(
+        types,
+        vec![
+            LinkType { name: "Blocks".into(), outward: "blocks".into(), inward: "is blocked by".into() },
+            LinkType { name: "Relates".into(), outward: "relates to".into(), inward: "relates to".into() },
+        ]
+    );
+
+    let captured = rx.recv().unwrap();
+    assert_eq!(captured.method, "GET");
+    assert_eq!(captured.path, "/rest/api/3/issueLinkType");
+}
+
+#[test]
+fn create_link_posts_the_type_name_and_both_keys_by_direction() {
+    let (base, rx) = one_shot(201, "");
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    provider.create_link("Blocks", "ACC-229", "ACC-338").unwrap();
+
+    let captured = rx.recv().unwrap();
+    assert_eq!(captured.method, "POST");
+    assert_eq!(captured.path, "/rest/api/3/issueLink");
+    let body: serde_json::Value = serde_json::from_str(&captured.body).unwrap();
+    assert_eq!(body["type"]["name"], "Blocks");
+    assert_eq!(body["outwardIssue"]["key"], "ACC-229");
+    assert_eq!(body["inwardIssue"]["key"], "ACC-338");
 }
 
 #[test]

@@ -1,7 +1,7 @@
 //! The real transport: Jira's REST API, reached directly — one port, not
 //! three transports each covering for what the other two can't do.
 
-use crate::provider::{Item, Provider, Sprint, Status, Transition};
+use crate::provider::{Item, LinkType, Provider, Sprint, Status, Transition};
 use anyhow::{anyhow, bail, Context, Result};
 use std::collections::BTreeMap;
 
@@ -130,6 +130,31 @@ impl Provider for JiraRest {
             }
         }
         Ok(by_name.into_iter().map(|(name, category)| Status { name, category }).collect())
+    }
+
+    fn link_types(&self) -> Result<Vec<LinkType>> {
+        let v = self.call("GET", "/rest/api/3/issueLinkType", None)?;
+        let arr = v.get("issueLinkTypes").and_then(|t| t.as_array()).ok_or_else(|| anyhow!("no `issueLinkTypes` in the response"))?;
+        Ok(arr
+            .iter()
+            .filter_map(|t| {
+                Some(LinkType {
+                    name: t.get("name")?.as_str()?.to_string(),
+                    outward: t.get("outward")?.as_str()?.to_string(),
+                    inward: t.get("inward")?.as_str()?.to_string(),
+                })
+            })
+            .collect())
+    }
+
+    fn create_link(&self, type_name: &str, outward_key: &str, inward_key: &str) -> Result<()> {
+        let body = serde_json::json!({
+            "type": { "name": type_name },
+            "outwardIssue": { "key": outward_key },
+            "inwardIssue": { "key": inward_key },
+        });
+        self.call("POST", "/rest/api/3/issueLink", Some(body))?;
+        Ok(())
     }
 }
 

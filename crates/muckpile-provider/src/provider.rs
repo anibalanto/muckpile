@@ -49,6 +49,27 @@ pub trait Provider {
     /// never differs between them on the same project (measured against
     /// ACC/701: three statuses, shared verbatim across six issue types).
     fn project_statuses(&self, project_key: &str) -> Result<Vec<Status>>;
+
+    /// Every relationship type the provider offers, instance-wide — measured
+    /// against the real Jira instance behind ACC: eleven types, none named
+    /// `Depends`, so `depends`/`blocks` was never going to be muckpile's own
+    /// vocabulary to keep (decision 8 extended from status to this).
+    fn link_types(&self) -> Result<Vec<LinkType>>;
+
+    /// Creates one link of `type_name` — `outward_key`'s issue plays that
+    /// type's outward phrase toward `inward_key`'s (`outward_key` "blocks"
+    /// `inward_key`, for `Blocks`).
+    fn create_link(&self, type_name: &str, outward_key: &str, inward_key: &str) -> Result<()>;
+}
+
+/// A relationship type, named from both directions — e.g. Jira's `Blocks`:
+/// outward `"blocks"`, inward `"is blocked by"`. Neither phrase is
+/// muckpile's own: both are exactly what the provider calls them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkType {
+    pub name: String,
+    pub outward: String,
+    pub inward: String,
 }
 
 /// A workflow status, as the provider names and categorizes it. `category`
