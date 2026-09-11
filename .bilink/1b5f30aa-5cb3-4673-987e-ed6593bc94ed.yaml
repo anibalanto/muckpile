@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture a47a3724ba861ad42236fea4187d6dc4
-      hash: 4bca6b7bbc6b4c5d8dc01ed7d4d895e4d4887a4bc83237daa6dbac8c83dd6ab5
+      hash: dfde68ecced6cfc97eea1ab7789bcc4c022e1e3b08f586e730a37abdad4b41d7
     name: config-spec
   1:
     link: capture d14029ebed96da6a18a3d37dea3b3b9e
