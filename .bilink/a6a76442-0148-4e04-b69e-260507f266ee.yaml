@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 3bfd444237afcc3287f67895b7163d1a
-      hash: f54216611d12932f1d1dcecb22c1ad9b729030fee6685ba195ccc7eff04a529e
+      hash: aaad21fb2ec2dd82511f0571eaf878f8fb552816c5062f94227136f68797ddb0
     name: ledger-spec
   1:
     link: capture cce10a819a7026de43e01d5e25e46ab3

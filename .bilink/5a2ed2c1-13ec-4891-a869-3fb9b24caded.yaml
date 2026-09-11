@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture f3348c2083ac6df96e08d916672b322d
-      hash: d87595e3d9d6e9f6f215056eb18b33d8cabadde803fcf53aea27d7446a526098
+      hash: b22366178b767d8b4d16a203d0437fdbe078ec6b51c20c313e2e65699e94b527
     name: init-spec
   1:
     link: capture 6c194485f7fb17e0f77fc96154d81613
@@ -14,7 +14,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 6c194485f7fb17e0f77fc96154d81613
-      hash: 56b88fdac0bb10afa52bbf9cb7a9e0ed1f6e3875e4ec1aded93376085b0627fa
-      hash_ast: 127fef0b1f16b74f1753645712938dd18d67cd1bd05b241d16a91582e705d1e9
+      hash: 487270933a2dcbb876f1d05ad4ea12e977cdaf6fbd8eda85cd0d3e4069c2f15b
+      hash_ast: 45b410fa7869c2af3b88b48766f90e420cdbaec4979012d511d0a7e11a7bca0d
       n: declined
     name: init-impl

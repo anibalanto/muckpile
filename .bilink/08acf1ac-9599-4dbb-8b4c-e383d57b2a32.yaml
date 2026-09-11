@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 44adc2f6894c7ebf5e8eb291d6efecf5
-      hash: 80880c16fc8b98d8583a08cf826ed7b46723d294e8c4cc2859bc9af0ac88d821
+      hash: c0813e4a8f6df93384c1e80fcd9f8713d6e292c950a084550349260b40d7e01b
     name: views-spec
   1:
     link: capture f6e607c06e34e1c523c99fc92ad58bf7
@@ -14,7 +14,7 @@ endpoint:
     - agree:
       - anibal
       link: capture f6e607c06e34e1c523c99fc92ad58bf7
-      hash: f568cb8e66ae7f18b19d0d0cb9fb09bd7b24ef910cad478462a95f718c9022fb
-      hash_ast: 9aff4b8fb78bdba98df12770029a35b2076cf6e62927fbea3446933f89263ca4
+      hash: c057a320ec56ae9a82e1de402d2edf2c475c74100bc7ccd9ea25d7de95b2e754
+      hash_ast: d61c7e09c00cfe59fdc7ee8d1d4160b683dfca60713d1630108b058924fd470e
       n: declined
     name: other-views-holding
