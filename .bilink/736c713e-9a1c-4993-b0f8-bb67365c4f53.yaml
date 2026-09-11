@@ -10,4 +10,11 @@ endpoint:
     name: help-row
   1:
     link: capture 46003c9ed5d65001c9ebf7740fd4c2e2
+    accepted:
+    - agree:
+      - anibal
+      link: capture 46003c9ed5d65001c9ebf7740fd4c2e2
+      hash: 9f43269df646291f644677f90a26fb9592a721648d0405a56fc6421e1c57dc23
+      hash_ast: 5063b6d744a04cc9a9ad931322b24bbc6538034ea374c019ea46e83a75333f93
+      n: declined
     name: usage_of
