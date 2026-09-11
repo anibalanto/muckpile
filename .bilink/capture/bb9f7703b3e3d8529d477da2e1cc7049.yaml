@@ -1,6 +1,0 @@
-file: docs/specs/concepts/messages.md
-query: |-
-  (section
-    (atx_heading (inline) @n0 (#eq? @n0 "Los catálogos"))
-    (section
-    (atx_heading (inline) @n1 (#eq? @n1 "El idioma sale de `MUCKPILE_LANG`, o del locale"))) @target)

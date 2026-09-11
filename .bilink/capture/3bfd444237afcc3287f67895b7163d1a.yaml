@@ -1,6 +1,0 @@
-file: docs/adr/0001-muckpile-nace-como-subsistema-propio.md
-query: |-
-  (section
-    (atx_heading (inline) @n0 (#eq? @n0 "Decisión"))
-    (section
-    (atx_heading (inline) @n1 (#eq? @n1 "5. Sync por comparación local, no por compare-and-swap en un servidor"))) @target)

@@ -1,6 +1,0 @@
-file: docs/specs/concepts/body.md
-query: |-
-  (section
-    (atx_heading (inline) @n0 (#eq? @n0 "Lo que se manda"))
-    (section
-    (atx_heading (inline) @n1 (#eq? @n1 "Antes de mandar, el borrador se reescribe a su forma canónica"))) @target)

@@ -1,6 +1,0 @@
-file: docs/adr/0001-muckpile-nace-como-subsistema-propio.md
-query: |-
-  (section
-    (atx_heading (inline) @n0 (#eq? @n0 "ADR-0001: muckpile nace como subsistema propio — sin hooks, multiproyecto"))
-    (section
-    (atx_heading (inline) @n1 (#eq? @n1 "La interfaz"))) @target)

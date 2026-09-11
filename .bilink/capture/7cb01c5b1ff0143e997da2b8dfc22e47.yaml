@@ -1,6 +1,0 @@
-file: docs/specs/concepts/question.md
-query: |-
-  (section
-    (atx_heading (inline) @n0 (#eq? @n0 "Los adjuntos"))
-    (section
-    (atx_heading (inline) @n1 (#eq? @n1 "`files/` tiene un archivo por adjunto, y `pull` no borra lo que no escribió"))) @target)

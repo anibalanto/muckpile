@@ -1,4 +1,0 @@
-file: crates/muckpile-core/src/body.rs
-query: |-
-  (function_item
-    name: (identifier) @n0 (#eq? @n0 "cards_to_file_links")) @target

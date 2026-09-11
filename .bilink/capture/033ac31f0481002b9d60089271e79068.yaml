@@ -1,6 +1,0 @@
-file: docs/specs/concepts/body.md
-query: |-
-  (section
-    (atx_heading (inline) @n0 (#eq? @n0 "El conversor"))
-    (section
-    (atx_heading (inline) @n1 (#eq? @n1 "El conversor es el fork de `atlassian-markdown-converter`"))) @target)

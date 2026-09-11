@@ -1,4 +1,0 @@
-file: crates/muckpile-core/tests/body.rs
-query: |-
-  (function_item
-    name: (identifier) @n0 (#eq? @n0 "a_bold_run_cut_by_code_reads_back_as_bold")) @target

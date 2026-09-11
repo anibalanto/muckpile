@@ -1,6 +1,0 @@
-file: docs/specs/concepts/configuration.md
-query: |-
-  (section
-    (atx_heading (inline) @n0 (#eq? @n0 "Los tipos de ítem"))
-    (section
-    (atx_heading (inline) @n1 (#eq? @n1 "`item_type` traduce el tipo del proveedor, y una etiqueta distingue un tipo compartido"))) @target)

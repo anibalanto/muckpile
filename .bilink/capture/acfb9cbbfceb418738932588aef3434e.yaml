@@ -1,4 +1,0 @@
-file: crates/muckpile-cli/src/lib.rs
-query: |-
-  (function_item
-    name: (identifier) @n0 (#eq? @n0 "status")) @target

@@ -1,6 +1,0 @@
-file: docs/specs/concepts/project.md
-query: |-
-  (section
-    (atx_heading (inline) @n0 (#eq? @n0 "Las vistas de trabajo"))
-    (section
-    (atx_heading (inline) @n1 (#eq? @n1 "`to-work <id>` abre una vista de trabajo y trae el ítem"))) @target)

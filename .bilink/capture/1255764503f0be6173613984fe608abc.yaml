@@ -1,6 +1,0 @@
-file: docs/specs/concepts/states.md
-query: |-
-  (section
-    (atx_heading (inline) @n0 (#eq? @n0 "Las relaciones"))
-    (section
-    (atx_heading (inline) @n1 (#eq? @n1 "El link se crea en la dirección que dice la frase"))) @target)

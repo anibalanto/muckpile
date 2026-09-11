@@ -1,6 +1,0 @@
-file: docs/specs/concepts/project.md
-query: |-
-  (section
-    (atx_heading (inline) @n0 (#eq? @n0 "Los sprints"))
-    (section
-    (atx_heading (inline) @n1 (#eq? @n1 "Un nombre de sprint cortado por el proveedor lleva la fecha de creación"))) @target)

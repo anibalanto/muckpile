@@ -1,4 +1,0 @@
-file: crates/muckpile-core/src/i18n.rs
-query: |-
-  (function_item
-    name: (identifier) @n0 (#eq? @n0 "lang_for")) @target

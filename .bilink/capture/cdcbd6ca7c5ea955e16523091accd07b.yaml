@@ -1,6 +1,0 @@
-file: docs/specs/concepts/provider.md
-query: |-
-  (section
-    (atx_heading (inline) @n0 (#eq? @n0 "El puerto"))
-    (section
-    (atx_heading (inline) @n1 (#eq? @n1 "Un solo puerto para el proveedor"))) @target)

@@ -1,4 +1,0 @@
-file: crates/muckpile-provider/src/rest.rs
-query: |-
-  (function_item
-    name: (identifier) @n0 (#eq? @n0 "link_from_own_side")) @target

@@ -1,6 +1,0 @@
-file: docs/specs/concepts/ledger.md
-query: |-
-  (section
-    (atx_heading (inline) @n0 (#eq? @n0 "Una vista en el registro"))
-    (section
-    (atx_heading (inline) @n1 (#eq? @n1 "Dos refs por vista, con el nombre de la vista"))) @target)

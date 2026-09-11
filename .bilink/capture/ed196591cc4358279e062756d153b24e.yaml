@@ -1,6 +1,0 @@
-file: docs/specs/concepts/item.md
-query: |-
-  (section
-    (atx_heading (inline) @n0 (#eq? @n0 "Header y cuerpo"))
-    (section
-    (atx_heading (inline) @n1 (#eq? @n1 "Después de escribir, el comando pone la vista al día"))) @target)

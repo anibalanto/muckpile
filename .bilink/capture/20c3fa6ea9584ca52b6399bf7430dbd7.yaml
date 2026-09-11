@@ -1,6 +1,0 @@
-file: docs/specs/concepts/item.md
-query: |-
-  (section
-    (atx_heading (inline) @n0 (#eq? @n0 "El tipo"))
-    (section
-    (atx_heading (inline) @n1 (#eq? @n1 "Si el proveedor cambia el tipo de un ítem, `pull` renombra el archivo"))) @target)

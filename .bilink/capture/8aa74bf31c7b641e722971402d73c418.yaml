@@ -1,6 +1,0 @@
-file: docs/specs/concepts/project.md
-query: |-
-  (section
-    (atx_heading (inline) @n0 (#eq? @n0 "Entre vistas"))
-    (section
-    (atx_heading (inline) @n1 (#eq? @n1 "`pull` dice en qué otras vistas de esta máquina está cada ítem"))) @target)

@@ -1,8 +1,0 @@
-file: crates/muckpile-provider/src/rest.rs
-query: |-
-  (impl_item
-    trait: (type_identifier) @n0 (#eq? @n0 "Provider")
-    type: (type_identifier) @n1 (#eq? @n1 "JiraRest")
-    body: (declaration_list
-    (function_item
-    name: (identifier) @n2 (#eq? @n2 "add_comment")) @target))
