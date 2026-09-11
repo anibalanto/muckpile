@@ -1,0 +1,8 @@
+kind: governs
+endpoint:
+  0:
+    link: capture f3b532152050c333a95116b3ef02508d
+    name: decisiones-vivas-1
+  1:
+    link: capture c9587df486cdde9b0cd920266a357d29
+    name: auto-update

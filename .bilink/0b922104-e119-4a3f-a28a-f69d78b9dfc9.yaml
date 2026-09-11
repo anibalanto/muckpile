@@ -1,0 +1,8 @@
+kind: governs
+endpoint:
+  0:
+    link: capture f56f2b8c2f1b9be1bc6d9c4443c6e0ba
+    name: auto-comment
+  1:
+    link: capture 26e5060bd7ad45e4bf665a20d51d060f
+    name: comment

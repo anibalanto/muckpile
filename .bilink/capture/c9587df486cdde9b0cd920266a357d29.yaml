@@ -1,0 +1,6 @@
+file: docs/specs/concepts/configuration.md
+query: |-
+  (section
+    (atx_heading (inline) @n0 (#eq? @n0 "Lo que se escribe sin una persona"))
+    (section
+    (atx_heading (inline) @n1 (#eq? @n1 "`auto_update` en `false` pide una persona para crear y editar en el proveedor"))) @target)

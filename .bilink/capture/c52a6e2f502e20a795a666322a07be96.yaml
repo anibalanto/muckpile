@@ -1,0 +1,6 @@
+file: docs/specs/concepts/configuration.md
+query: |-
+  (section
+    (atx_heading (inline) @n0 (#eq? @n0 "Lo que se escribe sin una persona"))
+    (section
+    (atx_heading (inline) @n1 (#eq? @n1 "`push` muestra lo que va a escribir y pide la frase una vez"))) @target)

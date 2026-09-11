@@ -1,0 +1,8 @@
+kind: governs
+endpoint:
+  0:
+    link: capture f3b532152050c333a95116b3ef02508d
+    name: decisiones-vivas-1
+  1:
+    link: capture c52a6e2f502e20a795a666322a07be96
+    name: push-asks-once

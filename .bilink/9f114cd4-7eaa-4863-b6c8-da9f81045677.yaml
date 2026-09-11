@@ -1,0 +1,8 @@
+kind: governs
+endpoint:
+  0:
+    link: capture c52a6e2f502e20a795a666322a07be96
+    name: push-asks-once
+  1:
+    link: capture 4324b758a8a00ba7b19eb85908450383
+    name: plan
