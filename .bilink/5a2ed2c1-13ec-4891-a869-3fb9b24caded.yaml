@@ -14,7 +14,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 6c194485f7fb17e0f77fc96154d81613
-      hash: 487270933a2dcbb876f1d05ad4ea12e977cdaf6fbd8eda85cd0d3e4069c2f15b
-      hash_ast: 45b410fa7869c2af3b88b48766f90e420cdbaec4979012d511d0a7e11a7bca0d
+      hash: 1fedbae7ee33881690dba495a1c231d1ea34de1a99e4d566d51d3586be1dcdbb
+      hash_ast: 7216c556b603c88b34adf91af0c24260e71923e04982f168e86ed4dde19d0628
       n: declined
     name: init-impl

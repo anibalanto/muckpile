@@ -14,7 +14,7 @@ endpoint:
     - agree:
       - anibal
       link: capture eccabdbfcf7a99c9e15cf0c63e88299c
-      hash: 9e62ecd10748c6c2e55fa0af1f4e762f88405116dd64a48faee0f04e9df6ad21
-      hash_ast: 087f149d179f8fe6d0afaaae9fd62c4e09d8069edf162ad66a21fa9278f1ea7f
+      hash: fb2765dc50b4b6a564f43fb48b73dca794c41d8e8d4f67d589f9b78ed2be70d5
+      hash_ast: 0e8954f85ee55ffdbdf0f418f31d19c6e766f9a6593f34847b3b20f2d5fa9405
       n: declined
     name: open-view

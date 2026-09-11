@@ -14,7 +14,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 332d81d6c806597d48fb756b3bdf2cad
-      hash: ad485ff6b0c08e59fda7eaa674b55b1d6b4a1369b15b10a19dc2ed27a482f099
-      hash_ast: 1c9b28c7412e4058d5fd084992321d93cd95da7b72a2078ee79320e46cdb24ed
+      hash: 26813096af5d23c6cd03c856eebd96000f67832e7922c09edf87fac41da96a06
+      hash_ast: 5e878481e9347a30699c5e6141251ec83a04fac9cedfeb828f7051be1654f5a6
       n: declined
     name: sprint-fetch-impl

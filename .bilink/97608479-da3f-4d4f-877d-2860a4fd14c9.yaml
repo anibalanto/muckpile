@@ -14,7 +14,7 @@ endpoint:
     - agree:
       - anibal
       link: capture aeb5a11492f41bde07f63d928930f3fd
-      hash: 68de3bf3067800e3ff424327d9a48f223ca05cdcbf0d3a65af70144b7f36960f
-      hash_ast: aa139e6d8d5def56339c0f29b7d58a015d3423dc568e796cd02fcf39c660127b
+      hash: 2b7be01d94da5af214540775ecab676a5df16f87839238b113ece03d84919722
+      hash_ast: 8fad65761a0024c5e76ced3556ca977feb3a7c68d41ea8b5345a01be86634a93
       n: declined
     name: pull-sprint-impl
