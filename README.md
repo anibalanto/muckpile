@@ -113,7 +113,7 @@ Cada vista tiene dos refs, con el nombre de la vista:
 | `<vista>` | Lo que se ve y se edita: lo del proveedor, con lo propio encima. Su upstream es la ref del proveedor, así que `git status` dice solo cuánto está adelante y atrás. | Quien trabaja, y `muckpile`. |
 
 - **`pull`** registra lo que trae en la ref del proveedor y rebasea la vista. Lo commiteado a mano se reaplica encima; si choca con lo que cambió en Jira, el rebase para y se resuelve con git.
-- **`pull` y `push` se niegan** con cambios sin commitear o con un rebase a medias. Un borrador nuevo que nadie agregó no estorba.
+- **`pull` y `push` se niegan** con cambios sin commitear o con un rebase a medias. Un borrador nuevo que nadie agregó no estorba, y tampoco sube: queda local.
 - **Los commits los firma quien los hace.** Los de `muckpile` —en la ref del proveedor, un renombre, una forma canónica— van como `muckpile <muckpile@localhost>`; los tuyos, con tu identidad de git. Un `git log` dice qué trajo la herramienta y qué editó alguien.
 - **Romper algo con git a mano no escribe nada mal en Jira.** Lo que `muckpile` guarda se vuelve a sacar con un `pull`; lo que no se subió lo cuida git —`git reflog`, o `git reset --hard @{u}` para volver a lo del proveedor—.
 
@@ -150,7 +150,7 @@ escribe [ACC-338](ACC-338.question.md).
 
 ![push](docs/diagrams/push.svg)
 
-`push <vista>` primero resuelve los borradores, y después, por cada ítem con un cuerpo editado:
+`push <vista>` sube lo commiteado, como `git push`, y nada del árbol de trabajo. Primero resuelve los borradores commiteados, y después, por cada ítem con un cuerpo editado:
 
 1. le pregunta a Jira qué tiene ahora, y lo compara contra la ref del proveedor —el ADF contra el ADF, que ve lo que el markdown no muestra—;
 2. si Jira cambió, **no escribe**: registra lo que trajo, rebasea la vista y avisa, para revisar y volver a correr `push`;
@@ -162,7 +162,7 @@ escribe [ACC-338](ACC-338.question.md).
 
 ![Un borrador que se resuelve](docs/diagrams/slug.svg)
 
-`muckpile new <tipo> "<título>"` escribe `@<slug>.<tipo>.md` sin tocar la red —`--parent` y `--blocks` completan su header—. El siguiente `push` lo resuelve, en este orden:
+`muckpile new <tipo> "<título>"` escribe `@<slug>.<tipo>.md` sin tocar la red —`--parent` y `--blocks` completan su header—. Mientras nadie lo commitee, queda local: `push` dice que lo vio, y no lo sube. Así se queda afuera de Jira una tarea de seguimiento. Commiteado —`git add` y `git commit`, porque `git commit -am` no agrega archivos nuevos—, el siguiente `push` lo resuelve, en este orden:
 
 1. busca un ítem con ese título y ese tipo —y esa etiqueta, si el tipo la lleva—, para que un reintento no duplique; sólo si no hay, lo crea, con el cuerpo, el padre y las relaciones del borrador;
 2. registra en la ref del proveedor `new @slug` —o `found @slug`— con lo que devolvió Jira, y rebasea la vista;
@@ -242,7 +242,7 @@ sin-sprint = "project = SGE AND sprint is empty"
 | `pull backlog/sprint/<sprint>` | Deja la vista con exactamente lo que el sprint tiene: lo que entró viene, lo que salió se va. |
 | `pull query/<nombre> [--query <JQL>]` | Lo mismo con una consulta: la de `muckpile.toml`, o la de `--query` para ese `pull`. |
 | `sprint fetch` | Una vista vacía por sprint abierto; nunca borra una con algo adentro. |
-| `push <vista>` | Resuelve los borradores y sube los cuerpos editados, si nada cambió en Jira. |
+| `push <vista>` | Resuelve los borradores commiteados y sube los cuerpos editados, si nada cambió en Jira. |
 | `status <vista>` | Compara lo local contra Jira, sin escribir. |
 | `list <vista> [--state <e>] [--category <c>] [--parent <id>]` | Los ítems de una vista, filtrados. |
 | `show <id> [--local]` | Un ítem, de Jira en vivo o de la copia local, y su `_data/`. |

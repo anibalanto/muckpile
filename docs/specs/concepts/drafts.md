@@ -10,7 +10,13 @@ Un ítem puede nacer local, sin red, y el proveedor le da su id la próxima vez 
 
 ## Cómo `push` resuelve los borradores
 
-`push` resuelve primero los borradores que la vista tiene, y recién después sube los cuerpos editados ([ledger.md](ledger.md)). Cada borrador pasa por los pasos de abajo, en este orden.
+`push` resuelve primero los borradores que la vista tiene commiteados, y recién después sube los cuerpos editados ([ledger.md](ledger.md)). Cada borrador pasa por los pasos de abajo, en este orden.
+
+### Un borrador que nadie commiteó queda local
+
+`push` sube los commits de la vista, y nada del árbol de trabajo. Un borrador que nadie commiteó no se busca ni se crea: `push` dice que lo vio y que queda local, y lo deja como está. Lo que lo nombra en `parent` o en `relation.*` espera con él, porque no hay id que ponerle. Un borrador se commitea con `git add` y `git commit`: `git commit -am` no agrega archivos nuevos.
+
+`push` no commitea un borrador en lugar de la persona. Sus commits en la vista van encima de los de ella: la forma canónica del cuerpo y el renombre.
 
 ### Antes de crear, se busca por título
 
@@ -43,4 +49,4 @@ Si buscar o crear un borrador falla, lo que lo nombra en `parent` o en `relation
 
 ### Un ítem que se encontró no recibe nada del borrador
 
-Ni el cuerpo, ni el `parent`, ni las relaciones: sólo viajan al crear. El borrador no se pierde, porque quedó commiteado en la vista antes de resolverse. Si un `push` creó el ítem y se cortó antes de terminar, el siguiente lo encuentra, y la relación que no llegó queda en el mensaje del primero, con el `link` que la crea.
+Ni el cuerpo, ni el `parent`, ni las relaciones: sólo viajan al crear. El borrador no se pierde, porque ya estaba commiteado en la vista. Si un `push` creó el ítem y se cortó antes de terminar, el siguiente lo encuentra, y la relación que no llegó queda en el mensaje del primero, con el `link` que la crea.
