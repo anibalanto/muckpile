@@ -212,7 +212,7 @@ multitask/
 
 **Y no hace falta un panorama de qué vista tiene abierto qué.** Si dos vistas traen el mismo ítem, no hay que coordinarlas con nada compartido: la corrección ya la da la decisión 5 — cada `push` vuelve a preguntarle al proveedor antes de escribir, así que la vista que llega segunda se entera ahí, no antes. Lo único que vale la pena ofrecer es un chequeo **local**, contra el propio disco —"¿ya tengo este ítem en otra vista, en esta máquina?"—, que es barato y no puede quedar viejo del mismo modo que un registro compartido: pregunta sobre algo que está ahí mismo, no sobre una copia de otro lado.
 
-**`to-work <id>` arma sólo la vista, sin tocar código:** crea `<proyecto>/to-work/<id>/`, trae el ítem y su `_data/`. No deja `code-work/` — con un solo repo por proyecto se podía asumir cuál worktree armar, pero con varios ya no hay "el" repo por default, y adivinar cuáles toca esta tarea es apostar. Lo relacionado se agrega después con `pull`, igual que siempre; el código se agrega después con `code-work add`, un repo a la vez.
+**`to-work <id>` arma sólo la vista, sin tocar código:** crea `<proyecto>/to-work/<id>/`, trae el ítem y su `_data/` —`--empty` la deja vacía, para traerlo después con `pull`—. No deja `code-work/` — con un solo repo por proyecto se podía asumir cuál worktree armar, pero con varios ya no hay "el" repo por default, y adivinar cuáles toca esta tarea es apostar. Lo relacionado se agrega después con `pull`, igual que siempre; el código se agrega después con `code-work add`, un repo a la vez.
 
 **`code-work add <repo>`, corrido adentro de la vista, agrega un worktree.** Deja `code-work/<repo>/` como worktree de `<proyecto>/base/<repo>/`, en la rama derivada del `commit_prefix` del proyecto (decisión 9) — `SGE-9876` con `commit_prefix = "jr"` da `jr-9876`, no la clave completa en minúscula. Es el mismo campo que ya nombra los commits: una sola abreviación gobierna las dos cosas. Si `base/<repo>/` todavía no existe en el disco, se clona ahí mismo y no antes — no hace falta clonar los cinco repos de un proyecto para trabajar uno solo.
 
@@ -235,6 +235,13 @@ acc: 2 sprint(s) abierto(s)
 
 $ muckpile pull backlog/sprint/22_Las_<TAB>
 backlog/sprint/22_Las_vistas/  backlog/sprint/23_Las_questions/     ← no hay ambigüedad todavía, pero ya completa
+```
+
+**Una consulta con nombre es otra vista del backlog: `backlog/queries/<nombre>/`.** La consulta —JQL— se declara en `muckpile.toml`, en `[queries]`, y `muckpile pull backlog/queries/<nombre>` deja la vista con exactamente lo que la consulta devuelve, como un sprint: lo que deja de coincidir se va. `--query "<JQL>"` usa otra consulta para ese `pull`, sin guardarla: el siguiente, sin `--query`, vuelve a la de `muckpile.toml`, y si no hay ninguna, se niega. Es lo que reemplaza a `bootstrap`/`reconcile`/`adopt`.
+
+```toml
+[queries]
+sin-sprint = "project = ACC AND sprint is empty"
 ```
 
 **Y re-correr `sprint fetch` nunca borra una carpeta con algo adentro.** Si un sprint cierra en el board, su carpeta puede seguir teniendo un `pull` viejo con trabajo real; `fetch` sólo crea las que faltan y borra las que él mismo dejó vacías, nunca una que alguien pobló. Es la misma regla de siempre: lo automático no destruye lo que no escribió.
@@ -286,7 +293,7 @@ SGE-7699_data/
 
 **Y `--i-human` lo tiene que confirmar alguien frente a una terminal.** `comment` muestra una frase de dos palabras cortas, distinta cada vez —`faro-azul`, `puma-veloz`, como los nombres que Docker les pone a los contenedores—, y pide que se la escriba de vuelta. La lee de la terminal misma —`/dev/tty` en Linux y Mac, la consola en Windows—, nunca de la entrada estándar, así que no se le puede pasar con un pipe; sin terminal, se niega. Medido el 2026-09-10: el shell desde el que un agente como Claude Code corre comandos no tiene terminal —`tty` dice `not a tty`, y `/dev/tty` no se puede abrir—. Frena a un agente que agrega `--i-human` por comodidad; no frena a uno que se arme una terminal a propósito para leer la frase y tipearla, ni a uno que postee directo contra la API con el token. Eso ya no es usar mal un flag, y lo que lo cierra no es local: que la IA tenga su propia cuenta en el proveedor, y que `author_id` diga quién escribió. No se guarda nada: no hay frase que recordar, ni hash en ningún archivo.
 
-**Avance: 11/12.**
+**Avance: 11/11.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -301,7 +308,6 @@ SGE-7699_data/
 | `--ai <modelo>` o `--i-human`, siempre uno de los dos: el modelo como dato al principio del comentario, y `pull` lo pasa al header | `cerrada` | `comment` ↔ esta decisión: sin ninguno se niega, y `--ai` antepone `ai: <modelo>` con el modelo como código; `render_comment` lo lee de vuelta (`split_ai`). Probado en `ACC-360`: el `pull` bajó `ai: claude-opus-5` al header y lo sacó del cuerpo |
 | `--i-human` pide en la terminal una frase distinta cada vez, y sin terminal se niega | `cerrada` | `confirm_human` ↔ esta decisión: sólo con esa prueba existe un `Author::Human`. La frase la arma `random_phrase`, y `main.rs` la pregunta en `/dev/tty` o en la consola de Windows. Probado el 2026-09-10 con el binario desde el shell de un agente: se niega sin terminal, y también con la respuesta por un pipe |
 | `_data/` viaja con el renombre del `@slug` | `cerrada` | `rename_one` lo mueve en el mismo commit; bilink de la decisión 4 |
-| Cómo se muda `files/` cuando la pregunta cierra | `falta spec` | La pregunta que dejó `ACC-335`: quién mueve el borrador a la capa que lo gobierna, y qué pasa si la pregunta cierra y el borrador se queda |
 
 ### 8. Sin vocabulario propio de estados: el que baja es el estado del proveedor, literal
 
@@ -449,6 +455,8 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **Y el comentario documenta el código, nunca señala hacia afuera.** No cita un ADR por número, ni un archivo de spec, ni un ítem del worklist — es la misma regla que `item.md` ya fija para cualquier comentario de este ecosistema, generalizada acá más allá de un ítem: si hace falta decir por qué el código es así, se dice en términos del código —una invariante, un caso límite medido, una razón que no sale de la firma—, no con un puntero a un documento que se puede mover o renombrar. `worklist-core/src/body.rs` cita `concepts/sync.md` por nombre en su doc-comment de módulo; es exactamente lo que un lector de `muckpile` no va a encontrar.
 
+**Lo que ve el usuario sale de archivos de mensajes, uno por idioma: `en` y `es-AR`.** El código nombra cada mensaje con una clave en inglés, y el texto vive en el archivo, con sus datos entre llaves. El idioma sale de `MUCKPILE_LANG`, o si no está, del locale del sistema —`LC_ALL`, `LC_MESSAGES`, `LANG`—: uno que empiece con `es` es `es-AR`, cualquier otro `en`. Un mensaje que falte en `es-AR` sale en `en`. `MUCKPILE_LANG` existe porque el locale de una máquina no siempre es el idioma de quien la usa: la de este desarrollo dice `en_US`.
+
 **Y esto no reemplaza el método — lo hace más estricto donde antes había una salida fácil.** La correspondencia entre spec y código sigue siendo la de `AGENTS.md`: se toca la spec, `bilinker check` reporta los endpoints no-OK, cada uno apunta al fragmento que hay que tocar, se cambia el código y se acepta. Es el bilink el que ata el código a la spec —estructural, verificable, y `bilinker check` avisa si se rompe— y no una línea de comentario que diga "ver tal archivo", que es lo que el comentario ya no puede hacer.
 
 **Avance: 2/3.**
@@ -457,7 +465,7 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 |---|---|---|
 | Identificadores y comentarios en inglés | `cumple` | — |
 | Ningún comentario cita un ADR, una spec o un ítem | `cumple` | Desde `ae5d5cd`, `git grep "decision [0-9]" -- crates` no encuentra nada; donde la cita decía algo, lo dice en términos del código |
-| El idioma de lo que ve el usuario | `falta spec` | Los mensajes y los errores están todos en castellano; esta decisión fija el idioma del código, no el de la salida |
+| Lo que ve el usuario sale de archivos de mensajes, `en` y `es-AR`, y el idioma de `MUCKPILE_LANG` o del locale | `pendiente` | Los mensajes y los errores están todos en castellano, escritos en el código |
 
 ### 12. El header cambia sólo por comando; el cuerpo se edita como texto
 
@@ -556,9 +564,9 @@ El choque de hoy, bajo este modelo, no es un `add/add` que exige `--force`: es u
 | `list` | Ítems por vista, sprint, estado (el string real, sin traducir), categoría (`new`/`indeterminate`/`done`, de Jira) o padre. | `$ muckpile list backlog/sprint/22_Las_vistas --state "Finalizada"`<br>`$ muckpile list backlog/sprint/22_Las_vistas --category done` |
 | `sprint fetch` | Trae los sprints abiertos del proyecto y crea una carpeta vacía por cada uno bajo `backlog/sprint/`, con el nombre slugificado — para tab-completar y para tener contra qué correr `pull`. Nunca borra una carpeta que ya tiene algo adentro. | `$ muckpile sprint fetch` |
 | `states discover` | Lista en vivo los estados del workflow y su categoría (`statusCategory` de Jira), y cachea `{nombre -> categoría}` en `<proyecto>.states.toml` — regenerable, nunca editado a mano. | `$ muckpile states discover` |
-| `to-work` | Arma una vista de trabajo bajo `to-work/`: `to-work/<id>/` con su `_data/`. No toca código — eso es `code-work add`. Sólo corre parado en la raíz del proyecto — se niega en `base/`, `backlog/`, `backlog/sprint/`, o adentro de `to-work/`. | `$ muckpile to-work SGE-344`  ← crea `to-work/SGE-344/`<br>`$ cd backlog/sprint/22_Las_vistas && muckpile to-work ACC-355`<br>`error: to-work corre en la raíz del proyecto, no en backlog/sprint/22_Las_vistas` |
+| `to-work` | Arma una vista de trabajo bajo `to-work/`: `to-work/<id>/`, con el ítem y su `_data/` ya traídos —`--empty` la deja vacía—. No toca código — eso es `code-work add`. Sólo corre parado en la raíz del proyecto — se niega en `base/`, `backlog/`, `backlog/sprint/`, o adentro de `to-work/`. | `$ muckpile to-work SGE-344`  ← crea `to-work/SGE-344/`<br>`$ cd backlog/sprint/22_Las_vistas && muckpile to-work ACC-355`<br>`error: to-work corre en la raíz del proyecto, no en backlog/sprint/22_Las_vistas` |
 | `code-work add` | Corrido adentro de una vista de trabajo, agrega un worktree por repo: `code-work/<repo>/`. Por default, trackea la rama derivada de `commit_prefix` si ya existe en el remoto, o la crea desde la principal de `base/<repo>/` si no — clonándolo en el momento si todavía no está en disco. `--from` pisa el punto de partida (un hotfix desde `rc-??`); `--branch` pisa el nombre cuando no es el derivado (split FE/BE). | `$ cd to-work/SGE-9876 && muckpile code-work add sge`<br>`$ muckpile code-work add portal-escolar --from rc-3.2` |
-| `pull` | Trae o actualiza una vista — un ítem, un sprint ya conocido por `sprint fetch` (bajo `backlog/sprint/`), una consulta. Sin argumento, actualiza la vista donde estás parado — misma convención que ya usa `worklist`. Corrido adentro de una vista con un id nuevo, le agrega lo relacionado. Nunca el proyecto entero. | `$ muckpile pull backlog/sprint/22_Las_vistas`  ← desde `acc/`<br>`$ cd acc/backlog/sprint/22_Las_vistas && muckpile pull`  ← la misma, parado adentro<br>`$ cd sge/to-work/SGE-344 && muckpile pull SGE-9875`  ← agrega un relacionado |
+| `pull` | Trae o actualiza una vista — un ítem, un sprint ya conocido por `sprint fetch` (bajo `backlog/sprint/`), una consulta con nombre (bajo `backlog/queries/`, declarada en `muckpile.toml`, o con `--query` para ese `pull`). Sin argumento, actualiza la vista donde estás parado — misma convención que ya usa `worklist`. Corrido adentro de una vista con un id nuevo, le agrega lo relacionado. Nunca el proyecto entero. | `$ muckpile pull backlog/sprint/22_Las_vistas`  ← desde `acc/`<br>`$ cd acc/backlog/sprint/22_Las_vistas && muckpile pull`  ← la misma, parado adentro<br>`$ cd sge/to-work/SGE-344 && muckpile pull SGE-9875`  ← agrega un relacionado |
 | `push` | Primero resuelve los `@slug` pendientes que la vista toca —busca, crea, renombra archivo y directorio, reescribe referencias, un commit—; después escribe el cuerpo editado. El header no se sube: cambia por comando, y una edición a mano se dice y no se manda (decisión 12). Antes de escribir, vuelve a preguntar: si el proveedor cambió desde el último `pull`, no pisa. El cuerpo, además, sólo se sube si es canónico (decisión 10) — si no, se niega y ofrece el diff. | `$ muckpile push backlog/sprint/22_Las_vistas`<br>`ACC-355: cambió del otro lado desde tu último pull — no se escribió nada`<br>`ACC-360: el cuerpo no es canónico — no se sube. Diff: …` |
 | `status` | Compara local contra el proveedor en vivo, sin escribir. | `$ muckpile status backlog/sprint/22_Las_vistas` |
 | `transition` | Reemplaza a `start`/`done`/`close`/`drop` — no hay vocabulario propio que darles (decisión 8). Lista las transiciones del ítem, busca la que lleva al estado pedido, la ejecuta. | `$ muckpile transition ACC-355 "Finalizada"` |
@@ -571,7 +579,7 @@ El choque de hoy, bajo este modelo, no es un `add/add` que exige `--force`: es u
 
 **Avance de la tabla: las dieciocho filas tienen bilink aceptado** (`show` tiene dos, uno por camino). Que la fila esté atada no quiere decir que el comando esté completo: `pull` y `push` son parciales —lo que les falta está en las decisiones 5, 6, 7, 8 y 10—, y `to-work` diverge de su propia fila (decisión 6).
 
-Dieciocho comandos contra los veintitrés de hoy (once de `worklist`, doce de `worklist-server`). Lo que no está en la tabla — `install-hooks`, `check-push`, `assign-keys`, `bootstrap`, `reconcile`, `removes`, `push-states`, `create-or-find`, `provider set-status`, `window-open`, `propagate`, `adopt` — no falta: era la maquinaria de la asimetría que la decisión 1 saca. `bootstrap`/`reconcile`/`adopt` sí tienen equivalente, pero no como comando aparte: son `pull` con una consulta que trae de a muchos — `muckpile pull backlog --query "project = ACC AND sprint is empty"`.
+Dieciocho comandos contra los veintitrés de hoy (once de `worklist`, doce de `worklist-server`). Lo que no está en la tabla — `install-hooks`, `check-push`, `assign-keys`, `bootstrap`, `reconcile`, `removes`, `push-states`, `create-or-find`, `provider set-status`, `window-open`, `propagate`, `adopt` — no falta: era la maquinaria de la asimetría que la decisión 1 saca. `bootstrap`/`reconcile`/`adopt` sí tienen equivalente, pero no como comando aparte: son `pull` con una consulta que trae de a muchos — `muckpile pull backlog/queries/sin-sprint`, con la consulta declarada en `muckpile.toml` (decisión 6).
 
 ---
 
@@ -588,6 +596,7 @@ Dieciocho comandos contra los veintitrés de hoy (once de `worklist`, doce de `w
 **Lo que no cambia, porque no es de esta capa:** los problemas del cuerpo — que Jira pode `strong`+`code`, que la búsqueda por título en JQL se rompa con `--` o con `[]` — siguen estando, porque son del schema de Jira y de su buscador. `muckpile` hereda la API de Jira tal cual es.
 
 **Lo que este ADR no decide:**
+- Cómo se muda un borrador de `files/` a la capa que lo gobierna cuando la pregunta cierra, y qué pasa si se queda: lo que dejó abierto `ACC-335`. No se maneja por ahora —decidido el 2026-09-10—: `files/` guarda los borradores, y moverlos es a mano.
 - Si `.muckpile/` —uno por proyecto, según decisión 6— necesita algún metadato propio además de lo que git ya da.
 - Cómo el workflow del proveedor hace cumplir `blocks` en la práctica — decisión 7/8 dice que es su responsabilidad y no la de `muckpile`, pero no dice cómo se configura eso en un board real.
 - Si el formato de archivo de un ítem (`<id>.<tipo>.md`, frontmatter con `title`/`status`/`parent`/`relation.*`) se conserva tal cual — este ADR asume que sí, porque nada de lo de arriba lo obliga a cambiar. La decisión 12 fija quién cambia el header, con qué clave baja una relación, y que el tipo sigue en el nombre del archivo.
