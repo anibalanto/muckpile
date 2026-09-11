@@ -10,4 +10,11 @@ endpoint:
     name: push-asks-once
   1:
     link: capture 4324b758a8a00ba7b19eb85908450383
+    accepted:
+    - agree:
+      - anibal
+      link: capture 4324b758a8a00ba7b19eb85908450383
+      hash: b530c3b539f90de65262157721e8fc8643aa4d91b1c6cda9a9c8b01c85eabbf1
+      hash_ast: 522474b25554a8f9120015e0c2431c511529d18371b050d391d43eae8e30958f
+      n: declined
     name: plan
