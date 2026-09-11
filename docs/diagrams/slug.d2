@@ -1,0 +1,20 @@
+shape: sequence_diagram
+
+persona: Persona
+mp: muckpile
+reg: ".muckpile/"
+jira: Jira
+
+persona -> mp: "muckpile new question \"¿se hereda?\" --blocks ACC-229"
+mp -> persona: "@se-hereda.question.md, sin red"
+persona -> mp: "muckpile push ."
+mp -> reg: "commitea el borrador"
+mp -> jira: "¿hay una Tarea con ese título y la etiqueta question?"
+jira -> mp: "no"
+mp -> jira: "la crea, con la etiqueta, el cuerpo y el padre"
+jira -> mp: "ACC-360"
+mp -> jira: "link: ACC-360 blocks ACC-229"
+mp -> reg: "new @se-hereda: registra ACC-360 en la ref del proveedor"
+mp -> reg: "rebasea la vista"
+mp -> reg: "rename @se-hereda -> ACC-360\nretira el borrador, mueve su _data/, reescribe referencias"
+mp -> persona: "@se-hereda: creado como ACC-360"

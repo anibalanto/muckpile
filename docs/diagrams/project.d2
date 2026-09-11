@@ -1,0 +1,33 @@
+direction: right
+
+sge: "multitask/sge/ — un proyecto, un board de Jira" {
+  ledger: ".muckpile/\nel git del proyecto\nsin worktree propio" {shape: cylinder}
+  toml: "muckpile.toml\ncompartible" {shape: page}
+
+  base: "base/" {
+    repo: "sge/\nclon, siempre en su rama principal"
+    otro: "portal-escolar/\notro repo del mismo board"
+  }
+
+  backlog: "backlog/sprint/" {
+    s: "Sprint_3.4_Team_Fernet/\nvista de sprint"
+  }
+
+  towork: "to-work/" {
+    v: "SGE-9876/ — vista de trabajo" {
+      item: "SGE-9876.task.md" {shape: page}
+      data: "SGE-9876_data/\nthread/ · files/"
+      story: "SGE-9875.user-story.md" {shape: page}
+      cw: "code-work/sge/\nworktree de base/sge/, rama jr-9876"
+    }
+  }
+
+  query: "query/" {
+    q: "sin-sprint/\nvista de consulta"
+  }
+}
+
+sge.ledger -> sge.towork.v: "worktree" {style.stroke-dash: 3}
+sge.ledger -> sge.backlog.s: "worktree" {style.stroke-dash: 3}
+sge.ledger -> sge.query.q: "worktree" {style.stroke-dash: 3}
+sge.base.repo -> sge.towork.v.cw: "worktree" {style.stroke-dash: 3}

@@ -1,0 +1,15 @@
+direction: right
+
+jira: "Jira\nla fuente" {shape: cloud}
+
+ledger: ".muckpile/ — dos refs por vista" {
+  provider: "refs/remotes/provider/to-work/ACC-1\nlo que dijo el proveedor\nsólo avanza, sólo lo mueve muckpile" {shape: queue}
+  view: "to-work/ACC-1\nlo del proveedor, y lo propio encima\nsu upstream es la ref del proveedor" {shape: queue}
+}
+
+persona: "Persona" {shape: person}
+
+jira -> ledger.provider: "pull · la pregunta de push\nregistra lo que devolvió"
+ledger.provider -> ledger.view: "rebase\nlo propio se reaplica encima"
+persona -> ledger.view: "edita y commitea"
+ledger.view -> jira: "push\nsólo el cuerpo, y sólo si nada cambió"

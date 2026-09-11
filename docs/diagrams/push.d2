@@ -1,0 +1,28 @@
+shape: sequence_diagram
+
+persona: Persona
+mp: muckpile
+reg: ".muckpile/"
+jira: Jira
+
+persona -> mp: "muckpile push ."
+mp -> reg: "¿cambios sin commitear? ¿rebase a medias?\nsi hay, se niega"
+mp -> mp: "resuelve los @slug pendientes"
+mp -> jira: "¿qué tenés ahora del ítem?"
+jira -> mp: "campos + ADF"
+mp -> reg: "¿coincide con la ref del proveedor?\nADF contra ADF"
+
+cambio: "Si el proveedor cambió" {
+  mp -> reg: "registra lo que trajo, rebasea la vista"
+  mp -> persona: "cambió del otro lado: revisá y volvé a correr push"
+}
+
+header: "Si el header se editó a mano" {
+  mp -> persona: "choca: no se manda nada, y sugiere el comando"
+}
+
+cuerpo: "Si el cuerpo cambió y es canónico" {
+  mp -> reg: "forma canónica, en un commit propio, si hace falta"
+  mp -> jira: "manda el cuerpo como ADF, con tarjetas"
+  mp -> reg: "registra lo que Jira tiene ahora, rebasea\nel commit de la edición desaparece: ya está en la ref"
+}

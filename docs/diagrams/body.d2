@@ -1,0 +1,20 @@
+direction: down
+
+baja: "De Jira a markdown — en cada pull" {
+  adf: "ADF de Jira" {shape: page}
+  cards: "tarjetas y links a ítems\n→ [ACC-338](ACC-338.task.md)"
+  filtro: "JiraAdfMarkdownFilter\nADF → markdown → ADF,\ncontra la forma canónica del conversor"
+  md: "markdown del cuerpo" {shape: page}
+  ro: "sólo lectura\nel conversor avisó Lossy,\no no vuelve igual" {shape: hexagon}
+  adf -> cards -> filtro -> md
+  filtro -> ro: "si pierde algo"
+}
+
+sube: "De markdown a Jira — al crear y en push" {
+  md2: "markdown editado" {shape: page}
+  canon: "forma canónica\nsi cambia, commit propio"
+  conv: "conversor\n(el fork de atlassian-markdown-converter)"
+  cards2: "links a <id>.<tipo>.md\n→ tarjetas de Jira"
+  adf2: "ADF" {shape: page}
+  md2 -> canon -> conv -> cards2 -> adf2
+}

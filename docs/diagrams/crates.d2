@@ -1,0 +1,34 @@
+direction: right
+
+cli: "muckpile-cli" {
+  main: "main.rs\nargv, idioma, salida"
+  lib: "lib.rs\ncada comando, como función"
+  main -> lib
+}
+
+core: "muckpile-core" {
+  ledger: "ledger\nel registro y sus refs"
+  body: "body\nlos dos filtros del cuerpo"
+  item: "item · rename\nel archivo de un ítem"
+  project: "project · identity\nla configuración"
+  i18n: "i18n\nen · es-AR"
+}
+
+provider: "muckpile-provider" {
+  port: "trait Provider\nun solo puerto" {shape: diamond}
+  rest: "JiraRest\nREST de Jira, ureq"
+  fake: "FakeProvider\nlo que usan los tests"
+  rest -> port: implementa
+  fake -> port: implementa
+}
+
+jira: "Jira Cloud" {shape: cloud}
+git: "git" {shape: cylinder}
+amdc: "atlassian-markdown-converter\n(fork)" {shape: package}
+
+cli.lib -> core
+cli.lib -> provider.port
+provider.rest -> jira: "HTTPS"
+core.ledger -> git
+core.body -> amdc
+provider -> core.i18n: mensajes
