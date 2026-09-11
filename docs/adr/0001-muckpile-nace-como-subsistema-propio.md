@@ -137,7 +137,7 @@ Git local es el registro de "qué es lo último que vi del proveedor", y lo llev
 
 **La rama del proveedor no se protege, porque nunca decide sola.** En un git local nada impide un `git update-ref`, y la única traba sería un hook — lo que la decisión 1 sacó. No hace falta: `push` le pregunta al proveedor antes de escribir, siempre. Si alguien movió la ref a mano, el `push` siguiente ve que el proveedor no coincide, registra lo que tiene de verdad, y queda una divergencia falsa que el rebase resuelve — nunca una escritura equivocada en el proveedor.
 
-**Y lo mismo vale para todo lo que está en git: romperlo a mano no escribe nada mal en el proveedor.** Lo que `muckpile` guarda —la ref del proveedor, el ADF— se vuelve a sacar del proveedor con un `pull`. Lo único que no está en el proveedor es lo editado que no se subió, y eso lo cuida git: `git reflog`, o `git reset --hard @{u}` para volver a lo que tiene el proveedor. No hay un comando de recuperación aparte, salvo para un caso: `.muckpile/` borrado con vistas todavía en disco, que es de `init` (decisión 6).
+**Y lo mismo vale para todo lo que está en git: romperlo a mano no escribe nada mal en el proveedor.** Lo que `muckpile` guarda —la ref del proveedor, el ADF— se vuelve a sacar del proveedor con un `pull`. Lo único que no está en el proveedor es lo editado que no se subió, y eso lo cuida git: `git reflog`, o `git reset --hard @{u}` para volver a lo que tiene el proveedor. No hay un comando de recuperación aparte, salvo para un caso: `.muckpile/` borrado con vistas todavía en disco, que queda como propuesta —`init --recover`, en la decisión 6—.
 
 **Y nada de esto hace `git push`, así que el rebase nunca obliga a un `push --force`.** Al proveedor se le habla por la API; la ref del proveedor y las ramas de las vistas viven sólo en `.muckpile/`, en la máquina de quien trabaja, y lo que el rebase reescribe son commits que nadie más tiene. Si algún día `.muckpile/` tiene un remoto git —un respaldo—, las refs del proveedor viajan sin forzar, porque sólo avanzan; lo único que pediría forzar son las ramas de las vistas, y eso se decide ese día.
 
@@ -256,7 +256,9 @@ sin-sprint = "project = ACC AND sprint is empty"
 
 **Un proyecto lo crea `init`, y ningún otro comando.** Corrido en `multitask/`, `muckpile init <proyecto>` deja `<proyecto>/.muckpile/` —el git del proyecto, sin worktree propio: el registro de la decisión 5—, un `muckpile.toml` para completar (decisión 9), y las cuatro carpetas reservadas. Cada vista la crea después el comando que la necesita —`to-work` una de trabajo, `sprint fetch` una por sprint—, como un worktree de `.muckpile/` parado en su rama. Fuera de un proyecto iniciado, los demás comandos se niegan: ninguno arma un `.muckpile/` de paso.
 
-**Avance: 8/9.**
+**Propuesta, sin implementar por ahora: `init <proyecto> --recover`, para cuando se borró `.muckpile/` y las vistas siguen en disco.** Lo que se pierde es menos de lo que parece: lo que dijo el proveedor se vuelve a traer, y lo editado sigue en los archivos de cada vista; lo roto son los worktrees, que apuntan a un registro que ya no existe, y la historia fina de los commits de la vista. La propuesta no pide más parámetros que el nombre del proyecto: las vistas salen de las carpetas de `to-work/`, `backlog/sprint/` y `query/`, los ítems de los `<id>.<tipo>.md` que tengan, y la configuración de `muckpile.toml`. Vista por vista: aparta la carpeta tal como está; la abre de nuevo como worktree del registro nuevo; trae lo que dice el proveedor —sus ítems, o el sprint o la consulta enteros—; pone encima lo que había en disco y lo commitea, `recuperado: lo que la vista tenía en disco`, así `git status` dice `[ahead 1]` y `git diff` muestra lo que no se había subido; y devuelve `code-work/` a su lugar, tal cual, porque es de otro repo. Si algo falla a mitad de una vista, esa carpeta vuelve como estaba, y la copia apartada se borra sólo cuando todo quedó commiteado. Un `init` sin `--recover` sobre una carpeta que tiene vistas y no tiene `.muckpile/` se niega y lo sugiere, para que nadie recupere por accidente. Lo que no vuelve es la historia de los commits de la vista: vuelve su estado final, en uno. Decidido el 2026-09-10: queda escrito como propuesta, y se implementa cuando el uso lo pida.
+
+**Avance: 8/8.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -268,7 +270,6 @@ sin-sprint = "project = ACC AND sprint is empty"
 | `pull` con una consulta — lo que reemplaza a `bootstrap`/`reconcile`/`adopt` | `cerrada` | `pull_query` ↔ esta decisión: `query/<nombre>/` queda con exactamente lo que devuelve la consulta de `[queries]`, o la de `--query` para ese `pull`, sin guardarla. Probado el 2026-09-10, sólo leyendo, con `recientes = "project = ACC AND key >= ACC-354"` |
 | El chequeo local: "¿ya tengo este ítem en otra vista, en esta máquina?" | `cerrada` | `other_views_holding` ↔ esta decisión: `pull` dice en qué otras vistas del proyecto está cada ítem que trae, mirando el disco. Probado: el `pull` de `to-work/ACC-269` dijo `también en backlog/sprint/17_Los_sprints_en_el_board` |
 | `init` crea el proyecto —`.muckpile/`, `muckpile.toml`, las cuatro carpetas—, y las vistas nacen como worktrees suyos | `cerrada` | `init` ↔ fila `init`; `to_work` y `sprint_fetch` abren cada vista con `ledger::open_view`, y `sprint fetch` cierra con `ledger::close_empty_view` sólo la que nadie usó |
-| `init` que recupera un proyecto: `.muckpile/` borrado con vistas todavía en disco | `falta spec` | Esta decisión sólo dice que `init` crea un proyecto nuevo. Con qué parámetros se recupera uno, y qué pasa con lo que cada vista no subió, queda para el final: es fino |
 
 ### 7. `question` desde el día uno: tipo, la relación `blocks`, y el directorio de datos del ítem
 
@@ -602,6 +603,7 @@ Dieciocho comandos contra los veintitrés de hoy (once de `worklist`, doce de `w
 **Lo que no cambia, porque no es de esta capa:** los problemas del cuerpo — que Jira pode `strong`+`code`, que la búsqueda por título en JQL se rompa con `--` o con `[]` — siguen estando, porque son del schema de Jira y de su buscador. `muckpile` hereda la API de Jira tal cual es.
 
 **Lo que este ADR no decide:**
+- Cómo se recupera un proyecto al que le borraron `.muckpile/` con las vistas todavía en disco: queda como propuesta, `init <proyecto> --recover`, en la decisión 6.
 - Cómo se muda un borrador de `files/` a la capa que lo gobierna cuando la pregunta cierra, y qué pasa si se queda. Queda como propuesta, la de `ACC-335` —"la ubicación es el estado": un borrador en `files/` no está decidido, y al cerrarse la pregunta se muda a la capa que lo gobierna—, sin implementar por ahora: decidido el 2026-09-10. Hoy moverlo es a mano.
 - Si `.muckpile/` —uno por proyecto, según decisión 6— necesita algún metadato propio además de lo que git ya da.
 - Cómo el workflow del proveedor hace cumplir `blocks` en la práctica — decisión 7/8 dice que es su responsabilidad y no la de `muckpile`, pero no dice cómo se configura eso en un board real.
