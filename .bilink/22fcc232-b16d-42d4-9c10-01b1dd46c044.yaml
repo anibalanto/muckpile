@@ -13,5 +13,5 @@ endpoint:
     - agree:
       - anibal
       link: capture 0d9997e9b01616e1126c9cebd2c5b8f1
-      hash: b53035146c33efe82d6f553dc33522ede51c17ed7ed85168682aa5186324cab4
+      hash: 04c8fa358656805918f8429563c31e8fdd64fbf7f50011d4bc4b839efd1d0b76
     name: dv-muckpile
