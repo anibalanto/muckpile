@@ -10,4 +10,11 @@ endpoint:
     name: help-row
   1:
     link: capture 5221670c334032327cd62d041c628070
+    accepted:
+    - agree:
+      - anibal
+      link: capture 5221670c334032327cd62d041c628070
+      hash: 5e17c1f0949513bc9d266980fc589e823071e979952e5c3d8713fdd8b30efe85
+      hash_ast: 4c685aeb12449b392d7cfca4c0bb0adbc2b975dfd5e5b304c1a3ed89cfd5cd34
+      n: declined
     name: help
