@@ -107,6 +107,10 @@ pub trait Provider {
     /// The keys of the items a sprint holds, as the provider says now.
     fn sprint_items(&self, sprint_id: u64) -> Result<Vec<String>>;
 
+    /// The keys of the items a query returns, the query written in the
+    /// provider's own language.
+    fn query_items(&self, query: &str) -> Result<Vec<String>>;
+
     /// The board's currently open sprints.
     fn open_sprints(&self, board_id: u64) -> Result<Vec<Sprint>>;
 

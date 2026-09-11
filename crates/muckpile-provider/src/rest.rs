@@ -257,13 +257,18 @@ impl Provider for JiraRest {
             .collect())
     }
 
-    /// `sprint = <id>`, a page at a time — measured on ACC's board: the
-    /// sprint's items come back in one search.
+    /// `sprint = <id>` — measured on ACC's board: the sprint's items come
+    /// back in one search.
     fn sprint_items(&self, sprint_id: u64) -> Result<Vec<String>> {
+        self.query_items(&format!("sprint = {sprint_id}"))
+    }
+
+    /// The JQL as given, a page at a time.
+    fn query_items(&self, query: &str) -> Result<Vec<String>> {
         let mut keys = Vec::new();
         let mut token: Option<String> = None;
         loop {
-            let mut path = format!("/rest/api/3/search/jql?jql={}&fields=summary&maxResults=100", url_encode(&format!("sprint = {sprint_id}")));
+            let mut path = format!("/rest/api/3/search/jql?jql={}&fields=summary&maxResults=100", url_encode(query));
             if let Some(token) = &token {
                 path.push_str(&format!("&nextPageToken={}", url_encode(token)));
             }

@@ -637,3 +637,13 @@ fn sprint_items_lists_the_keys_the_sprint_holds() {
     let path = rx.recv().unwrap().path;
     assert!(path.starts_with("/rest/api/3/search/jql?jql=") && path.contains("6522"), "{path}");
 }
+
+#[test]
+fn query_items_searches_with_the_query_as_given() {
+    let (base, rx) = one_shot(200, r#"{"issues":[{"key":"ACC-1","fields":{"summary":"a"}}],"isLast":true}"#);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    assert_eq!(provider.query_items("project = ACC AND sprint is empty").unwrap(), vec!["ACC-1".to_string()]);
+    let path = rx.recv().unwrap().path;
+    assert!(path.starts_with("/rest/api/3/search/jql?jql=project%20%3D%20ACC"), "{path}");
+}

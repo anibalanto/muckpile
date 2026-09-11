@@ -28,6 +28,10 @@ pub struct ProjectConfig {
     pub repos: BTreeMap<String, RepoConfig>,
     #[serde(default)]
     pub item_type: BTreeMap<String, ItemType>,
+    /// Named queries, in the provider's own query language: what
+    /// `backlog/queries/<name>/` holds.
+    #[serde(default)]
+    pub queries: BTreeMap<String, String>,
 }
 
 /// How one muckpile type lives on the provider: its issue type, and the
@@ -138,6 +142,10 @@ pub enum Position {
     BacklogSprint,
     /// Inside a specific sprint's folder, at any depth.
     SprintView,
+    /// `backlog/queries/` itself.
+    BacklogQueries,
+    /// Inside a specific query's folder, at any depth.
+    QueryView,
     /// `to-work/` itself.
     ToWorkRoot,
     /// Inside a specific working view, at any depth — including its
@@ -156,6 +164,8 @@ pub fn classify(root: &Path, cwd: &Path) -> Position {
         [b, s] if b == "backlog" && s == "sprint" => Position::BacklogSprint,
         [b] if b == "backlog" => Position::Backlog,
         [b, s, _, ..] if b == "backlog" && s == "sprint" => Position::SprintView,
+        [b, q] if b == "backlog" && q == "queries" => Position::BacklogQueries,
+        [b, q, _, ..] if b == "backlog" && q == "queries" => Position::QueryView,
         [t] if t == "to-work" => Position::ToWorkRoot,
         [t, _, ..] if t == "to-work" => Position::WorkView,
         _ => Position::Elsewhere,

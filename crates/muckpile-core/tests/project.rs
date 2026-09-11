@@ -154,3 +154,23 @@ fn a_project_without_repos_or_item_type_still_loads() {
     assert!(config.item_type.is_empty());
     assert_eq!(config.jira_board_id, None);
 }
+
+#[test]
+fn a_query_s_view_is_one_level_inside_backlog_queries() {
+    let root = Path::new("/multitask/acc");
+    assert_eq!(classify(root, &root.join("backlog/queries")), Position::BacklogQueries);
+    assert_eq!(classify(root, &root.join("backlog/queries/sin-sprint")), Position::QueryView);
+    assert_eq!(classify(root, &root.join("backlog/queries/sin-sprint/ACC-1_data")), Position::QueryView);
+}
+
+#[test]
+fn declared_queries_are_read_by_name() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("muckpile.toml"),
+        "provider = \"jira-rest\"\njira_base_url = \"https://x\"\njira_project_key = \"ACC\"\ncommit_prefix = \"acc\"\n\n[queries]\nsin-sprint = \"project = ACC AND sprint is empty\"\n",
+    )
+    .unwrap();
+    let config = load_project_config(dir.path()).unwrap();
+    assert_eq!(config.queries["sin-sprint"], "project = ACC AND sprint is empty");
+}

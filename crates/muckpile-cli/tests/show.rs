@@ -19,6 +19,7 @@ fn config() -> ProjectConfig {
         commit_prefix: "acc".into(),
         repos: BTreeMap::new(),
         item_type,
+        queries: BTreeMap::new(),
     }
 }
 

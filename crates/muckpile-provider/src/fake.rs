@@ -14,6 +14,7 @@ pub struct FakeProvider {
     statuses: RefCell<Vec<Status>>,
     link_types: RefCell<Vec<LinkType>>,
     sprint_items: RefCell<HashMap<u64, Vec<String>>>,
+    queries: RefCell<HashMap<String, Vec<String>>>,
     links_created: RefCell<Vec<(String, String, String)>>,
     next_keys: RefCell<VecDeque<(String, String)>>,
     next_id: RefCell<u64>,
@@ -42,6 +43,7 @@ impl FakeProvider {
             statuses: RefCell::new(Vec::new()),
             link_types: RefCell::new(Vec::new()),
             sprint_items: RefCell::new(HashMap::new()),
+            queries: RefCell::new(HashMap::new()),
             links_created: RefCell::new(Vec::new()),
             next_keys: RefCell::new(VecDeque::new()),
             next_id: RefCell::new(1),
@@ -86,6 +88,11 @@ impl FakeProvider {
             .enumerate()
             .map(|(i, (name, created))| Sprint { id: i as u64 + 1, name: name.to_string(), created: created.to_string() })
             .collect();
+    }
+
+    /// Seeds the keys a query returns, the query matched as written.
+    pub fn seed_query(&self, query: &str, keys: &[&str]) {
+        self.queries.borrow_mut().insert(query.to_string(), keys.iter().map(|k| k.to_string()).collect());
     }
 
     /// Seeds the keys a sprint holds.
@@ -280,6 +287,10 @@ impl Provider for FakeProvider {
 
     fn sprint_items(&self, sprint_id: u64) -> Result<Vec<String>> {
         Ok(self.sprint_items.borrow().get(&sprint_id).cloned().unwrap_or_default())
+    }
+
+    fn query_items(&self, query: &str) -> Result<Vec<String>> {
+        Ok(self.queries.borrow().get(query).cloned().unwrap_or_default())
     }
 
     fn open_sprints(&self, _board_id: u64) -> Result<Vec<Sprint>> {

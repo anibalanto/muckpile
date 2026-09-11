@@ -144,8 +144,9 @@ pub fn pull(root: &Path, cwd: &Path, id: Option<&str>, provider: &dyn Provider, 
     Ok(pulled)
 }
 
-/// What `pull` of a sprint's view brought: every item the sprint holds, and
-/// the ids of the ones that went — taken out of the sprint on the provider.
+/// What `pull` of a sprint's or a query's view brought: every item it
+/// holds, and the ids of the ones that went — out of the sprint, or no
+/// longer matching the query.
 #[derive(Debug)]
 pub struct SprintPull {
     pub items: Vec<Pulled>,
@@ -168,17 +169,43 @@ pub fn pull_sprint(root: &Path, view: &Path, provider: &dyn Provider, config: &P
         .find(|s| slugify(&legible_name(s)) == slug)
         .with_context(|| format!("{slug}: no es un sprint abierto del board — sprint fetch lista los que hay"))?;
     ready_to_sync(view)?;
-
     let keys = provider.sprint_items(sprint.id)?;
+    pull_membership(root, view, &keys, provider, config)
+}
+
+/// Brings the view of a named query — `backlog/queries/<name>/` — to
+/// exactly what the query returns, making the view on the first pull. The
+/// query is `query` when given, for this pull only, or else the one
+/// `muckpile.toml` declares under that name.
+pub fn pull_query(root: &Path, view: &Path, query: Option<&str>, provider: &dyn Provider, config: &ProjectConfig) -> Result<SprintPull> {
+    if classify(root, view) != Position::QueryView || view.parent() != Some(&root.join("backlog/queries")) {
+        bail!("{}: no es la vista de una consulta", view.display());
+    }
+    let name = view.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let query = match query {
+        Some(query) => query.to_string(),
+        None => config.queries.get(&name).cloned().with_context(|| format!("{name}: no hay consulta con ese nombre en muckpile.toml — declarala en [queries], o pasala con --query"))?,
+    };
+    if !view.exists() {
+        ledger::open_view(root, &format!("backlog/queries/{name}"))?;
+    }
+    ready_to_sync(view)?;
+    let keys = provider.query_items(&query)?;
+    pull_membership(root, view, &keys, provider, config)
+}
+
+/// Brings `view` to exactly the items `keys` names, in one record on its
+/// provider ref: every one of them comes, and one the ref recorded that
+/// isn't among them goes, with everything recorded for it.
+fn pull_membership(root: &Path, view: &Path, keys: &[String], provider: &dyn Provider, config: &ProjectConfig) -> Result<SprintPull> {
     let recorded = ledger::provider_paths(view)?;
     let mut changes = Vec::new();
     let mut items = Vec::new();
-    for key in &keys {
+    for key in keys {
         let (item_changes, pulled) = item_changes(view, key, provider, config, &recorded)?;
         changes.extend(item_changes);
         items.push(pulled);
     }
-    // What the sprint no longer holds goes, with everything recorded for it.
     let mut gone = Vec::new();
     for path in &recorded {
         let Some((id, _)) = path.strip_suffix(".md").and_then(|stem| stem.split_once('.')) else { continue };
@@ -213,11 +240,23 @@ pub fn sprint_view_of(root: &Path, cwd: &Path, target: Option<&str>) -> Option<P
     (parts.len() == 3 && classify(root, &view) == Position::SprintView && view.is_dir()).then_some(view)
 }
 
+/// The query view `pull` means: the one named, from the project's root —
+/// `backlog/queries/<name>`, which may not exist yet: the first pull makes
+/// it — or, with nothing named, the one `cwd` stands in.
+pub fn query_view_of(root: &Path, cwd: &Path, target: Option<&str>) -> Option<PathBuf> {
+    let view = match target {
+        Some(target) => cwd.join(target),
+        None if cwd.is_dir() => cwd.to_path_buf(),
+        None => return None,
+    };
+    (view.parent() == Some(&root.join("backlog/queries")) && classify(root, &view) == Position::QueryView).then_some(view)
+}
+
 /// The views of the project, other than `view`, whose folder already holds
 /// `<id>.<type>.md` — on this machine, right now.
 fn other_views_holding(root: &Path, view: &Path, id: &str) -> Result<Vec<String>> {
     let mut out = Vec::new();
-    for container in ["to-work", "backlog/sprint"] {
+    for container in ["to-work", "backlog/sprint", "backlog/queries"] {
         let Ok(entries) = std::fs::read_dir(root.join(container)) else { continue };
         for entry in entries.flatten() {
             let path = entry.path();

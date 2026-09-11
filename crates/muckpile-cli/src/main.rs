@@ -15,8 +15,7 @@ fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.as_slice() {
         [cmd, id] if cmd == "to-work" => run_to_work(id),
-        [cmd] if cmd == "pull" => run_pull(None),
-        [cmd, target] if cmd == "pull" => run_pull(Some(target)),
+        [cmd, rest @ ..] if cmd == "pull" => run_pull(rest),
         [cmd, sub] if cmd == "sprint" && sub == "fetch" => run_sprint_fetch(),
         [cmd, id, status] if cmd == "transition" => run_transition(id, status),
         [cmd, sub] if cmd == "states" && sub == "discover" => run_states_discover(),
@@ -35,7 +34,7 @@ fn main() -> Result<()> {
         [cmd, id, flag] if cmd == "show" && flag == "--local" => run_show(id, true),
         [cmd, sub, repo, rest @ ..] if cmd == "code-work" && sub == "add" => run_code_work_add(repo, rest),
         _ => bail!(
-            "uso: muckpile init <proyecto> | muckpile to-work <id> | muckpile pull [id | backlog/sprint/<sprint>] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile push <vista> | muckpile link <a> <frase> <b> | muckpile unlink <a> <frase> <b> | muckpile title <id> <título> | muckpile parent <id> <padre> | muckpile comment <id> <archivo> [--reply-to <id>] (--ai <modelo> | --i-human) | muckpile attach <id> <archivo> | muckpile new <tipo> <título> [--parent <id>] [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
+            "uso: muckpile init <proyecto> | muckpile to-work <id> | muckpile pull [id | backlog/sprint/<sprint> | backlog/queries/<nombre> [--query <consulta>]] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile push <vista> | muckpile link <a> <frase> <b> | muckpile unlink <a> <frase> <b> | muckpile title <id> <título> | muckpile parent <id> <padre> | muckpile comment <id> <archivo> [--reply-to <id>] (--ai <modelo> | --i-human) | muckpile attach <id> <archivo> | muckpile new <tipo> <título> [--parent <id>] [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
         ),
     }
 }
@@ -48,19 +47,36 @@ fn run_to_work(id: &str) -> Result<()> {
     Ok(())
 }
 
-fn run_pull(target: Option<&str>) -> Result<()> {
+fn run_pull(args: &[String]) -> Result<()> {
+    let (mut target, mut query) = (None, None);
+    let mut rest = args.iter();
+    while let Some(arg) = rest.next() {
+        match arg.as_str() {
+            "--query" => query = Some(rest.next().context("--query necesita la consulta")?.as_str()),
+            other if target.is_none() => target = Some(other),
+            other => bail!("{other}: argumento de más para pull"),
+        }
+    }
     let (root, cwd) = standing_in_a_project()?;
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
-    if let Some(view) = muckpile_cli::sprint_view_of(&root, &cwd, target) {
-        let pulled = muckpile_cli::pull_sprint(&root, &view, provider.as_ref(), &config)?;
+    let membership = if let Some(view) = muckpile_cli::query_view_of(&root, &cwd, target) {
+        Some((view.clone(), muckpile_cli::pull_query(&root, &view, query, provider.as_ref(), &config)?, "ya no coincide con la consulta"))
+    } else if query.is_some() {
+        bail!("--query es para la vista de una consulta: backlog/queries/<nombre>");
+    } else if let Some(view) = muckpile_cli::sprint_view_of(&root, &cwd, target) {
+        Some((view.clone(), muckpile_cli::pull_sprint(&root, &view, provider.as_ref(), &config)?, "salió del sprint"))
+    } else {
+        None
+    };
+    if let Some((view, pulled, why_gone)) = membership {
         let name = view.strip_prefix(&root).unwrap_or(&view).display().to_string();
         println!("{name}/: {} ítem(s) traído(s)", pulled.items.len());
         for item in &pulled.items {
             print_pulled(&root, item);
         }
         for id in &pulled.gone {
-            println!("  {id}: salió del sprint — sacado de la vista");
+            println!("  {id}: {why_gone} — sacado de la vista");
         }
         return Ok(());
     }
