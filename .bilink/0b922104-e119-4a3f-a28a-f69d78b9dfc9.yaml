@@ -10,4 +10,11 @@ endpoint:
     name: auto-comment
   1:
     link: capture 26e5060bd7ad45e4bf665a20d51d060f
+    accepted:
+    - agree:
+      - anibal
+      link: capture 26e5060bd7ad45e4bf665a20d51d060f
+      hash: 3f24bb887afbdf6c69ff214891b6cd4df66f039ca3de810ad1e3aa60455427ec
+      hash_ast: b742820f060b80596b4c3b831310d09b9fd5ac24ae8032a87e955ddb0519d15a
+      n: declined
     name: comment
