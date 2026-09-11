@@ -1,12 +1,12 @@
 kind: governs
 endpoint:
   0:
-    link: capture 0e9ac65784eabd4db2586d947d9293bb
+    link: capture 7114e56d5734fa9e8dc87a9ec06faf9e
     accepted:
     - agree:
       - anibal
-      link: capture 0e9ac65784eabd4db2586d947d9293bb
-      hash: 6561d21daf35f3b860b03d24715ca4765f8146481404a7df328ab8357063ddf2
+      link: capture 7114e56d5734fa9e8dc87a9ec06faf9e
+      hash: f2dfb511bc75c1222618bc8e96be3d941e54a01a085a59415986bfd8c1490978
     name: question-spec
   1:
     link: capture 173676d8e8b0c5760a82777493ae7953

@@ -1,12 +1,12 @@
 kind: governs
 endpoint:
   0:
-    link: capture 44adc2f6894c7ebf5e8eb291d6efecf5
+    link: capture 4bada99debac2c115c251a7aa5446d39
     accepted:
     - agree:
       - anibal
-      link: capture 44adc2f6894c7ebf5e8eb291d6efecf5
-      hash: 5db9e51c3571f033b4cd3d25f09b96388c1a7c0d6163c41cdd58eff425e42341
+      link: capture 4bada99debac2c115c251a7aa5446d39
+      hash: 0860bb5a46ba85939f0d577b4e822f0fe70b414f89c0304705c7a139c3963c55
     name: truncated-sprint-name-spec
   1:
     link: capture 3c6116d6a26eeba63dca406defa3a118

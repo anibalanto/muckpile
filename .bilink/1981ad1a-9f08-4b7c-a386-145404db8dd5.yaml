@@ -1,12 +1,12 @@
 kind: governs
 endpoint:
   0:
-    link: capture e1938d387e13a68e2410fd2c1616009d
+    link: capture fe139e521b241e8c7ecb1ceff24efa23
     accepted:
     - agree:
       - anibal
-      link: capture e1938d387e13a68e2410fd2c1616009d
-      hash: d1633895f2d1ffe73c12296e63664e4a00ace2bcb9b63ace6e7696a4512b6e61
+      link: capture fe139e521b241e8c7ecb1ceff24efa23
+      hash: d4e0881e3855e276e33ec4686506eebc6a9cc8ba806187e7dfa6bf4f1ce2c0ef
     name: config-spec
   1:
     link: capture 8b28751e06527617d9d8b2c2d2aacb31

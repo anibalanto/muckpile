@@ -1,12 +1,12 @@
 kind: governs
 endpoint:
   0:
-    link: capture 23dc8955eedf7af56c0c073bc3ded06b
+    link: capture ee93c353badb7e409eae7adaf45b77b5
     accepted:
     - agree:
       - anibal
-      link: capture 23dc8955eedf7af56c0c073bc3ded06b
-      hash: 6a9e00560ecc782a76c111e7c7c300509a97731847d4222828a06c204dd4ab8a
+      link: capture ee93c353badb7e409eae7adaf45b77b5
+      hash: d5b0ac328145e200ba8c0b9d15a28f735576124a70573b1192aa87eb6ba3d7f9
     name: transition-spec
   1:
     link: capture 7d967c7fddffd623a9ea81252f90e140

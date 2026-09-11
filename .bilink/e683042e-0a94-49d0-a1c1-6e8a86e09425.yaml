@@ -1,12 +1,12 @@
 kind: governs
 endpoint:
   0:
-    link: capture e86ee0f210f359b43560be57566fb77e
+    link: capture 396585ac36d84f34ce71f21e66cd5eb4
     accepted:
     - agree:
       - anibal
-      link: capture e86ee0f210f359b43560be57566fb77e
-      hash: 86fc84ad9dd5cb65d4f206269a154e25fdd5c233fe95f64c4d1693b18b0b02cc
+      link: capture 396585ac36d84f34ce71f21e66cd5eb4
+      hash: 038c208ff508c052cee6892a24242208b08baa0a2e3f01cd67006a8c41c81879
     name: canonicity-spec
   1:
     link: capture fbfdf1192aab827511b5b393b9682bad

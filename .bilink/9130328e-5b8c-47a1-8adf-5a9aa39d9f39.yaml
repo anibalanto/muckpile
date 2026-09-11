@@ -1,12 +1,12 @@
 kind: governs
 endpoint:
   0:
-    link: capture e86ee0f210f359b43560be57566fb77e
+    link: capture 033ac31f0481002b9d60089271e79068
     accepted:
     - agree:
       - anibal
-      link: capture e86ee0f210f359b43560be57566fb77e
-      hash: 86fc84ad9dd5cb65d4f206269a154e25fdd5c233fe95f64c4d1693b18b0b02cc
+      link: capture 033ac31f0481002b9d60089271e79068
+      hash: e2215fad53c3483e1008d692e67374cf31b160b832ac7b4b353e69cf240d3a21
     name: converter-fork-spec
   1:
     link: capture c0342def35f155fc52cc3b5729c3246b

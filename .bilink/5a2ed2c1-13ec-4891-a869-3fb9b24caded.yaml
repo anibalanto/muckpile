@@ -1,12 +1,12 @@
 kind: governs
 endpoint:
   0:
-    link: capture f3348c2083ac6df96e08d916672b322d
+    link: capture 008ad9fea11afa8d85e255529cce8ed8
     accepted:
     - agree:
       - anibal
-      link: capture f3348c2083ac6df96e08d916672b322d
-      hash: b22366178b767d8b4d16a203d0437fdbe078ec6b51c20c313e2e65699e94b527
+      link: capture 008ad9fea11afa8d85e255529cce8ed8
+      hash: c1263a98ebccf38b9bdf0d371fa15b982fd17f451a2624b182572a66c4a648aa
     name: init-spec
   1:
     link: capture 6c194485f7fb17e0f77fc96154d81613

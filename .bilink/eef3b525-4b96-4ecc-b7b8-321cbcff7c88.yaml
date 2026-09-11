@@ -1,12 +1,12 @@
 kind: governs
 endpoint:
   0:
-    link: capture 9b5f01bb1ec7f5ca6c0b37455ad52abb
+    link: capture a0afc66c5f6db14ad2fd11cd190d8768
     accepted:
     - agree:
       - anibal
-      link: capture 9b5f01bb1ec7f5ca6c0b37455ad52abb
-      hash: aa90c7f061f46b72d3f7e729748046fcba7658cd4d8ca443a2013a81e0bfad95
+      link: capture a0afc66c5f6db14ad2fd11cd190d8768
+      hash: 95a189221d0bc0ba335c303a3afaa45135bc0a0e9070526b3d748656acc5a52b
     name: no-hooks-spec
   1:
     link: capture a4cbd6d6d88669f27007a8e9531db787

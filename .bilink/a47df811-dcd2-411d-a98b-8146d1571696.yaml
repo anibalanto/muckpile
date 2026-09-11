@@ -1,12 +1,12 @@
 kind: governs
 endpoint:
   0:
-    link: capture 6248115ab3c7bff8bec2420bba676a03
+    link: capture 47f63f5e4cb804aba573a1675279d7c7
     accepted:
     - agree:
       - anibal
-      link: capture 6248115ab3c7bff8bec2420bba676a03
-      hash: 94b6e82915f39a1d8c1b13bfcbb1bc590e4fde38325e361b8e983c9c592779f6
+      link: capture 47f63f5e4cb804aba573a1675279d7c7
+      hash: 63ee2d7ce1293f5ccee00000b100f03a33f18296f781381b27ba66803f988584
     name: slug-resolution
   1:
     link: capture a130e7e866b7e4ef41e8d2ae17b173f4

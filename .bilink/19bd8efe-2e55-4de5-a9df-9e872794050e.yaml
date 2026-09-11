@@ -1,12 +1,12 @@
 kind: governs
 endpoint:
   0:
-    link: capture 8f588ee92627b151eaa6b40e27329c97
+    link: capture 61353599b0e9376186fa77eba04cc9b4
     accepted:
     - agree:
       - anibal
-      link: capture 8f588ee92627b151eaa6b40e27329c97
-      hash: 114344df5926788e49966944fc7657f91713126d209bf4f9f66b553b5d624209
+      link: capture 61353599b0e9376186fa77eba04cc9b4
+      hash: 4007a1e67b2b912c43f623be62ed93b44b62a48d396edb4919b545d424b798a4
     name: code-work-add-spec
   1:
     link: capture f502ee6026e17f60202ff9509c8fc9bb

@@ -1,12 +1,12 @@
 kind: governs
 endpoint:
   0:
-    link: capture e748050a3213c49bf48e6c93f6115084
+    link: capture 8f49a6a6b40980eb845c251607f86c83
     accepted:
     - agree:
       - anibal
-      link: capture e748050a3213c49bf48e6c93f6115084
-      hash: b9e61201fc3d7dcf358d4353342ccb7b0e5c37b7e3d603d1dea9e795b035ab54
+      link: capture 8f49a6a6b40980eb845c251607f86c83
+      hash: 26e636c92f64a9c39e3ae1faf2323c1a38b4136345164318a52d03c45cd88ab5
     name: new-spec
   1:
     link: capture 52a96cbb3a4951edd14696fe063fb7cc

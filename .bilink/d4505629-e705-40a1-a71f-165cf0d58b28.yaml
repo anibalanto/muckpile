@@ -1,12 +1,12 @@
 kind: governs
 endpoint:
   0:
-    link: capture 069497007f5aa9a55d6ffd7c9343aa27
+    link: capture 7f9db351e72713eafd790f878f7750d6
     accepted:
     - agree:
       - anibal
-      link: capture 069497007f5aa9a55d6ffd7c9343aa27
-      hash: 8a351fa4c102d27f4f2568b3a8a1fedd6433e148b3eb1854fb42d6d78732ab18
+      link: capture 7f9db351e72713eafd790f878f7750d6
+      hash: 2818b2c9df512623598e845e35590a75d2925352792a9e21b9249d2ee6ae050b
     name: parent-spec
   1:
     link: capture 0f782b7400a8f50ef7c6a61e82f850f6

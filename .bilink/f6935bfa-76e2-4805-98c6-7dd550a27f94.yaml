@@ -1,12 +1,12 @@
 kind: governs
 endpoint:
   0:
-    link: capture 0d882c6b8d5201d0f6cb630dd4c27f86
+    link: capture cdcbd6ca7c5ea955e16523091accd07b
     accepted:
     - agree:
       - anibal
-      link: capture 0d882c6b8d5201d0f6cb630dd4c27f86
-      hash: 5b2e63027cf4099f49233958c6896e3fddafa7485393a37dde57215020f8890b
+      link: capture cdcbd6ca7c5ea955e16523091accd07b
+      hash: a835b393de8ef964fc359c05c27fa9128f27aeb37151cbaa2c07823d9446c10b
     name: own-port-spec
   1:
     link: capture 2f423399b0cc3e6ece49d81c64bcb42c

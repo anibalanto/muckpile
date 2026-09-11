@@ -1,12 +1,12 @@
 kind: governs
 endpoint:
   0:
-    link: capture 3bfd444237afcc3287f67895b7163d1a
+    link: capture a637665ed5b9917ba71c9ef39f026955
     accepted:
     - agree:
       - anibal
-      link: capture 3bfd444237afcc3287f67895b7163d1a
-      hash: f3c916e3212a82e01c747eeb8d2914c497c6f5fe3d7bc140d036af622e788f0d
+      link: capture a637665ed5b9917ba71c9ef39f026955
+      hash: 12f5c0d551d152e09fa760fdb9bd5588ecd38426cae731ed1a95a51ee5dcbb6e
     name: ledger-spec
   1:
     link: capture eccabdbfcf7a99c9e15cf0c63e88299c

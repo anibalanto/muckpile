@@ -1,12 +1,12 @@
 kind: governs
 endpoint:
   0:
-    link: capture 78485dff4ac004cb316e363d24066a90
+    link: capture c2b904e60ca747b1f53714a87589d831
     accepted:
     - agree:
       - anibal
-      link: capture 78485dff4ac004cb316e363d24066a90
-      hash: 09a8a41ec6d2204bea4b3ea3ff76e839d785e8597aebf5be58580348e41ae05d
+      link: capture c2b904e60ca747b1f53714a87589d831
+      hash: c6bc4a1513f15b7e8e324e69b6caf1677b70f8a22bd36d8efb8ea53fd12fa568
     name: states-discover-spec
   1:
     link: capture f54842039d25e89547c43f714db5b6e7

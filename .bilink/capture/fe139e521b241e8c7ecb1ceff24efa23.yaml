@@ -1,0 +1,6 @@
+file: docs/specs/concepts/configuration.md
+query: |-
+  (section
+    (atx_heading (inline) @n0 (#eq? @n0 "Los tipos de ítem"))
+    (section
+    (atx_heading (inline) @n1 (#eq? @n1 "Una tabla `item_type` ambigua no se carga"))) @target)

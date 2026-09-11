@@ -1,0 +1,6 @@
+file: docs/specs/concepts/ledger.md
+query: |-
+  (section
+    (atx_heading (inline) @n0 (#eq? @n0 "La ref del proveedor"))
+    (section
+    (atx_heading (inline) @n1 (#eq? @n1 "Cada vez que se le pregunta al proveedor, un commit en su ref"))) @target)

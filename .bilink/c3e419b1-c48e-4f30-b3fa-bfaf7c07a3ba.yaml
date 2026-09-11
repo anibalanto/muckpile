@@ -1,12 +1,12 @@
 kind: governs
 endpoint:
   0:
-    link: capture 00a1dfefd8c144f52c3dd3d2ad64e146
+    link: capture e3dcada541d9db47f9e5cb758361ea6e
     accepted:
     - agree:
       - anibal
-      link: capture 00a1dfefd8c144f52c3dd3d2ad64e146
-      hash: 4695b4621a7b212bb88c7d2b7eabdf312f408efbe44a74550f0cae34d5d3e8e6
+      link: capture e3dcada541d9db47f9e5cb758361ea6e
+      hash: bc11d50bc2f3d71b70f001d750e18ddb78b3615f0c74d61ff2fdb789d48f8873
     name: no-own-vocabulary-spec
   1:
     link: capture aec8445bd8f382cdae902860849a10d9
