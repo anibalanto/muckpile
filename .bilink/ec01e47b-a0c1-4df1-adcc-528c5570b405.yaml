@@ -10,4 +10,9 @@ endpoint:
     name: decisiones-vivas-1
   1:
     link: capture c9587df486cdde9b0cd920266a357d29
+    accepted:
+    - agree:
+      - anibal
+      link: capture c9587df486cdde9b0cd920266a357d29
+      hash: d45623260e626c2790ff0c2b8e66dc30bc6ed92589d1bd600c34cd2fcbbf4b61
     name: auto-update
