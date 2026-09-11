@@ -1,0 +1,8 @@
+kind: governs
+endpoint:
+  0:
+    link: capture 76d2b08bca86c433b66ede16151593e1
+    name: decisiones-vivas-3
+  1:
+    link: capture 756abb03e85b44e25aac5f88decfe500
+    name: rename-one-commit
