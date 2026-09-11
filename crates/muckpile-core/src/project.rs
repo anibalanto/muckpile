@@ -29,7 +29,7 @@ pub struct ProjectConfig {
     #[serde(default)]
     pub item_type: BTreeMap<String, ItemType>,
     /// Named queries, in the provider's own query language: what
-    /// `backlog/queries/<name>/` holds.
+    /// `query/<name>/` holds.
     #[serde(default)]
     pub queries: BTreeMap<String, String>,
 }
@@ -127,10 +127,10 @@ pub fn find_project_root(start: &Path) -> Option<PathBuf> {
     }
 }
 
-/// What a directory, relative to its project root, counts as. The three
-/// reserved names are `base/`, `backlog/`, `to-work/` — nothing else lives
-/// loose at the root, so every other position is a fixed number of steps
-/// into one of the three.
+/// What a directory, relative to its project root, counts as. The four
+/// reserved names are `base/`, `backlog/`, `to-work/`, `query/` — nothing
+/// else lives loose at the root, so every other position is a fixed number
+/// of steps into one of the four.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Position {
     Root,
@@ -142,8 +142,8 @@ pub enum Position {
     BacklogSprint,
     /// Inside a specific sprint's folder, at any depth.
     SprintView,
-    /// `backlog/queries/` itself.
-    BacklogQueries,
+    /// `query/` itself.
+    QueryRoot,
     /// Inside a specific query's folder, at any depth.
     QueryView,
     /// `to-work/` itself.
@@ -151,7 +151,7 @@ pub enum Position {
     /// Inside a specific working view, at any depth — including its
     /// `code-work/<repo>/` worktrees.
     WorkView,
-    /// Not under any of the three reserved names.
+    /// Not under any of the four reserved names.
     Elsewhere,
 }
 
@@ -164,8 +164,8 @@ pub fn classify(root: &Path, cwd: &Path) -> Position {
         [b, s] if b == "backlog" && s == "sprint" => Position::BacklogSprint,
         [b] if b == "backlog" => Position::Backlog,
         [b, s, _, ..] if b == "backlog" && s == "sprint" => Position::SprintView,
-        [b, q] if b == "backlog" && q == "queries" => Position::BacklogQueries,
-        [b, q, _, ..] if b == "backlog" && q == "queries" => Position::QueryView,
+        [q] if q == "query" => Position::QueryRoot,
+        [q, _, ..] if q == "query" => Position::QueryView,
         [t] if t == "to-work" => Position::ToWorkRoot,
         [t, _, ..] if t == "to-work" => Position::WorkView,
         _ => Position::Elsewhere,

@@ -156,11 +156,12 @@ fn a_project_without_repos_or_item_type_still_loads() {
 }
 
 #[test]
-fn a_query_s_view_is_one_level_inside_backlog_queries() {
+fn a_query_s_view_is_one_level_inside_query() {
     let root = Path::new("/multitask/acc");
-    assert_eq!(classify(root, &root.join("backlog/queries")), Position::BacklogQueries);
-    assert_eq!(classify(root, &root.join("backlog/queries/sin-sprint")), Position::QueryView);
-    assert_eq!(classify(root, &root.join("backlog/queries/sin-sprint/ACC-1_data")), Position::QueryView);
+    assert_eq!(classify(root, &root.join("query")), Position::QueryRoot);
+    assert_eq!(classify(root, &root.join("query/sin-sprint")), Position::QueryView);
+    assert_eq!(classify(root, &root.join("query/sin-sprint/ACC-1_data")), Position::QueryView);
+    assert_eq!(classify(root, &root.join("backlog/queries/sin-sprint")), Position::Elsewhere, "not inside backlog");
 }
 
 #[test]

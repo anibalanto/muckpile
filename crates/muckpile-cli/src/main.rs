@@ -35,7 +35,7 @@ fn main() -> Result<()> {
         [cmd, id, flag] if cmd == "show" && flag == "--local" => run_show(id, true),
         [cmd, sub, repo, rest @ ..] if cmd == "code-work" && sub == "add" => run_code_work_add(repo, rest),
         _ => bail!(
-            "uso: muckpile init <proyecto> | muckpile to-work <id> [--empty] | muckpile pull [id | backlog/sprint/<sprint> | backlog/queries/<nombre> [--query <consulta>]] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile push <vista> | muckpile link <a> <frase> <b> | muckpile unlink <a> <frase> <b> | muckpile title <id> <título> | muckpile parent <id> <padre> | muckpile comment <id> <archivo> [--reply-to <id>] (--ai <modelo> | --i-human) | muckpile attach <id> <archivo> | muckpile new <tipo> <título> [--parent <id>] [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
+            "uso: muckpile init <proyecto> | muckpile to-work <id> [--empty] | muckpile pull [id | backlog/sprint/<sprint> | query/<nombre> [--query <consulta>]] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile push <vista> | muckpile link <a> <frase> <b> | muckpile unlink <a> <frase> <b> | muckpile title <id> <título> | muckpile parent <id> <padre> | muckpile comment <id> <archivo> [--reply-to <id>] (--ai <modelo> | --i-human) | muckpile attach <id> <archivo> | muckpile new <tipo> <título> [--parent <id>] [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
         ),
     }
 }
@@ -71,7 +71,7 @@ fn run_pull(args: &[String]) -> Result<()> {
     let membership = if let Some(view) = muckpile_cli::query_view_of(&root, &cwd, target) {
         Some((view.clone(), muckpile_cli::pull_query(&root, &view, query, provider.as_ref(), &config)?, "ya no coincide con la consulta"))
     } else if query.is_some() {
-        bail!("--query es para la vista de una consulta: backlog/queries/<nombre>");
+        bail!("--query es para la vista de una consulta: query/<nombre>");
     } else if let Some(view) = muckpile_cli::sprint_view_of(&root, &cwd, target) {
         Some((view.clone(), muckpile_cli::pull_sprint(&root, &view, provider.as_ref(), &config)?, "salió del sprint"))
     } else {

@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 /// Makes a project, `<multitask>/<name>/`: its ledger, a `muckpile.toml`
-/// to fill in, and the three reserved folders. The only command that makes
+/// to fill in, and the four reserved folders. The only command that makes
 /// a ledger — every other one refuses outside a project that has one.
 pub fn init(multitask: &Path, name: &str) -> Result<PathBuf> {
     if name.is_empty() || name.starts_with('.') || name.contains(['/', '\\']) {
@@ -27,7 +27,7 @@ pub fn init(multitask: &Path, name: &str) -> Result<PathBuf> {
     if project.join(ledger::LEDGER).exists() {
         bail!("{name}: ya es un proyecto");
     }
-    for folder in ["base", "backlog/sprint", "to-work"] {
+    for folder in ["base", "backlog/sprint", "to-work", "query"] {
         std::fs::create_dir_all(project.join(folder)).with_context(|| format!("creating {}/{folder}", project.display()))?;
     }
     ledger::init(&project)?;
@@ -186,12 +186,12 @@ pub fn pull_sprint(root: &Path, view: &Path, provider: &dyn Provider, config: &P
     pull_membership(root, view, &keys, provider, config)
 }
 
-/// Brings the view of a named query — `backlog/queries/<name>/` — to
+/// Brings the view of a named query — `query/<name>/` — to
 /// exactly what the query returns, making the view on the first pull. The
 /// query is `query` when given, for this pull only, or else the one
 /// `muckpile.toml` declares under that name.
 pub fn pull_query(root: &Path, view: &Path, query: Option<&str>, provider: &dyn Provider, config: &ProjectConfig) -> Result<SprintPull> {
-    if classify(root, view) != Position::QueryView || view.parent() != Some(&root.join("backlog/queries")) {
+    if classify(root, view) != Position::QueryView || view.parent() != Some(&root.join("query")) {
         bail!("{}: no es la vista de una consulta", view.display());
     }
     let name = view.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
@@ -200,7 +200,7 @@ pub fn pull_query(root: &Path, view: &Path, query: Option<&str>, provider: &dyn 
         None => config.queries.get(&name).cloned().with_context(|| format!("{name}: no hay consulta con ese nombre en muckpile.toml — declarala en [queries], o pasala con --query"))?,
     };
     if !view.exists() {
-        ledger::open_view(root, &format!("backlog/queries/{name}"))?;
+        ledger::open_view(root, &format!("query/{name}"))?;
     }
     ready_to_sync(view)?;
     let keys = provider.query_items(&query)?;
@@ -254,7 +254,7 @@ pub fn sprint_view_of(root: &Path, cwd: &Path, target: Option<&str>) -> Option<P
 }
 
 /// The query view `pull` means: the one named, from the project's root —
-/// `backlog/queries/<name>`, which may not exist yet: the first pull makes
+/// `query/<name>`, which may not exist yet: the first pull makes
 /// it — or, with nothing named, the one `cwd` stands in.
 pub fn query_view_of(root: &Path, cwd: &Path, target: Option<&str>) -> Option<PathBuf> {
     let view = match target {
@@ -262,14 +262,14 @@ pub fn query_view_of(root: &Path, cwd: &Path, target: Option<&str>) -> Option<Pa
         None if cwd.is_dir() => cwd.to_path_buf(),
         None => return None,
     };
-    (view.parent() == Some(&root.join("backlog/queries")) && classify(root, &view) == Position::QueryView).then_some(view)
+    (view.parent() == Some(&root.join("query")) && classify(root, &view) == Position::QueryView).then_some(view)
 }
 
 /// The views of the project, other than `view`, whose folder already holds
 /// `<id>.<type>.md` — on this machine, right now.
 fn other_views_holding(root: &Path, view: &Path, id: &str) -> Result<Vec<String>> {
     let mut out = Vec::new();
-    for container in ["to-work", "backlog/sprint", "backlog/queries"] {
+    for container in ["to-work", "backlog/sprint", "query"] {
         let Ok(entries) = std::fs::read_dir(root.join(container)) else { continue };
         for entry in entries.flatten() {
             let path = entry.path();

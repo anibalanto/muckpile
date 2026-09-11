@@ -1,17 +1,17 @@
 //! `init` is the only command that makes a project: its ledger, a
-//! `muckpile.toml` to fill in, and the three reserved folders.
+//! `muckpile.toml` to fill in, and the four reserved folders.
 
 use muckpile_cli::init;
 use muckpile_core::project::load_project_config;
 
 #[test]
-fn makes_the_ledger_the_config_and_the_three_folders() {
+fn makes_the_ledger_the_config_and_the_four_folders() {
     let dir = tempfile::tempdir().unwrap();
 
     let project = init(dir.path(), "sge").unwrap();
 
     assert_eq!(project, dir.path().join("sge"));
-    for name in ["base", "backlog", "to-work"] {
+    for name in ["base", "backlog", "to-work", "query"] {
         assert!(project.join(name).is_dir(), "{name}");
     }
     let bare = std::process::Command::new("git").arg("-C").arg(project.join(".muckpile")).args(["rev-parse", "--is-bare-repository"]).output().unwrap();
