@@ -9,12 +9,12 @@ endpoint:
       hash: 80880c16fc8b98d8583a08cf826ed7b46723d294e8c4cc2859bc9af0ac88d821
     name: views-spec
   1:
-    link: capture f6e607c06e34e1c523c99fc92ad58bf7
+    link: capture 888360b622ad2c685c9146630c5dcbc9
     accepted:
     - agree:
       - anibal
-      link: capture f6e607c06e34e1c523c99fc92ad58bf7
-      hash: f568cb8e66ae7f18b19d0d0cb9fb09bd7b24ef910cad478462a95f718c9022fb
-      hash_ast: 9aff4b8fb78bdba98df12770029a35b2076cf6e62927fbea3446933f89263ca4
+      link: capture 888360b622ad2c685c9146630c5dcbc9
+      hash: 9d6fd717b75569ebfa62b2fa9c809654d4909654670fb3a997b953ebb644a9b4
+      hash_ast: b971424435f95c8d7c3acda6a90a0180c2dacafe363520e7dc41b2576f6aaa33
       n: declined
-    name: other-views-holding
+    name: to-work-and-pull

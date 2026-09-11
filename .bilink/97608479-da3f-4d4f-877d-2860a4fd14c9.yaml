@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 8a90b348eb330fa1e19167921c5a5b7d
-      hash: 3df7fa044e8bb75726abd72aa3bf8f885d2abd852922ba2f35f00c4f8fd14eca
+      hash: 93af8d1586205d796959caab3a97e7e4a0a1e68341d846e9aa3e3db7f2154189
     name: pull-spec
   1:
     link: capture aeb5a11492f41bde07f63d928930f3fd
@@ -14,7 +14,7 @@ endpoint:
     - agree:
       - anibal
       link: capture aeb5a11492f41bde07f63d928930f3fd
-      hash: 4878b7f429815a75fdc2101e3a4eb1abf430837c0292efdea882d8d6fef08a3a
-      hash_ast: 32332683fc491e7bb0542acd0d13c2805558b15207b7e0e523d0dba6616f4a10
+      hash: 68de3bf3067800e3ff424327d9a48f223ca05cdcbf0d3a65af70144b7f36960f
+      hash_ast: aa139e6d8d5def56339c0f29b7d58a015d3423dc568e796cd02fcf39c660127b
       n: declined
     name: pull-sprint-impl

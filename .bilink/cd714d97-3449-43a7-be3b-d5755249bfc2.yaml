@@ -9,12 +9,12 @@ endpoint:
       hash: 80880c16fc8b98d8583a08cf826ed7b46723d294e8c4cc2859bc9af0ac88d821
     name: views-spec
   1:
-    link: capture f6e607c06e34e1c523c99fc92ad58bf7
+    link: capture c5c23a46df60a377012d969be66a503d
     accepted:
     - agree:
       - anibal
-      link: capture f6e607c06e34e1c523c99fc92ad58bf7
-      hash: f568cb8e66ae7f18b19d0d0cb9fb09bd7b24ef910cad478462a95f718c9022fb
-      hash_ast: 9aff4b8fb78bdba98df12770029a35b2076cf6e62927fbea3446933f89263ca4
+      link: capture c5c23a46df60a377012d969be66a503d
+      hash: 31eb7fa8561d7e442591d51c01242beddbec280e8bc7295e28a91fdba5d04532
+      hash_ast: 6692773e3a38e8b004851d81dd8d4bddfbe525ec86711fc0095dcfba26ab7b0f
       n: declined
-    name: other-views-holding
+    name: pull-query
