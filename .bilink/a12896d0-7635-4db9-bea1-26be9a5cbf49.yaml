@@ -10,4 +10,11 @@ endpoint:
     name: push-asks-once
   1:
     link: capture 441992756609ea9c254cdc4f648c549b
+    accepted:
+    - agree:
+      - anibal
+      link: capture 441992756609ea9c254cdc4f648c549b
+      hash: baae02dac6f7cf7c58a445291b20ea9874e6e21e3e56ddcaacdec26a76cd7417
+      hash_ast: 4eb5a1ed167999a4cb074ec085d29212b56f53a3c8b04fa662a650a6885158c2
+      n: declined
     name: push
