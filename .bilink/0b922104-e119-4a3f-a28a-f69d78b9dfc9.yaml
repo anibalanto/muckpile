@@ -2,6 +2,11 @@ kind: governs
 endpoint:
   0:
     link: capture f56f2b8c2f1b9be1bc6d9c4443c6e0ba
+    accepted:
+    - agree:
+      - anibal
+      link: capture f56f2b8c2f1b9be1bc6d9c4443c6e0ba
+      hash: 627acc756b026305c99e524ad4a413498590f6998e490c3850f0da314c9422da
     name: auto-comment
   1:
     link: capture 26e5060bd7ad45e4bf665a20d51d060f
