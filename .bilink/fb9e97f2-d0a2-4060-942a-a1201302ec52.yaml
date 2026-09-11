@@ -14,7 +14,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 26e5060bd7ad45e4bf665a20d51d060f
-      hash: 4f24d2b53cb8b792db67b3bf9a7710cc1566309ad0cab6c06a929e1081b065af
-      hash_ast: 2edf65437626a22d5695708c0706e710c032a11e49fd81a2890b254286356855
+      hash: 3f24bb887afbdf6c69ff214891b6cd4df66f039ca3de810ad1e3aa60455427ec
+      hash_ast: b742820f060b80596b4c3b831310d09b9fd5ac24ae8032a87e955ddb0519d15a
       n: declined
     name: comment-author
