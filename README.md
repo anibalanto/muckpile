@@ -201,7 +201,7 @@ muckpile comment ACC-338 nota.md --i-human
 muckpile attach ACC-338 medicion.png
 ```
 
-`--ai <modelo>` pone `ai: <modelo>` al principio del comentario —y `pull` lo devuelve al header—. `--i-human` pide que una persona escriba en la terminal una frase distinta cada vez, `faro-azul`, `puma-veloz`: sin terminal, se niega. Sin ninguno de los dos, `comment` no manda nada.
+`--ai <modelo>` pone `ai: <modelo>` al principio del comentario —y `pull` lo devuelve al header—, y solo manda si el proyecto lo permite, con `auto_comment = true`. `--i-human` pide que una persona escriba en la terminal una frase distinta cada vez, `faro-azul`, `puma-veloz`: sin terminal, se niega. Sin ninguno de los dos, `comment` no manda nada.
 
 ## Configuración
 
@@ -213,6 +213,8 @@ jira_base_url = "https://lamansys.atlassian.net"
 jira_project_key = "SGE"
 jira_board_id = 12                      # para sprint fetch y pull de un sprint
 commit_prefix = "jr"                    # nombra la rama de code-work: SGE-9876 -> jr-9876
+auto_update = false                     # true: crear y editar en Jira sin la frase
+auto_comment = false                    # true: comment --ai manda
 
 [repos.sge]
 remote = "git@gitlab.lamansys.ar:minsal/sge.git"
@@ -228,6 +230,8 @@ question = { type = "Tarea", label = "question" }   # un tipo compartido se dist
 sin-sprint = "project = SGE AND sprint is empty"
 ```
 
+- **Crear y editar en Jira pide una persona, salvo `auto_update = true`.** Los borradores y los cuerpos que sube `push`, y `title`, `transition`, `parent`, `link`, `unlink` y `attach`, piden la misma frase que `--i-human` antes de escribir. `push` muestra todo lo que va a escribir y la pide una vez. Sin terminal —la de un agente—, no se escribe nada. Leer no la pide.
+- **`comment --ai` solo manda con `auto_comment = true`.** Así, un equipo puede dejar que un modelo discuta en los hilos sin darle el board.
 - Entre los tipos que comparten un tipo de Jira, uno solo puede ir sin etiqueta; si la tabla es ambigua, el archivo no se carga.
 - `~/.config/muckpile/identity.toml` es de cada máquina ([Primeros pasos](#primeros-pasos)).
 - El idioma de la salida sale de `MUCKPILE_LANG` (`en` o `es-AR`), o del locale del sistema: uno que empiece con `es` es `es-AR`, cualquier otro `en`.
