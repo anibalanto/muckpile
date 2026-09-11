@@ -10,4 +10,11 @@ endpoint:
     name: auto-update
   1:
     link: capture 340af5855992e515cc4e3aa99a23b5e7
+    accepted:
+    - agree:
+      - anibal
+      link: capture 340af5855992e515cc4e3aa99a23b5e7
+      hash: 837d73085e36aed45591fbb93cc2076adc5344bd3981f3d3784726b4abde4277
+      hash_ast: e2b01c7818195bccce58a174b38e1d018f9dcfc64497810d023498a0cf5ffc8d
+      n: declined
     name: approve_update
