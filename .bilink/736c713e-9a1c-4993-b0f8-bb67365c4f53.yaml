@@ -1,0 +1,13 @@
+kind: governs
+endpoint:
+  0:
+    link: capture aaa8c32ddc62cd5311dc776a8fbe4963
+    accepted:
+    - agree:
+      - anibal
+      link: capture aaa8c32ddc62cd5311dc776a8fbe4963
+      hash: 264c6c790567984075e16f6ff21e7b8d3881efe268f4512e8fbc7519188228bc
+    name: help-row
+  1:
+    link: capture 46003c9ed5d65001c9ebf7740fd4c2e2
+    name: usage_of
