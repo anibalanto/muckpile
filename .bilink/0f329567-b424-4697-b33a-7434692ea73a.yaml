@@ -10,4 +10,9 @@ endpoint:
     name: decisiones-vivas-3
   1:
     link: capture 64a27ab3f7b2473c782c8b40f062db4e
+    accepted:
+    - agree:
+      - anibal
+      link: capture 64a27ab3f7b2473c782c8b40f062db4e
+      hash: 2150470839c99a1157706a351ce0f9b737f311a47693512304971da6bec1d953
     name: draft-stays-local
