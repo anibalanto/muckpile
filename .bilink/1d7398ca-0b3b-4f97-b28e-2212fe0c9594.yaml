@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture c2b904e60ca747b1f53714a87589d831
+    accepted:
+    - agree:
+      - anibal
+      link: capture c2b904e60ca747b1f53714a87589d831
+      hash: c6bc4a1513f15b7e8e324e69b6caf1677b70f8a22bd36d8efb8ea53fd12fa568
+    name: states-discover-spec
+  1:
+    link: capture f54842039d25e89547c43f714db5b6e7
+    accepted:
+    - agree:
+      - anibal
+      link: capture f54842039d25e89547c43f714db5b6e7
+      hash: 53c32922e17788f12ac9ddec66d3c883c85300c449e324c446ba27b952f162bf
+      hash_ast: 402fd988204138d12b5aa50b69f19440bf1d14e9ebb2263280f832ece3d046d0
+      n: declined
+    name: states-discover-impl

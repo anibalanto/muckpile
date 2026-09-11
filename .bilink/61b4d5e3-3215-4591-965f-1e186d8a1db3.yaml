@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture 8829568cac4f68469330cea8fb2d1852
+    accepted:
+    - agree:
+      - anibal
+      link: capture 8829568cac4f68469330cea8fb2d1852
+      hash: 9fdab8fbf91dcb60eedcad3fb07894570f317742d5e4987613ae5e461cf7f576
+    name: push-row
+  1:
+    link: capture 31535b5f714d57ffb8fdbab35db097b9
+    accepted:
+    - agree:
+      - anibal
+      link: capture 31535b5f714d57ffb8fdbab35db097b9
+      hash: 773f93cb507911b92ec9724f2cee251dc1e4f9c496c092851d030b6f9bceb811
+      hash_ast: 96f9738415b2f66dad0b45a224a900f5b3c093f8ee1e78ba36a78434572ba16a
+      n: declined
+    name: push_one

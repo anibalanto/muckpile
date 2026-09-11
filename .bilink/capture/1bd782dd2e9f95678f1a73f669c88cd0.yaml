@@ -1,0 +1,6 @@
+file: docs/specs/concepts/project.md
+query: |-
+  (section
+    (atx_heading (inline) @n0 (#eq? @n0 "Las consultas"))
+    (section
+    (atx_heading (inline) @n1 (#eq? @n1 "Una consulta con nombre es una vista en `query/`"))) @target)

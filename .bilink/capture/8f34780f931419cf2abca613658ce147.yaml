@@ -1,0 +1,6 @@
+file: docs/specs/concepts/body.md
+query: |-
+  (section
+    (atx_heading (inline) @n0 (#eq? @n0 "Los links a ítems"))
+    (section
+    (atx_heading (inline) @n1 (#eq? @n1 "Una tarjeta o un link del proyecto baja como link al archivo"))) @target)

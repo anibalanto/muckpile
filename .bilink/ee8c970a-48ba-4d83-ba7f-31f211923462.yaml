@@ -1,0 +1,17 @@
+kind: governs
+endpoint:
+  0:
+    link: path <
+    accepted:
+    - agree:
+      - anibal
+      link: capture 7bab1cefb4498428cc79e4305cf381e5
+      hash: cfa5f65554ed9ef1fcee76c280ab75e8a7b7b8664057800d75fee772628d1417
+  1:
+    link: capture 61353599b0e9376186fa77eba04cc9b4
+    accepted:
+    - agree:
+      - anibal
+      link: capture 61353599b0e9376186fa77eba04cc9b4
+      hash: 4007a1e67b2b912c43f623be62ed93b44b62a48d396edb4919b545d424b798a4
+    name: muckpile-code-work-add

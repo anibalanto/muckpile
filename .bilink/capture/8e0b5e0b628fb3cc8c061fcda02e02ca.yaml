@@ -1,0 +1,6 @@
+file: docs/specs/concepts/body.md
+query: |-
+  (section
+    (atx_heading (inline) @n0 (#eq? @n0 "La canonicidad"))
+    (section
+    (atx_heading (inline) @n1 (#eq? @n1 "La canonicidad se calcula sobre el ADF cada vez"))) @target)

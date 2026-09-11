@@ -1,0 +1,18 @@
+kind: governs
+endpoint:
+  0:
+    link: capture 0e9ac65784eabd4db2586d947d9293bb
+    accepted:
+    - agree:
+      - anibal
+      link: capture 0e9ac65784eabd4db2586d947d9293bb
+      hash: 6561d21daf35f3b860b03d24715ca4765f8146481404a7df328ab8357063ddf2
+    name: adr-decision-7
+  1:
+    link: capture f596f2b23cc6191b901d4801080f376c
+    accepted:
+    - agree:
+      - anibal
+      link: capture f596f2b23cc6191b901d4801080f376c
+      hash: 07154023c5e7ea4616a9c4e62112fe3f594ef4db63f4846d1ee539bcfe1074f3
+    name: spec-question

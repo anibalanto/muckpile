@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture bb9f7703b3e3d8529d477da2e1cc7049
+    accepted:
+    - agree:
+      - anibal
+      link: capture bb9f7703b3e3d8529d477da2e1cc7049
+      hash: 25fd549851483f79f606a62195941d3c6beb1099d442227e63df9482ae1339df
+    name: english-code-spec
+  1:
+    link: capture 95217ae65cade9a715203a70b4dbd6f5
+    accepted:
+    - agree:
+      - anibal
+      link: capture 95217ae65cade9a715203a70b4dbd6f5
+      hash: d7fbd26a0d10ac4152d15b155f9df12ba6a791a6ff13c94b38f2faa94b890394
+      hash_ast: 23353f0dcfbb7749994e9e1e95c1e1656e0cd9e1e5fbbe43b9e7708a7d9a8b1e
+      n: declined
+    name: i18n-lang-for

@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture ba9f66a6acc60dc9960d1e234f6ea17c
+    accepted:
+    - agree:
+      - anibal
+      link: capture ba9f66a6acc60dc9960d1e234f6ea17c
+      hash: b8dc84673ee7f30fd92f3fb2f1c93a052c6f9a97f907fe551623bc5573758cde
+    name: identity-spec
+  1:
+    link: capture ecf708824cc56af834ca826a0aeca17b
+    accepted:
+    - agree:
+      - anibal
+      link: capture ecf708824cc56af834ca826a0aeca17b
+      hash: 4a182e55629033d9191e65a28514f90ac6e48411a127bafdefe2d652c4a838a4
+      hash_ast: 7a378a7e74b67be86aeac24de41eb7305e6e003e1251574e6175d42d376c5dc9
+      n: declined
+    name: identity-impl

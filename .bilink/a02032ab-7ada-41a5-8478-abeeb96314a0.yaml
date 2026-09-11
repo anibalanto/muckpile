@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture 11eb08a80ea57dd29257f7b43f9c2b9d
+    accepted:
+    - agree:
+      - anibal
+      link: capture 11eb08a80ea57dd29257f7b43f9c2b9d
+      hash: 58a3418b284163700377219fd6d4bf58a3b04600a66992bae4af2fe264fbc2bb
+    name: canonicity-spec
+  1:
+    link: capture 73fab8cba40f730226c9f01314621671
+    accepted:
+    - agree:
+      - anibal
+      link: capture 73fab8cba40f730226c9f01314621671
+      hash: aea3509cb3df416886be7b8b0440105a95139ec5494de2224f4fc218f93d7ca7
+      hash_ast: 9adda022be08c1d0c2954a27eb05a20eff039352170a953a0d9587fddc1ac9a2
+      n: declined
+    name: to-markdown

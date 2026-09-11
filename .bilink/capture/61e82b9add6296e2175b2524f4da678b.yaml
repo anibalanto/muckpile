@@ -1,0 +1,6 @@
+file: docs/specs/concepts/provider.md
+query: |-
+  (section
+    (atx_heading (inline) @n0 (#eq? @n0 "Sin hooks ni servidor"))
+    (section
+    (atx_heading (inline) @n1 (#eq? @n1 "Cada comando le habla al proveedor en el momento en que corre"))) @target)

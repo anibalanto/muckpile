@@ -1,0 +1,4 @@
+file: crates/muckpile-core/src/project.rs
+query: |-
+  (function_item
+    name: (identifier) @n0 (#eq? @n0 "load_project_config")) @target

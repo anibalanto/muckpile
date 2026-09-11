@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture 7114e56d5734fa9e8dc87a9ec06faf9e
+    accepted:
+    - agree:
+      - anibal
+      link: capture 7114e56d5734fa9e8dc87a9ec06faf9e
+      hash: f2dfb511bc75c1222618bc8e96be3d941e54a01a085a59415986bfd8c1490978
+    name: question-spec
+  1:
+    link: capture 173676d8e8b0c5760a82777493ae7953
+    accepted:
+    - agree:
+      - anibal
+      link: capture 173676d8e8b0c5760a82777493ae7953
+      hash: 4b812b624a021499a0e898a98c7d0a495321062152ba2905e679abad16f6d8e3
+      hash_ast: 20b0858247ea9491989db0fb25caf1654ce61cfda65c53cb85c8465d92fb74bb
+      n: declined
+    name: rest-add-comment

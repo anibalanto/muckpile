@@ -1,0 +1,6 @@
+file: docs/adr/0001-muckpile-nace-como-subsistema-propio.md
+query: |-
+  (section
+    (atx_heading (inline) @n0 (#eq? @n0 "Decisión"))
+    (section
+    (atx_heading (inline) @n1 (#eq? @n1 "10. Editar el cuerpo local sólo si es seguro — canonicidad, no origen"))) @target)

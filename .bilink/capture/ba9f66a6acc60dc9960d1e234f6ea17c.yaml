@@ -1,0 +1,6 @@
+file: docs/specs/concepts/configuration.md
+query: |-
+  (section
+    (atx_heading (inline) @n0 (#eq? @n0 "Los dos archivos"))
+    (section
+    (atx_heading (inline) @n1 (#eq? @n1 "`identity.toml` es de cada máquina"))) @target)

@@ -1,0 +1,19 @@
+kind: governs
+endpoint:
+  0:
+    link: capture 033ac31f0481002b9d60089271e79068
+    accepted:
+    - agree:
+      - anibal
+      link: capture 033ac31f0481002b9d60089271e79068
+      hash: e2215fad53c3483e1008d692e67374cf31b160b832ac7b4b353e69cf240d3a21
+    name: converter-fork-spec
+  1:
+    link: capture c4a18e4f30c1d0002bce4eb078f955d2
+    accepted:
+    - agree:
+      - anibal
+      link: capture c4a18e4f30c1d0002bce4eb078f955d2
+      hash: 3d816a87fff511f516f8e21d3a07ac7bd35f9990925092cd5383efe79aa6f2f9
+      hash_ast: ad2afd328d581e9c9f34ed81484ae020c68469b3f464add8b2571334c789d03d
+    name: converter-fork-merged-cells-test

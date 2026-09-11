@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture 404072793c0e4118441f94559eeb15d1
+    accepted:
+    - agree:
+      - anibal
+      link: capture 404072793c0e4118441f94559eeb15d1
+      hash: 112699e3806de7c61aac55674508fb447847cee8eb673842489e69ae5668d6f9
+    name: question-spec
+  1:
+    link: capture c47d3c22f1fc523ac0d35f026b65625b
+    accepted:
+    - agree:
+      - anibal
+      link: capture c47d3c22f1fc523ac0d35f026b65625b
+      hash: cfcb4ad9af87d515008c842570a9ad07e4c12e747f67a1ec939b00168306f7da
+      hash_ast: 6905c6854ab3f4236a867c4ada91ef34f29f503de5df83f2187edfdc9164e0d7
+      n: declined
+    name: rest-add-attachment

@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture fe139e521b241e8c7ecb1ceff24efa23
+    accepted:
+    - agree:
+      - anibal
+      link: capture fe139e521b241e8c7ecb1ceff24efa23
+      hash: d4e0881e3855e276e33ec4686506eebc6a9cc8ba806187e7dfa6bf4f1ce2c0ef
+    name: config-spec
+  1:
+    link: capture 8b28751e06527617d9d8b2c2d2aacb31
+    accepted:
+    - agree:
+      - anibal
+      link: capture 8b28751e06527617d9d8b2c2d2aacb31
+      hash: d3f72e57fdb0f57657e1a2d323cb949c1227b75b5bf8cd8ab045ea10cdbb6efe
+      hash_ast: 899ee46efed831fe61e676836ec174558ddd309bce6f81c5c4723e94c5ecdee6
+      n: declined
+    name: check-item-types

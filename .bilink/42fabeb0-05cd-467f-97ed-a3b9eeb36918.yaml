@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture a0def7252caa097e656ca1cb704d2f18
+    accepted:
+    - agree:
+      - anibal
+      link: capture a0def7252caa097e656ca1cb704d2f18
+      hash: 049a1cd48a2a825a12cec218a1e38583fa3647092fcd12b3748eb12579e1e487
+    name: pull-spec
+  1:
+    link: capture c5c23a46df60a377012d969be66a503d
+    accepted:
+    - agree:
+      - anibal
+      link: capture c5c23a46df60a377012d969be66a503d
+      hash: 262aff7e6973163d4343ab07959dd2299a9e8c526b82f6f4ea5a7121e04f0f9d
+      hash_ast: 5c2a291f29e62c3c2fd95be8efe8cb3a0f14d21018380d8b74aa616802dbd0e7
+      n: declined
+    name: pull-query-impl

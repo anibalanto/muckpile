@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture 4fac1dc0bfd8a82e8046bc5c5baf5c2f
+    accepted:
+    - agree:
+      - anibal
+      link: capture 4fac1dc0bfd8a82e8046bc5c5baf5c2f
+      hash: 61cb7922ef0db71ab3449a60034c8e2a1c1267e7a91d906fc000755ef03f339c
+    name: ledger-spec
+  1:
+    link: capture 103777e805adf9de5e03771bb329835e
+    accepted:
+    - agree:
+      - anibal
+      link: capture 103777e805adf9de5e03771bb329835e
+      hash: 16ff0896cff646e41698a48cdb2d566bd81135d57fa5f638ae5ccfb5d945da09
+      hash_ast: 54dbaf01fec205f317508a0f748879ccb149f4a4c3c98d058fdcef5596bd8592
+      n: declined
+    name: ready-to-sync

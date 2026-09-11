@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture 27049c7e4c7770a76b211ff81258933d
+    accepted:
+    - agree:
+      - anibal
+      link: capture 27049c7e4c7770a76b211ff81258933d
+      hash: b3dba2f37dbddf1192946879044d2c09a666ac2b70235e955a30f56fe24fd6ca
+    name: ledger-spec
+  1:
+    link: capture 075724e42e48e8f88e077070fcedc91d
+    accepted:
+    - agree:
+      - anibal
+      link: capture 075724e42e48e8f88e077070fcedc91d
+      hash: 03ba64a855e79034cca9c070ec61c923a684df16bac450ce7481d580e5072e82
+      hash_ast: 084c0529972e29c3ba52f2e868cd81d793625704ae0fb824507384953b8c5683
+      n: declined
+    name: branch-name

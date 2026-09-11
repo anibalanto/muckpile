@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture d24e14bf9526626710e3aa2f66fb1412
+    accepted:
+    - agree:
+      - anibal
+      link: capture d24e14bf9526626710e3aa2f66fb1412
+      hash: 79c50a6cd9c2899197038db0283fb08a4add8c7de334e34967f0fe87e56aba71
+    name: unlink-spec
+  1:
+    link: capture 8aa46a02aa548eee2e2f8e288c1dbf31
+    accepted:
+    - agree:
+      - anibal
+      link: capture 8aa46a02aa548eee2e2f8e288c1dbf31
+      hash: e156ba666528b5e767323971da9c0912019b8f6e07a18b71b8fc064d68c91f3d
+      hash_ast: d1fb7d2490ac3c1c21e8572f3978af3b0eb252b7e5d8a17ede5929aed7390fa8
+      n: declined
+    name: unlink-impl

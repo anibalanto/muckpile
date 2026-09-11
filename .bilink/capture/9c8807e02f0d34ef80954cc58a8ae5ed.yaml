@@ -1,0 +1,6 @@
+file: docs/specs/concepts/question.md
+query: |-
+  (section
+    (atx_heading (inline) @n0 (#eq? @n0 "`question`"))
+    (section
+    (atx_heading (inline) @n1 (#eq? @n1 "Al crear un borrador se crean las relaciones de su header"))) @target)

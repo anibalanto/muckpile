@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture d0836e695356818641ef44adef3b9389
+    accepted:
+    - agree:
+      - anibal
+      link: capture d0836e695356818641ef44adef3b9389
+      hash: 2ac5ff1a6eeeb60567c97605bd63b312ff04a5a91414f7be24f4096462f4896f
+    name: canonicity-spec
+  1:
+    link: capture 22dcdda7b37c27ab0ef1eceff9496535
+    accepted:
+    - agree:
+      - anibal
+      link: capture 22dcdda7b37c27ab0ef1eceff9496535
+      hash: 9ff4fe09e2711bf4f116443c50a182469ba8aeb9a8d91b1b48d7ffba3aee5b54
+      hash_ast: 7b321984acb4042149a6e482a8c691faefbeba686d335d4dc90b3a530406b9cc
+      n: declined
+    name: settle-canonical

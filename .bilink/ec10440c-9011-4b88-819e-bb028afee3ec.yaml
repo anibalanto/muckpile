@@ -1,0 +1,20 @@
+kind: governs
+endpoint:
+  0:
+    link: capture a54063ed5dce93f93cfa593c6762c0e9
+    accepted:
+    - agree:
+      - anibal
+      link: capture a54063ed5dce93f93cfa593c6762c0e9
+      hash: 16ceab441376c453958a93365922da16c590d2f443dca1d07df4436c25a9e012
+    name: canonicity-spec
+  1:
+    link: capture 55c433e5ec1791b1c8b45233c9102ecd
+    accepted:
+    - agree:
+      - anibal
+      link: capture 55c433e5ec1791b1c8b45233c9102ecd
+      hash: 66111d9a6f18004092cc4f1b3db4de8909748140e5a684bb5fafccdf552a0824
+      hash_ast: 09dae2c037f4e3d581e8688382a70048dba0797f54deb3d66c8bc25ab81b8057
+      n: declined
+    name: jira-adf-markdown-filter

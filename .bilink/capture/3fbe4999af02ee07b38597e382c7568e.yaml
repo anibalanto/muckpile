@@ -1,0 +1,6 @@
+file: docs/specs/concepts/item.md
+query: |-
+  (section
+    (atx_heading (inline) @n0 (#eq? @n0 "Las relaciones"))
+    (section
+    (atx_heading (inline) @n1 (#eq? @n1 "Cada link se lee desde el lado del ítem"))) @target)

@@ -1,0 +1,6 @@
+file: docs/specs/concepts/question.md
+query: |-
+  (section
+    (atx_heading (inline) @n0 (#eq? @n0 "Escribir en el hilo"))
+    (section
+    (atx_heading (inline) @n1 (#eq? @n1 "Todo comentario dice quién lo escribió"))) @target)

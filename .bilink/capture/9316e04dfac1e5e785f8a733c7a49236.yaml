@@ -1,0 +1,6 @@
+file: docs/specs/concepts/ledger.md
+query: |-
+  (section
+    (atx_heading (inline) @n0 (#eq? @n0 "La vista"))
+    (section
+    (atx_heading (inline) @n1 (#eq? @n1 "La vista se actualiza con rebase sobre la ref del proveedor"))) @target)
