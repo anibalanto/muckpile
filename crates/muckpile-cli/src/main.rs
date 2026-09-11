@@ -17,6 +17,8 @@ fn main() -> Result<()> {
     set_lang(lang_from_env());
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.as_slice() {
+        [] => run_help(),
+        [cmd] if ["help", "--help", "-h"].contains(&cmd.as_str()) => run_help(),
         [cmd, id] if cmd == "to-work" => run_to_work(id, false),
         [cmd, id, flag] if cmd == "to-work" && flag == "--empty" => run_to_work(id, true),
         [cmd, rest @ ..] if cmd == "pull" => run_pull(rest),
@@ -37,8 +39,16 @@ fn main() -> Result<()> {
         [cmd, id] if cmd == "show" => run_show(id, false),
         [cmd, id, flag] if cmd == "show" && flag == "--local" => run_show(id, true),
         [cmd, sub, repo, rest @ ..] if cmd == "code-work" && sub == "add" => run_code_work_add(repo, rest),
-        _ => bail!(msg!("usage.all")),
+        [cmd, ..] => match muckpile_cli::usage_of(cmd) {
+            Some(usage) => bail!(usage),
+            None => bail!(msg!("usage.unknown", command = cmd)),
+        },
     }
+}
+
+fn run_help() -> Result<()> {
+    print!("{}", muckpile_cli::help());
+    Ok(())
 }
 
 fn run_to_work(id: &str, empty: bool) -> Result<()> {
@@ -189,7 +199,7 @@ fn run_states_discover() -> Result<()> {
 
 fn run_list(args: &[String]) -> Result<()> {
     let Some((view_arg, flags)) = args.split_first() else {
-        bail!(msg!("usage.list"));
+        bail!(muckpile_cli::usage_of("list").unwrap_or_default());
     };
 
     let mut state = None;
