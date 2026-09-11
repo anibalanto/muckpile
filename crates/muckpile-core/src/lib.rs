@@ -365,11 +365,18 @@ fn replace_link(re: &Regex, text: &str, changed: &mut bool, new_id: &str, item_t
 /// commit signed as the tool: every reference across the view rewritten,
 /// the draft's `_data/` merged into the item's, and the draft file gone —
 /// or, when the provider's own file for the item hasn't come down, the
-/// draft becomes it. Returns the files whose references were rewritten.
+/// draft becomes it. What nobody committed — another draft that names this
+/// one, a file loose in its `_data/` — is rewritten and moved the same, and
+/// left out of the commit. Returns the files whose references were
+/// rewritten.
 pub fn rename_one(view: &Path, old_slug: &str, new_id: &str) -> Result<Vec<String>> {
     let (src, item_type) = find_file(view, old_slug)?;
     let src_name = src.file_name().unwrap().to_string_lossy().into_owned();
     let dst_name = format!("{new_id}.{item_type}.md");
+    let old_data = format!("{old_slug}_data");
+    let new_data = format!("{new_id}_data");
+    let committed_src = is_tracked(view, &src_name);
+    let committed_data = tracked_under(view, &old_data)?;
 
     let mut touched = Vec::new();
     for path in markdown_files(view) {
@@ -392,27 +399,38 @@ pub fn rename_one(view: &Path, old_slug: &str, new_id: &str) -> Result<Vec<Strin
     } else {
         std::fs::rename(&src, view.join(&dst_name)).with_context(|| format!("renaming {src_name}"))?;
     }
-    let mut paths = vec![src_name, dst_name];
+    let mut paths = if committed_src { vec![src_name, dst_name] } else { Vec::new() };
 
-    let old_data = format!("{old_slug}_data");
     if view.join(&old_data).is_dir() {
-        let new_data = format!("{new_id}_data");
         move_merging(&view.join(&old_data), &view.join(&new_data))?;
-        paths.extend([old_data, new_data]);
+        for old in committed_data {
+            let new = format!("{new_data}{}", &old[old_data.len()..]);
+            paths.extend([old, new]);
+        }
     }
-    paths.extend(touched.iter().cloned());
+    let committed_touched: Vec<String> = touched.iter().filter(|p| is_tracked(view, p)).cloned().collect();
+    let refs = committed_touched.len();
+    paths.extend(committed_touched);
     paths.retain(|p| view.join(p).exists() || is_tracked(view, p));
+    if paths.is_empty() {
+        return Ok(touched);
+    }
 
-    let msg = if touched.is_empty() {
-        format!("rename {old_slug} -> {new_id}")
-    } else {
-        format!("rename {old_slug} -> {new_id} ({} refs)", touched.len())
-    };
+    let msg = if refs == 0 { format!("rename {old_slug} -> {new_id}") } else { format!("rename {old_slug} -> {new_id} ({refs} refs)") };
     // Every path named, and nothing else: never another view's uncommitted
     // edit, nor something a person staged by hand.
     let paths: Vec<&str> = paths.iter().map(String::as_str).collect();
     ledger::tool_commit(view, &paths, &msg)?;
     Ok(touched)
+}
+
+/// Every committed file under `dir` of `view`, as a path from `view`.
+fn tracked_under(view: &Path, dir: &str) -> Result<Vec<String>> {
+    let out = Command::new("git").arg("-C").arg(view).args(["ls-files", "-z", "--", dir]).output().with_context(|| format!("listing {dir}"))?;
+    if !out.status.success() {
+        bail!("git ls-files -- {dir} failed with {}", out.status);
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).split('\0').filter(|p| !p.is_empty()).map(str::to_string).collect())
 }
 
 /// Moves everything under `from` to the same place under `to`, which may
