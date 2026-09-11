@@ -2,6 +2,11 @@ kind: governs
 endpoint:
   0:
     link: capture f3b532152050c333a95116b3ef02508d
+    accepted:
+    - agree:
+      - anibal
+      link: capture f3b532152050c333a95116b3ef02508d
+      hash: 8f66f6280e38669381bce0936c6abfa7fd4a50da742defb0929b35eb921f4a39
     name: decisiones-vivas-1
   1:
     link: capture c52a6e2f502e20a795a666322a07be96
