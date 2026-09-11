@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `63f17ac`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `aaf8838`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -250,16 +250,16 @@ sin-sprint = "project = ACC AND sprint is empty"
 
 **Un proyecto lo crea `init`, y ningún otro comando.** Corrido en `multitask/`, `muckpile init <proyecto>` deja `<proyecto>/.muckpile/` —el git del proyecto, sin worktree propio: el registro de la decisión 5—, un `muckpile.toml` para completar (decisión 9), y las tres carpetas reservadas. Cada vista la crea después el comando que la necesita —`to-work` una de trabajo, `sprint fetch` una por sprint—, como un worktree de `.muckpile/` parado en su rama. Fuera de un proyecto iniciado, los demás comandos se niegan: ninguno arma un `.muckpile/` de paso.
 
-**Avance: 6/9.**
+**Avance: 8/9.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
 | Tres nombres reservados, y `to-work` sólo en la raíz | `cerrada` | `to_work` → `require_root`/`classify` ↔ fila `to-work` |
-| `to-work <id>` trae el ítem y su `_data/` | `diverge` | Crea `to-work/<id>/` vacía y nada más: el ítem llega con un `pull` aparte, y `_data/` no lo crea nadie. El bilink de la fila está aceptado igual |
+| `to-work <id>` trae el ítem y su `_data/` —`--empty` la deja vacía— | `cerrada` | `to_work_and_pull` ↔ fila `to-work`: la vista y un `pull` del ítem; si el ítem no se puede traer, la vista recién abierta se cierra. Probado el 2026-09-10 en `ACC-354` |
 | `code-work add`: rama derivada de `commit_prefix`, clon a demanda de `base/<repo>/`, `--from`, `--branch` | `cerrada` | `code_work_add` ↔ fila `code-work add` |
 | `sprint fetch`: una carpeta vacía por sprint abierto, `…` → fecha, nunca borra una poblada | `cerrada` | `sprint_fetch` ↔ fila; `legible_name` ↔ esta decisión. Un borde: borra cualquier carpeta vacía que no sea de un sprint abierto, aunque no la haya dejado él |
 | `pull` de una vista de sprint (`backlog/sprint/<slug>`) | `cerrada` | `pull_sprint` ↔ esta decisión: la vista queda con exactamente lo que el sprint tiene —lo que entró viene, lo que salió se va, con todo lo que la ref registró para él—, en un solo commit de la ref del proveedor. Probado el 2026-09-10 con el binario, sólo leyendo: `pull backlog/sprint/17_Los_sprints_en_el_board` trajo sus 6 ítems de `ACC` |
-| `pull` con una consulta — lo que reemplaza a `bootstrap`/`reconcile`/`adopt` | `pendiente` | — |
+| `pull` con una consulta — lo que reemplaza a `bootstrap`/`reconcile`/`adopt` | `cerrada` | `pull_query` ↔ esta decisión: `backlog/queries/<nombre>/` queda con exactamente lo que devuelve la consulta de `[queries]`, o la de `--query` para ese `pull`, sin guardarla. Probado el 2026-09-10, sólo leyendo, con `recientes = "project = ACC AND key >= ACC-354"` |
 | El chequeo local: "¿ya tengo este ítem en otra vista, en esta máquina?" | `cerrada` | `other_views_holding` ↔ esta decisión: `pull` dice en qué otras vistas del proyecto está cada ítem que trae, mirando el disco. Probado: el `pull` de `to-work/ACC-269` dijo `también en backlog/sprint/17_Los_sprints_en_el_board` |
 | `init` crea el proyecto —`.muckpile/`, `muckpile.toml`, las tres carpetas—, y las vistas nacen como worktrees suyos | `cerrada` | `init` ↔ fila `init`; `to_work` y `sprint_fetch` abren cada vista con `ledger::open_view`, y `sprint fetch` cierra con `ledger::close_empty_view` sólo la que nadie usó |
 | `init` que recupera un proyecto: `.muckpile/` borrado con vistas todavía en disco | `falta spec` | Esta decisión sólo dice que `init` crea un proyecto nuevo. Con qué parámetros se recupera uno, y qué pasa con lo que cada vista no subió, queda para el final: es fino |
