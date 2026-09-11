@@ -758,3 +758,21 @@ fn a_committed_draft_keeps_the_person_s_commit() {
     assert!(log.contains("Ana borrador"), "{log}");
     assert!(!log.contains("muckpile borrador"), "{log}");
 }
+
+/// A local draft that hangs from a committed one gets the id its parent was
+/// given, and stays local: the rename rewrites it without committing it.
+#[test]
+fn a_local_draft_under_a_committed_one_stays_local_after_its_parent_goes() {
+    let dir = git_view();
+    let view = dir.path();
+    let provider = FakeProvider::new();
+    provider.queue_create("ACC-100", "Tareas por hacer");
+    write_pending(view, "@padre", "La épica", None, "");
+    write_local(view, "@hijo", "La tarea", Some("@padre"), "");
+
+    push(view, &provider, &config(), approved_push).unwrap();
+    let again = push(view, &provider, &config(), approved_push).unwrap();
+
+    assert!(std::fs::read_to_string(view.join("@hijo.task.md")).unwrap().contains("parent: ACC-100\n"));
+    assert_eq!(again.iter().find(|o| o.id == "@hijo").map(|o| &o.result), Some(&PushResult::Local), "{again:?}");
+}

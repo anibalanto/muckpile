@@ -265,3 +265,45 @@ fn a_rename_commits_only_what_it_touched() {
     committed.sort();
     assert_eq!(committed, vec!["view/ACC-1.task.md", "view/ACC-100.task.md", "view/slug-a.task.md"]);
 }
+
+fn untracked(repo: &Path) -> Vec<String> {
+    let out = Command::new("git").arg("-C").arg(repo).args(["ls-files", "--others", "--exclude-standard"]).output().unwrap();
+    String::from_utf8(out.stdout).unwrap().lines().map(str::to_string).collect()
+}
+
+/// What nobody committed stays that way: a file loose in the draft's
+/// `_data/` travels with the rest, and isn't in the rename's commit.
+#[test]
+fn an_uncommitted_file_in_the_data_directory_moves_but_is_not_committed() {
+    let dir = git_repo();
+    let repo = dir.path();
+    write(repo, "slug-q.question.md", "---\ntitle: Q\n---\n");
+    write(repo, "slug-q_data/thread/1.md", "first message\n");
+    run(repo, &["add", "-A"]);
+    run(repo, &["commit", "-q", "-m", "seed"]);
+    write(repo, "slug-q_data/files/notas.md", "sin commitear\n");
+
+    muckpile_core::rename_one(repo, "slug-q", "ACC-9").unwrap();
+
+    assert!(!repo.join("slug-q_data").exists());
+    assert!(repo.join("ACC-9_data/thread/1.md").exists());
+    assert_eq!(untracked(repo), vec!["ACC-9_data/files/notas.md"]);
+}
+
+/// A draft nobody committed that names the renamed one gets its reference
+/// rewritten, and stays uncommitted: the rename doesn't commit it for anyone.
+#[test]
+fn an_uncommitted_draft_that_names_the_renamed_one_is_rewritten_but_not_committed() {
+    let dir = git_repo();
+    let repo = dir.path();
+    write(repo, "@padre.task.md", "---\ntitle: P\n---\n");
+    run(repo, &["add", "-A"]);
+    run(repo, &["commit", "-q", "-m", "seed"]);
+    write(repo, "@hijo.task.md", "---\ntitle: H\nparent: @padre\n---\n");
+
+    let touched = muckpile_core::rename_one(repo, "@padre", "ACC-100").unwrap();
+
+    assert_eq!(touched, vec!["@hijo.task.md".to_string()]);
+    assert!(std::fs::read_to_string(repo.join("@hijo.task.md")).unwrap().contains("parent: ACC-100\n"));
+    assert_eq!(untracked(repo), vec!["@hijo.task.md"]);
+}

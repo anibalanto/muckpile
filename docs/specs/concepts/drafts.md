@@ -41,7 +41,7 @@ Si la vista renombrara antes de rebasear, escribiría el mismo `<id>.<tipo>.md` 
 
 ### El renombre es un solo commit
 
-Un commit de la vista por ítem, firmado `muckpile`, con todo lo del renombre y nada más: se retira el borrador —el archivo del ítem ya bajó con el rebase—, `@<slug>_data/` se funde en `<id>_data/`, y se reescribe cada referencia al `@slug` en los demás archivos: `parent`, `relation.*`, el destino de un link y el id en prosa entre backticks. No se lleva la edición sin commitear de otra vista ni lo que alguien dejó en staging.
+Un commit de la vista por ítem, firmado `muckpile`, con todo lo del renombre y nada más: se retira el borrador —el archivo del ítem ya bajó con el rebase—, `@<slug>_data/` se funde en `<id>_data/`, y se reescribe cada referencia al `@slug` en los demás archivos: `parent`, `relation.*`, el destino de un link y el id en prosa entre backticks. No se lleva la edición sin commitear de otra vista ni lo que alguien dejó en staging. Lo que nadie commiteó se reescribe o se mueve igual, pero queda afuera del commit: un borrador local que nombra al `@slug` recibe el id y sigue local, y un archivo suelto en `@<slug>_data/` pasa a `<id>_data/` sin commitear.
 
 ### Un borrador que falla sólo frena a lo que depende de él
 
