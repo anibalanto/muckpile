@@ -1,0 +1,17 @@
+kind: governs
+endpoint:
+  0:
+    link: path <
+    accepted:
+    - agree:
+      - anibal
+      link: capture 955b54bad70e82749b10a13d50583bd7
+      hash: f785b4ea046cd5041eff424fc64add04fe9e55c01b30cde7ba9d68e8e5012699
+  1:
+    link: capture d5d155679a12da0431c73a3fcaa0e33d
+    accepted:
+    - agree:
+      - anibal
+      link: capture d5d155679a12da0431c73a3fcaa0e33d
+      hash: 471be6bd900682be0af0468506372cbf314e450953cdf0b8d8844131db4df5b3
+    name: muckpile-readme-desarrollo
