@@ -2,7 +2,7 @@
 
 Los ítems de Jira como archivos markdown en git: una carpeta por contexto de trabajo, varios proyectos a la vez, y ni hooks ni servidor de por medio.
 
-`muckpile` baja cada ítem —título, estado, padre, relaciones, cuerpo, comentarios y adjuntos— como un `<id>.<tipo>.md` con su carpeta `<id>_data/`, y lo sube de vuelta cuando es seguro. Git local es el registro de lo que dijo Jira: cada vista tiene una ref del proveedor que sólo avanza, y la vista se rebasea encima, con lo propio arriba. Reemplaza a `worklist`/`worklist-server`; el porqué y cada decisión están en [ADR-0001](docs/adr/0001-muckpile-nace-como-subsistema-propio.md).
+`muckpile` baja cada ítem —título, estado, padre, relaciones, cuerpo, comentarios y adjuntos— como un `<id>.<tipo>.md` con su carpeta `<id>_data/`, y lo sube de vuelta cuando es seguro. Git local es el registro de lo que dijo Jira: cada vista tiene una ref del proveedor que sólo avanza, y la vista se rebasea encima, con lo propio arriba. Reemplaza a `worklist`/`worklist-server`; el porqué y cada decisión están en [ADR-0001](docs/adr/0001-muckpile-nace-como-subsistema-propio.md), y lo que hace hoy, regla por regla, en [`docs/specs/`](docs/specs/commands.md).
 
 - **Sin hooks ni servidor.** Un solo binario, que le habla a Jira en el momento en que corre el comando.
 - **Multiproyecto.** Una carpeta por proyecto, y adentro, una vista por contexto: un ítem para trabajar, un sprint, una consulta.
@@ -273,11 +273,11 @@ cargo test                       # la suite completa
 cargo clippy --all-targets       # tiene que salir limpio
 ```
 
-- **La suite nunca le habla a Jira.** Corre contra `FakeProvider` y contra un servidor HTTP local que responde lo que el test le da; lo que se sabe de la API real está medido a mano, contra el board de `ACC`, y dicho en los tests y en el ADR.
+- **La suite nunca le habla a Jira.** Corre contra `FakeProvider` y contra un servidor HTTP local que responde lo que el test le da; lo que se sabe de la API real está medido a mano, contra el board de `ACC`, y dicho en los tests y en la spec.
 - **TDD:** el test va antes que el código.
 - **El código va en inglés entero**, identificadores y comentarios; un comentario dice por qué el código es así en términos del código, nunca señalando un documento.
 - **Los mensajes** viven en `crates/muckpile-core/i18n/en.toml` y `es-AR.toml`, con las mismas claves —un test lo exige—.
-- **La spec manda.** Cada decisión de [ADR-0001](docs/adr/0001-muckpile-nace-como-subsistema-propio.md) está atada al código que la implementa con `bilinker`, la herramienta de accreta para eso: se toca la spec, `bilinker check .` señala el código que quedó atrás, se cambia y se acepta.
+- **La spec manda.** Vive en `docs/specs/`: un archivo por concepto en `concepts/`, y los comandos en `commands.md`. Cada regla está atada con `bilinker`, la herramienta de accreta para eso, al código que la implementa, y cada archivo de la spec a la decisión de [ADR-0001](docs/adr/0001-muckpile-nace-como-subsistema-propio.md) de la que sale. Se toca la spec, `bilinker check .` señala el código que quedó atrás, se cambia y se acepta.
 - **Los diagramas** son fuentes [D2](https://d2lang.com) en `docs/diagrams/`. Para regenerar uno:
 
   ```sh
