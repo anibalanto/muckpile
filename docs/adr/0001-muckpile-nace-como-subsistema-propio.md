@@ -1,6 +1,6 @@
 # ADR-0001: muckpile nace como subsistema propio — sin hooks, multiproyecto
 
-**Estado:** Propuesto **Fecha:** 2026-09-09
+**Estado:** Aceptado —el 2026-09-10, con todas sus dimensiones cerradas— **Fecha:** 2026-09-09
 
 Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya prevé para crear o mover trabajo del worklist, aplicada un escalón más arriba: exigirle una tarea a la decisión que pregunta si el worklist sigue existiendo con esta forma sería la misma recursividad.
 
