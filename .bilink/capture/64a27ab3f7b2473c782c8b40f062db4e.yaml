@@ -1,0 +1,6 @@
+file: docs/specs/concepts/drafts.md
+query: |-
+  (section
+    (atx_heading (inline) @n0 (#eq? @n0 "Cómo `push` resuelve los borradores"))
+    (section
+    (atx_heading (inline) @n1 (#eq? @n1 "Un borrador que nadie commiteó queda local"))) @target)

@@ -1,0 +1,6 @@
+file: docs/decisions/2026-09-11.decisiones-vivas.md
+query: |-
+  (section
+    (atx_heading (inline) @n0 (#eq? @n0 "Decisión"))
+    (section
+    (atx_heading (inline) @n1 (#eq? @n1 "3. `push` sube solo lo commiteado"))) @target)

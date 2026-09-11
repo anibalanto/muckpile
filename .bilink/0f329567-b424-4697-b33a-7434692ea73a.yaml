@@ -1,0 +1,8 @@
+kind: governs
+endpoint:
+  0:
+    link: capture 76d2b08bca86c433b66ede16151593e1
+    name: decisiones-vivas-3
+  1:
+    link: capture 64a27ab3f7b2473c782c8b40f062db4e
+    name: draft-stays-local
