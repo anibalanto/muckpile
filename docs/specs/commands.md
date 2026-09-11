@@ -4,6 +4,7 @@ Cada comando corre parado en un proyecto iniciado —en su raíz o adentro de un
 
 | Comando | Uso | Qué hace |
 |---|---|---|
+| `help` | `help`, `--help`, `-h`, o sin argumentos | Lista los comandos por grupo, cada uno con su uso y lo que hace, en la salida estándar, y termina bien. Un comando que no existe se dice en una línea, que remite a `--help`; uno con los argumentos equivocados muestra solo su uso. |
 | `init` | `init <proyecto>` | Crea un proyecto: `<proyecto>/.muckpile/`, un `muckpile.toml` para completar y las cuatro carpetas reservadas. Es el único comando que crea un registro ([project.md](concepts/project.md)). |
 | `new` | `new <tipo> "<título>" [--parent <id>] [--blocks <id>]` | Escribe el borrador `@<slug>.<tipo>.md`, sin red. `<tipo>` es uno de los de `item_type`, `question` incluido. `--parent` y `--blocks` escriben el header que viaja al crearlo ([drafts.md](concepts/drafts.md)). |
 | `show` | `show <id> [--local]` | Muestra el header, el cuerpo y el listado de `<id>_data/`, del proveedor en vivo o, con `--local`, de la copia de la vista. |

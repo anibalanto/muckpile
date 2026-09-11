@@ -16,6 +16,37 @@ use muckpile_provider::transition::{transition as provider_transition, Outcome};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
+/// Every command, in the groups `help` lists them under: the group's name,
+/// and each command's first word as argv spells it. How it's run and what
+/// it does are messages, `help.usage.<command>` and `help.what.<command>`.
+const COMMANDS: &[(&str, &[&str])] = &[
+    ("project", &["init", "to-work", "code-work", "sprint", "states"]),
+    ("read", &["show", "list", "status"]),
+    ("sync", &["new", "pull", "push"]),
+    ("write", &["title", "transition", "parent", "link", "unlink", "comment", "attach"]),
+];
+
+/// What `muckpile --help` prints: every command, group by group, each one
+/// on its own line with what it does under it.
+pub fn help() -> String {
+    let mut text = format!("{}\n", msg!("help.header"));
+    for (group, commands) in COMMANDS {
+        text.push_str(&format!("\n{}\n", msg!(&format!("help.group.{group}"))));
+        for command in *commands {
+            text.push_str(&format!("  {}\n      {}\n", msg!(&format!("help.usage.{command}")), msg!(&format!("help.what.{command}"))));
+        }
+    }
+    text.push_str(&format!("\n{}\n", msg!("help.footer")));
+    text
+}
+
+/// How `command` is run, in one line — `None` when there's no such
+/// command.
+pub fn usage_of(command: &str) -> Option<String> {
+    let known = COMMANDS.iter().flat_map(|(_, commands)| commands.iter()).find(|c| **c == command)?;
+    Some(msg!("usage.one", usage = msg!(&format!("help.usage.{known}"))))
+}
+
 /// Makes a project, `<multitask>/<name>/`: its ledger, a `muckpile.toml`
 /// to fill in, and the four reserved folders. The only command that makes
 /// a ledger — every other one refuses outside a project that has one.
