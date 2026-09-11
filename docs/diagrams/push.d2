@@ -7,7 +7,13 @@ jira: Jira
 
 persona -> mp: "muckpile push ."
 mp -> reg: "¿cambios sin commitear? ¿rebase a medias?\nsi hay, se niega"
-mp -> mp: "resuelve los @slug pendientes"
+
+frase: "Con auto_update = false, si hay algo que escribir" {
+  mp -> persona: "muestra los borradores y los cuerpos que va a subir\ny pide la frase, una vez"
+  persona -> mp: "faro-azul"
+}
+
+mp -> mp: "resuelve los @slug commiteados"
 mp -> jira: "¿qué tenés ahora del ítem?"
 jira -> mp: "campos + ADF"
 mp -> reg: "¿coincide con la ref del proveedor?\nADF contra ADF"

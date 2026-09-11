@@ -1,6 +1,6 @@
 # Los comandos
 
-Cada comando corre parado en un proyecto iniciado —en su raíz o adentro de una de sus vistas—, salvo `init`, que corre en la carpeta que junta los proyectos. Los que le escriben al proveedor lo hacen en el momento, y después ponen la vista al día ([item.md](concepts/item.md)).
+Cada comando corre parado en un proyecto iniciado —en su raíz o adentro de una de sus vistas—, salvo `init`, que corre en la carpeta que junta los proyectos. Los que le escriben al proveedor lo hacen en el momento, y después ponen la vista al día ([item.md](concepts/item.md)). Con `auto_update` en `false`, antes de escribir piden que una persona escriba una frase en la terminal ([configuration.md](concepts/configuration.md)).
 
 | Comando | Uso | Qué hace |
 |---|---|---|
@@ -18,7 +18,7 @@ Cada comando corre parado en un proyecto iniciado —en su raíz o adentro de un
 | `transition` | `transition <id> "<estado>"` | Busca la transición que lleva a ese estado y la pide ([states.md](concepts/states.md)). |
 | `link` | `link <a> <frase> <b>` | Crea una relación con una de las frases del proveedor, de ida o de vuelta, con espacios o con `_` ([states.md](concepts/states.md)). |
 | `unlink` | `unlink <a> <frase> <b>` | Quita la relación que `link` con la misma frase crearía ([item.md](concepts/item.md)). |
-| `comment` | `comment <id> <archivo> [--reply-to <id del comentario>] (--ai <modelo> \| --i-human)` | Manda un archivo markdown como comentario, colgado de otro con `--reply-to`. Siempre dice quién lo escribió ([question.md](concepts/question.md)). |
+| `comment` | `comment <id> <archivo> [--reply-to <id del comentario>] (--ai <modelo> \| --i-human)` | Manda un archivo markdown como comentario, colgado de otro con `--reply-to`. Siempre dice quién lo escribió, y `--ai` solo manda si `auto_comment` lo permite ([question.md](concepts/question.md), [configuration.md](concepts/configuration.md)). |
 | `attach` | `attach <id> <archivo>` | Sube un adjunto ([question.md](concepts/question.md)). |
 | `title` | `title <id> "<título>"` | Cambia el título. Es la única forma: `push` no sube un `title:` editado ([item.md](concepts/item.md)). |
 | `parent` | `parent <id> <padre>` | Cambia el padre. Valida los dos ids, y se niega a que un ítem sea su propio padre ([item.md](concepts/item.md)). |

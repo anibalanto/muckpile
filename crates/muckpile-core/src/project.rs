@@ -32,6 +32,13 @@ pub struct ProjectConfig {
     /// `query/<name>/` holds.
     #[serde(default)]
     pub queries: BTreeMap<String, String>,
+    /// Whether creating and editing on the provider goes without a person
+    /// retyping a phrase at a terminal. Off unless the file says so.
+    #[serde(default)]
+    pub auto_update: bool,
+    /// Whether `comment --ai` goes at all. Off unless the file says so.
+    #[serde(default)]
+    pub auto_comment: bool,
 }
 
 /// How one muckpile type lives on the provider: its issue type, and the

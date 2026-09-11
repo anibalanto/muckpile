@@ -175,3 +175,20 @@ fn declared_queries_are_read_by_name() {
     let config = load_project_config(dir.path()).unwrap();
     assert_eq!(config.queries["sin-sprint"], "project = ACC AND sprint is empty");
 }
+
+/// Writing to the provider without a person, and commenting as a model,
+/// are the project's to allow: a file that says nothing allows neither.
+#[test]
+fn auto_update_and_auto_comment_are_off_unless_the_project_says() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = "provider = \"jira-rest\"\njira_base_url = \"https://x\"\njira_project_key = \"ACC\"\ncommit_prefix = \"acc\"\n";
+    std::fs::write(dir.path().join("muckpile.toml"), base).unwrap();
+    let config = load_project_config(dir.path()).unwrap();
+    assert!(!config.auto_update);
+    assert!(!config.auto_comment);
+
+    std::fs::write(dir.path().join("muckpile.toml"), format!("{base}auto_update = true\nauto_comment = true\n")).unwrap();
+    let config = load_project_config(dir.path()).unwrap();
+    assert!(config.auto_update);
+    assert!(config.auto_comment);
+}

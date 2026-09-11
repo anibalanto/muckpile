@@ -19,6 +19,20 @@ fn makes_the_ledger_the_config_and_the_four_folders() {
     assert!(load_project_config(&project).is_ok(), "the template reads as a config, placeholders and all");
 }
 
+/// The file `init` leaves says, in so many words, that writing to the
+/// provider and commenting as a model both wait for a person.
+#[test]
+fn the_template_says_auto_update_and_auto_comment_are_off() {
+    let dir = tempfile::tempdir().unwrap();
+
+    let project = init(dir.path(), "sge").unwrap();
+
+    let text = std::fs::read_to_string(project.join("muckpile.toml")).unwrap();
+    assert!(text.contains("\nauto_update = false\n") && text.contains("\nauto_comment = false\n"), "{text}");
+    let config = load_project_config(&project).unwrap();
+    assert!(!config.auto_update && !config.auto_comment);
+}
+
 /// A code worktree inside a view belongs to another repository: the ledger
 /// never sees it.
 #[test]

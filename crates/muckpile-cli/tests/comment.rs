@@ -2,8 +2,31 @@
 //! and every comment says who wrote it — a model, or a person.
 
 use muckpile_cli::{attach, comment, confirm_human, random_phrase, Author};
+use muckpile_core::project::ProjectConfig;
 use muckpile_provider::fake::FakeProvider;
 use muckpile_provider::provider::Provider;
+use std::collections::BTreeMap;
+
+/// A project that lets a model comment, or not.
+fn config(auto_comment: bool) -> ProjectConfig {
+    ProjectConfig {
+        provider: "jira-rest".into(),
+        jira_base_url: "https://x.atlassian.net".into(),
+        jira_project_key: "ACC".into(),
+        jira_board_id: None,
+        commit_prefix: "acc".into(),
+        repos: BTreeMap::new(),
+        item_type: BTreeMap::new(),
+        queries: BTreeMap::new(),
+        auto_update: false,
+        auto_comment,
+    }
+}
+
+/// The person approved it, or the project writes on its own.
+fn approved() -> anyhow::Result<()> {
+    Ok(())
+}
 
 /// A person at a terminal, retyping exactly what they were shown.
 fn person() -> muckpile_cli::HumanProof {
@@ -22,9 +45,23 @@ fn refuses_a_comment_that_does_not_say_who_wrote_it() {
     let provider = FakeProvider::new();
     provider.seed_item("ACC-360", "Tarea", "x", "Abierta", None, None);
 
-    let err = comment("ACC-360", &draft(dir.path(), "algo\n"), None, None, &provider).unwrap_err();
+    let err = comment("ACC-360", &draft(dir.path(), "algo\n"), None, None, &provider, &config(false)).unwrap_err();
 
     assert!(err.to_string().contains("--ai") && err.to_string().contains("--i-human"), "{err}");
+    assert!(provider.comments("ACC-360").unwrap().is_empty());
+}
+
+/// In a project that doesn't allow it, a model doesn't comment at all: only
+/// a person, with `--i-human`.
+#[test]
+fn an_ai_comment_is_refused_where_the_project_does_not_allow_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let provider = FakeProvider::new();
+    provider.seed_item("ACC-360", "Tarea", "x", "Abierta", None, None);
+
+    let err = comment("ACC-360", &draft(dir.path(), "lo que dijo\n"), None, Some(Author::Ai("claude-opus-5")), &provider, &config(false)).unwrap_err();
+
+    assert!(err.to_string().contains("--i-human"), "{err}");
     assert!(provider.comments("ACC-360").unwrap().is_empty());
 }
 
@@ -36,7 +73,7 @@ fn an_ai_comment_opens_with_the_model() {
     let provider = FakeProvider::new();
     provider.seed_item("ACC-360", "Tarea", "x", "Abierta", None, None);
 
-    let id = comment("ACC-360", &draft(dir.path(), "lo que dijo\n"), None, Some(Author::Ai("claude-opus-5")), &provider).unwrap();
+    let id = comment("ACC-360", &draft(dir.path(), "lo que dijo\n"), None, Some(Author::Ai("claude-opus-5")), &provider, &config(true)).unwrap();
 
     let sent = provider.comments("ACC-360").unwrap().into_iter().find(|c| c.id == id).unwrap();
     let markdown = muckpile_core::body::adf_to_body(&sent.body_adf).unwrap();
@@ -49,7 +86,7 @@ fn a_human_comment_adds_nothing() {
     let provider = FakeProvider::new();
     provider.seed_item("ACC-360", "Tarea", "x", "Abierta", None, None);
 
-    let id = comment("ACC-360", &draft(dir.path(), "lo que dije\n"), None, Some(Author::Human(person())), &provider).unwrap();
+    let id = comment("ACC-360", &draft(dir.path(), "lo que dije\n"), None, Some(Author::Human(person())), &provider, &config(false)).unwrap();
 
     let sent = provider.comments("ACC-360").unwrap().into_iter().find(|c| c.id == id).unwrap();
     assert!(!sent.body_adf.contains("ai: "), "{}", sent.body_adf);
@@ -61,9 +98,9 @@ fn a_reply_hangs_from_the_comment_it_names() {
     let dir = tempfile::tempdir().unwrap();
     let provider = FakeProvider::new();
     provider.seed_item("ACC-360", "Tarea", "x", "Abierta", None, None);
-    let root = comment("ACC-360", &draft(dir.path(), "raíz\n"), None, Some(Author::Human(person())), &provider).unwrap();
+    let root = comment("ACC-360", &draft(dir.path(), "raíz\n"), None, Some(Author::Human(person())), &provider, &config(false)).unwrap();
 
-    let reply = comment("ACC-360", &draft(dir.path(), "respuesta\n"), Some(&root), Some(Author::Human(person())), &provider).unwrap();
+    let reply = comment("ACC-360", &draft(dir.path(), "respuesta\n"), Some(&root), Some(Author::Human(person())), &provider, &config(false)).unwrap();
 
     let sent = provider.comments("ACC-360").unwrap().into_iter().find(|c| c.id == reply).unwrap();
     assert_eq!(sent.parent.as_deref(), Some(root.as_str()));
@@ -75,8 +112,8 @@ fn refuses_a_model_that_would_not_read_back() {
     let provider = FakeProvider::new();
     provider.seed_item("ACC-360", "Tarea", "x", "Abierta", None, None);
 
-    assert!(comment("ACC-360", &draft(dir.path(), "x\n"), None, Some(Author::Ai("")), &provider).is_err());
-    assert!(comment("ACC-360", &draft(dir.path(), "x\n"), None, Some(Author::Ai("a`b")), &provider).is_err());
+    assert!(comment("ACC-360", &draft(dir.path(), "x\n"), None, Some(Author::Ai("")), &provider, &config(true)).is_err());
+    assert!(comment("ACC-360", &draft(dir.path(), "x\n"), None, Some(Author::Ai("a`b")), &provider, &config(true)).is_err());
 }
 
 #[test]
@@ -87,7 +124,7 @@ fn attach_uploads_the_file_under_its_own_name() {
     let path = dir.path().join("medicion.txt");
     std::fs::write(&path, "34828 bytes").unwrap();
 
-    let attachment = attach("ACC-360", &path, &provider).unwrap();
+    let attachment = attach("ACC-360", &path, &provider, approved).unwrap();
 
     assert_eq!(attachment.filename, "medicion.txt");
     assert_eq!(provider.attachment_content(&attachment.id).unwrap(), b"34828 bytes");
@@ -97,8 +134,8 @@ fn attach_uploads_the_file_under_its_own_name() {
 fn refuses_an_id_with_characters_a_path_cannot_carry() {
     let dir = tempfile::tempdir().unwrap();
     let provider = FakeProvider::new();
-    assert!(comment("../x", &draft(dir.path(), "x\n"), None, Some(Author::Human(person())), &provider).is_err());
-    assert!(attach("../x", &draft(dir.path(), "x\n"), &provider).is_err());
+    assert!(comment("../x", &draft(dir.path(), "x\n"), None, Some(Author::Human(person())), &provider, &config(false)).is_err());
+    assert!(attach("../x", &draft(dir.path(), "x\n"), &provider, approved).is_err());
 }
 
 #[test]
@@ -141,7 +178,7 @@ fn a_link_to_an_item_file_in_a_comment_goes_up_as_a_card() {
     let provider = FakeProvider::new();
     provider.seed_item("ACC-360", "Tarea", "x", "Abierta", None, None);
 
-    let id = comment("ACC-360", &draft(dir.path(), "Mirá [ACC-356](ACC-356.task.md).\n"), None, Some(Author::Human(person())), &provider).unwrap();
+    let id = comment("ACC-360", &draft(dir.path(), "Mirá [ACC-356](ACC-356.task.md).\n"), None, Some(Author::Human(person())), &provider, &config(false)).unwrap();
 
     let sent = provider.comments("ACC-360").unwrap().into_iter().find(|c| c.id == id).unwrap();
     assert!(sent.body_adf.contains(r#""type":"inlineCard""#), "{}", sent.body_adf);

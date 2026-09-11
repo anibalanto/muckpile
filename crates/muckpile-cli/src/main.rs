@@ -5,7 +5,7 @@ use muckpile_core::identity::load_identity;
 use muckpile_core::msg;
 use muckpile_core::project::{find_project_root, load_project_config, ProjectConfig};
 use muckpile_core::states::read_states_cache;
-use muckpile_cli::{CatchUp, HeaderEdit, ListFilter, PushResult};
+use muckpile_cli::{CatchUp, HeaderEdit, ListFilter, Planned, PushResult};
 use muckpile_provider::link::{Outcome as LinkOutcome, UnlinkOutcome};
 use muckpile_provider::provider::Provider;
 use muckpile_provider::rest::{Credentials, JiraRest};
@@ -160,7 +160,7 @@ fn run_transition(id: &str, target_status: &str) -> Result<()> {
     let (root, cwd) = standing_in_a_project()?;
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
-    match muckpile_cli::transition(id, target_status, provider.as_ref())? {
+    match muckpile_cli::transition(id, target_status, provider.as_ref(), approve(&config))? {
         Outcome::Applied { transition_name } => {
             println!("{}", msg!("transition.applied", id, transition = transition_name, status = target_status));
             catch_up_view(&cwd, id, provider.as_ref(), &config)?;
@@ -263,7 +263,8 @@ fn run_push(view_arg: &str) -> Result<()> {
     let provider = build_provider(&root, &config)?;
     let view = cwd.join(view_arg);
 
-    for outcome in muckpile_cli::push(&view, provider.as_ref(), &config)? {
+    let approve_plan = |planned: &[Planned]| muckpile_cli::approve_update(&config, ask_on_terminal(describe_plan(planned), "update.human.prompt"));
+    for outcome in muckpile_cli::push(&view, provider.as_ref(), &config, approve_plan)? {
         match outcome.result {
             PushResult::Unchanged => println!("{}", msg!("item.unchanged", id = outcome.id)),
             PushResult::NeverPulled => println!("{}", msg!("push.never_pulled", id = outcome.id)),
@@ -306,7 +307,7 @@ fn run_title(id: &str, new_title: &str) -> Result<()> {
     let (root, cwd) = standing_in_a_project()?;
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
-    muckpile_cli::title(id, new_title, provider.as_ref())?;
+    muckpile_cli::title(id, new_title, provider.as_ref(), approve(&config))?;
     println!("{}", msg!("title.changed", id, title = new_title));
     catch_up_view(&cwd, id, provider.as_ref(), &config)
 }
@@ -327,7 +328,7 @@ fn run_parent(id: &str, parent_id: &str) -> Result<()> {
     let (root, cwd) = standing_in_a_project()?;
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
-    muckpile_cli::parent(id, parent_id, provider.as_ref())?;
+    muckpile_cli::parent(id, parent_id, provider.as_ref(), approve(&config))?;
     println!("{}", msg!("parent.changed", id, parent = parent_id));
     catch_up_view(&cwd, id, provider.as_ref(), &config)
 }
@@ -346,38 +347,61 @@ fn run_comment(id: &str, file: &str, flags: &[String]) -> Result<()> {
     let author = match (model, human) {
         (Some(_), true) => bail!(msg!("comment.ai_and_human")),
         (Some(model), false) => Some(muckpile_cli::Author::Ai(model)),
-        (None, true) => Some(muckpile_cli::Author::Human(muckpile_cli::confirm_human(ask_on_terminal)?)),
+        (None, true) => Some(muckpile_cli::Author::Human(muckpile_cli::confirm_human(ask_on_terminal(String::new(), "comment.human.prompt"))?)),
         (None, false) => None,
     };
     let (root, cwd) = standing_in_a_project()?;
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
-    let comment_id = muckpile_cli::comment(id, &cwd.join(file), reply_to, author, provider.as_ref())?;
+    let comment_id = muckpile_cli::comment(id, &cwd.join(file), reply_to, author, provider.as_ref(), &config)?;
     println!("{}", msg!("comment.added", id, comment = comment_id));
     catch_up_view(&cwd, id, provider.as_ref(), &config)
 }
 
-/// Shows `phrase` on the terminal and reads the answer from it — the
-/// terminal itself, never standard input, so a pipe can't answer.
-fn ask_on_terminal(phrase: &str) -> Result<String> {
-    use std::io::{BufRead, Write};
-    #[cfg(windows)]
-    let (input, output) = ("CONIN$", "CONOUT$");
-    #[cfg(not(windows))]
-    let (input, output) = ("/dev/tty", "/dev/tty");
-    let mut out = std::fs::OpenOptions::new().write(true).open(output).with_context(|| msg!("terminal.opening", path = output))?;
-    write!(out, "{}", msg!("comment.human.prompt", phrase))?;
-    out.flush()?;
-    let mut answer = String::new();
-    std::io::BufReader::new(std::fs::File::open(input).with_context(|| msg!("terminal.opening", path = input))?).read_line(&mut answer)?;
-    Ok(answer)
+/// Shows `said`, and then the phrase with the message `prompt`, on the
+/// terminal, and reads the answer from it — the terminal itself, never
+/// standard input, so a pipe can't answer.
+fn ask_on_terminal(said: String, prompt: &'static str) -> impl FnOnce(&str) -> Result<String> {
+    move |phrase| {
+        use std::io::{BufRead, Write};
+        #[cfg(windows)]
+        let (input, output) = ("CONIN$", "CONOUT$");
+        #[cfg(not(windows))]
+        let (input, output) = ("/dev/tty", "/dev/tty");
+        let mut out = std::fs::OpenOptions::new().write(true).open(output).with_context(|| msg!("terminal.opening", path = output))?;
+        write!(out, "{said}{}", msg!(prompt, phrase))?;
+        out.flush()?;
+        let mut answer = String::new();
+        std::io::BufReader::new(std::fs::File::open(input).with_context(|| msg!("terminal.opening", path = input))?).read_line(&mut answer)?;
+        Ok(answer)
+    }
+}
+
+/// What a command that writes to the provider needs before it writes: the
+/// person at the terminal, unless the project writes on its own.
+fn approve(config: &ProjectConfig) -> impl FnOnce() -> Result<()> + '_ {
+    move || muckpile_cli::approve_update(config, ask_on_terminal(String::new(), "update.human.prompt"))
+}
+
+/// Everything `push` is about to write, one line each, to show before
+/// asking for all of it at once.
+fn describe_plan(planned: &[Planned]) -> String {
+    let mut text = format!("{}\n", msg!("push.plan.header"));
+    for step in planned {
+        let line = match step {
+            Planned::Draft(slug) => msg!("push.plan.draft", slug),
+            Planned::Body(id) => msg!("push.plan.body", id),
+        };
+        text.push_str(&format!("  {line}\n"));
+    }
+    text
 }
 
 fn run_attach(id: &str, file: &str) -> Result<()> {
     let (root, cwd) = standing_in_a_project()?;
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
-    let attachment = muckpile_cli::attach(id, &cwd.join(file), provider.as_ref())?;
+    let attachment = muckpile_cli::attach(id, &cwd.join(file), provider.as_ref(), approve(&config))?;
     println!("{}", msg!("attach.done", id, filename = attachment.filename, attachment = attachment.id));
     catch_up_view(&cwd, id, provider.as_ref(), &config)
 }
@@ -386,7 +410,7 @@ fn run_link(a: &str, phrase: &str, b: &str) -> Result<()> {
     let (root, cwd) = standing_in_a_project()?;
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
-    match muckpile_cli::link(a, phrase, b, provider.as_ref())? {
+    match muckpile_cli::link(a, phrase, b, provider.as_ref(), approve(&config))? {
         LinkOutcome::Applied { type_name } => {
             println!("{a} {phrase} {b}  ({type_name})");
             // A link shows on both of its ends.
@@ -404,7 +428,7 @@ fn run_unlink(a: &str, phrase: &str, b: &str) -> Result<()> {
     let (root, cwd) = standing_in_a_project()?;
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
-    match muckpile_cli::unlink(a, phrase, b, provider.as_ref())? {
+    match muckpile_cli::unlink(a, phrase, b, provider.as_ref(), approve(&config))? {
         UnlinkOutcome::Removed { type_name } => {
             println!("{}", msg!("unlink.removed", a, phrase, b, type_name));
             // A link shows on both of its ends.

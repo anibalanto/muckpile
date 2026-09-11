@@ -46,6 +46,11 @@ jira_project_key = "CLAVE"
 # jira_board_id = 0
 commit_prefix = "prefijo"
 
+# true: crear y editar en el proveedor sin que una persona escriba la frase
+auto_update = false
+# true: comment --ai manda sin pedir nada
+auto_comment = false
+
 # [repos.nombre]
 # remote = "git@host:grupo/repo.git"
 # branch = "main"
@@ -665,11 +670,13 @@ fn date_only(iso: &str) -> &str {
 /// own transition leading to `target_status`, deciding by `to` — never by
 /// guessing whether a transition's own name is the status it leads to. The
 /// deciding logic lives in `muckpile-provider`; this only adds the id check
-/// every other command already applies to an argument coming from argv.
-pub fn transition(id: &str, target_status: &str, provider: &dyn Provider) -> Result<Outcome> {
+/// every other command already applies to an argument coming from argv,
+/// and `approve` before anything is fired.
+pub fn transition(id: &str, target_status: &str, provider: &dyn Provider, approve: impl FnOnce() -> Result<()>) -> Result<Outcome> {
     if !is_valid_id(id) {
         bail!(msg!("id.invalid", id));
     }
+    approve()?;
     provider_transition(provider, id, target_status)
 }
 
@@ -677,28 +684,31 @@ pub fn transition(id: &str, target_status: &str, provider: &dyn Provider) -> Res
 /// `transition` does for status: `phrase` is one of the provider's own —
 /// the deciding-and-firing logic lives in `muckpile-provider`; this only
 /// adds the id checks every other command already applies to arguments
-/// coming from argv.
-pub fn link(a: &str, phrase: &str, b: &str, provider: &dyn Provider) -> Result<LinkOutcome> {
+/// coming from argv, and `approve` before anything is created.
+pub fn link(a: &str, phrase: &str, b: &str, provider: &dyn Provider, approve: impl FnOnce() -> Result<()>) -> Result<LinkOutcome> {
     if !is_valid_id(a) {
         bail!(msg!("id.invalid", id = a));
     }
     if !is_valid_id(b) {
         bail!(msg!("id.invalid", id = b));
     }
+    approve()?;
     provider_link(provider, a, phrase, b)
 }
 
 /// Removes, on the provider, the relation `link` with the same arguments
 /// creates — the same phrase, taken the same two ways. The deciding and
 /// removing lives in `muckpile-provider`; this only adds the id checks
-/// every other command applies to arguments coming from argv.
-pub fn unlink(a: &str, phrase: &str, b: &str, provider: &dyn Provider) -> Result<UnlinkOutcome> {
+/// every other command applies to arguments coming from argv, and `approve`
+/// before anything is removed.
+pub fn unlink(a: &str, phrase: &str, b: &str, provider: &dyn Provider, approve: impl FnOnce() -> Result<()>) -> Result<UnlinkOutcome> {
     if !is_valid_id(a) {
         bail!(msg!("id.invalid", id = a));
     }
     if !is_valid_id(b) {
         bail!(msg!("id.invalid", id = b));
     }
+    approve()?;
     provider_unlink(provider, a, phrase, b)
 }
 
@@ -845,15 +855,33 @@ pub struct BodyRefused {
     pub diff: String,
 }
 
+/// What `push` is about to write to the provider, shown before it writes
+/// any of it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Planned {
+    /// A committed `@slug`: searched by its title, and created — with its
+    /// body, its parent and its relations — when nothing matches.
+    Draft(String),
+    /// An item whose body was edited and committed, and its header left as
+    /// the provider has it: its body goes.
+    Body(String),
+}
+
 /// First resolves every pending `@slug` the view has committed — search or
 /// create, then rename, rewrite references, and settle a fresh baseline for
 /// it, same as a `pull` — and then sends the body of every item that
 /// already had a real id and changed since its own last `pull`, refusing
 /// anything the provider moved on since then. The header never travels
 /// through the second half: it only changes by command, so an item whose
-/// header was edited by hand is reported and left exactly as it is.
-pub fn push(view: &Path, provider: &dyn Provider, config: &ProjectConfig) -> Result<Vec<PushOutcome>> {
+/// header was edited by hand is reported and left exactly as it is. Before
+/// any of it, `approve` sees everything that's about to go, once — and
+/// nothing, and no one asked, when nothing is.
+pub fn push(view: &Path, provider: &dyn Provider, config: &ProjectConfig, approve: impl FnOnce(&[Planned]) -> Result<()>) -> Result<Vec<PushOutcome>> {
     ready_to_sync(view)?;
+    let planned = plan(view)?;
+    if !planned.is_empty() {
+        approve(&planned)?;
+    }
     let mut outcomes = resolve_pending(view, provider, config)?;
     let just_resolved: HashSet<String> = outcomes
         .iter()
@@ -872,6 +900,30 @@ pub fn push(view: &Path, provider: &dyn Provider, config: &ProjectConfig) -> Res
         outcomes.push(push_one(view, &local, provider, config)?);
     }
     Ok(outcomes)
+}
+
+/// What `push` would write, read off the view alone: each committed draft,
+/// and each item whose committed body differs from what its provider's ref
+/// recorded while its header doesn't. What the provider says once asked —
+/// that it moved, that a body isn't canonical — can still hold one back.
+fn plan(view: &Path) -> Result<Vec<Planned>> {
+    let mut planned = Vec::new();
+    for pending in item::list_pending(view)? {
+        if ledger::committed(view, &format!("{}.{}.md", pending.slug, pending.item_type))? {
+            planned.push(Planned::Draft(pending.slug));
+        }
+    }
+    for local in list_summaries(view)? {
+        let filename = format!("{}.{}.md", local.id, local.item_type);
+        let Some(recorded) = ledger::provider_text(view, &filename)? else { continue };
+        let working = std::fs::read_to_string(view.join(&filename)).with_context(|| format!("reading {filename}"))?;
+        let (recorded_header, recorded_body) = body::split_frontmatter(&recorded);
+        let (working_header, working_body) = body::split_frontmatter(&working);
+        if working_header == recorded_header && working_body != recorded_body {
+            planned.push(Planned::Body(local.id));
+        }
+    }
+    Ok(planned)
 }
 
 /// Resolves every pending `@slug` directly under `view` that's committed —
@@ -1100,21 +1152,24 @@ fn header_edits(id: &str, item_type: &str, working: &str, remote: &Item) -> Resu
 
 
 /// The only way an item's title changes: written to the provider right
-/// away, with no conversion — `push` never sends a title edited by hand.
-pub fn title(id: &str, new_title: &str, provider: &dyn Provider) -> Result<()> {
+/// away once `approve` lets it, with no conversion — `push` never sends a
+/// title edited by hand.
+pub fn title(id: &str, new_title: &str, provider: &dyn Provider, approve: impl FnOnce() -> Result<()>) -> Result<()> {
     if !is_valid_id(id) {
         bail!(msg!("id.invalid", id));
     }
     if new_title.trim().is_empty() {
         bail!(msg!("title.empty"));
     }
+    approve()?;
     provider.update_title(id, new_title)
 }
 
 /// The only way the parent of an already-synced item changes: written to the
 /// provider right away — `push` never sends a `parent` edited by hand. That
-/// the parent exists, and can hold this item, is the provider's to say.
-pub fn parent(id: &str, parent_id: &str, provider: &dyn Provider) -> Result<()> {
+/// the parent exists, and can hold this item, is the provider's to say;
+/// that it goes at all, `approve`'s.
+pub fn parent(id: &str, parent_id: &str, provider: &dyn Provider, approve: impl FnOnce() -> Result<()>) -> Result<()> {
     if !is_valid_id(id) {
         bail!(msg!("id.invalid", id));
     }
@@ -1124,6 +1179,7 @@ pub fn parent(id: &str, parent_id: &str, provider: &dyn Provider) -> Result<()> 
     if id == parent_id {
         bail!(msg!("parent.self", id));
     }
+    approve()?;
     provider.set_parent(id, parent_id)
 }
 
@@ -1147,10 +1203,25 @@ pub struct HumanProof(());
 /// standard input, which a pipe can fill — so with no terminal there's no
 /// answer, and no confirmation.
 pub fn confirm_human(ask: impl FnOnce(&str) -> Result<String>) -> Result<HumanProof> {
+    confirm(ask, "comment.human.no_terminal", "comment.human.mismatch")
+}
+
+/// Stands before every command that creates or edits on the provider: lets
+/// it through when the project writes on its own — `auto_update` — and
+/// otherwise only when a person retypes the phrase `ask` shows them, the
+/// same way `confirm_human` does. Never asks when it doesn't have to.
+pub fn approve_update(config: &ProjectConfig, ask: impl FnOnce(&str) -> Result<String>) -> Result<()> {
+    if !config.auto_update {
+        confirm(ask, "update.human.no_terminal", "update.human.mismatch")?;
+    }
+    Ok(())
+}
+
+fn confirm(ask: impl FnOnce(&str) -> Result<String>, no_terminal: &str, mismatch: &str) -> Result<HumanProof> {
     let phrase = random_phrase();
-    let typed = ask(&phrase).with_context(|| msg!("comment.human.no_terminal"))?;
+    let typed = ask(&phrase).with_context(|| msg!(no_terminal))?;
     if typed.trim() != phrase {
-        bail!(msg!("comment.human.mismatch"));
+        bail!(msg!(mismatch));
     }
     Ok(HumanProof(()))
 }
@@ -1184,8 +1255,9 @@ fn random_below(n: usize) -> usize {
 /// Sends the markdown in `file` as a comment on `id` — a reply to
 /// `reply_to` when given — and returns the new comment's id. Refused unless
 /// it says who wrote it, so a comment with no model on top is never one
-/// that forgot to say.
-pub fn comment(id: &str, file: &Path, reply_to: Option<&str>, author: Option<Author>, provider: &dyn Provider) -> Result<String> {
+/// that forgot to say; and refused from a model unless the project lets one
+/// comment — `auto_comment`.
+pub fn comment(id: &str, file: &Path, reply_to: Option<&str>, author: Option<Author>, provider: &dyn Provider, config: &ProjectConfig) -> Result<String> {
     if !is_valid_id(id) {
         bail!(msg!("id.invalid", id));
     }
@@ -1197,6 +1269,9 @@ pub fn comment(id: &str, file: &Path, reply_to: Option<&str>, author: Option<Aut
     let Some(author) = author else {
         bail!(msg!("comment.no_author"));
     };
+    if matches!(author, Author::Ai(_)) && !config.auto_comment {
+        bail!(msg!("comment.ai.not_allowed"));
+    }
     let text = std::fs::read_to_string(file).with_context(|| format!("reading {}", file.display()))?;
     let markdown = match author {
         Author::Ai(model) => {
@@ -1210,13 +1285,15 @@ pub fn comment(id: &str, file: &Path, reply_to: Option<&str>, author: Option<Aut
     provider.add_comment(id, &to_adf(&markdown, provider)?, reply_to)
 }
 
-/// Uploads `file` as an attachment of `id`, under its own name.
-pub fn attach(id: &str, file: &Path, provider: &dyn Provider) -> Result<Attachment> {
+/// Uploads `file` as an attachment of `id`, under its own name, once
+/// `approve` lets it.
+pub fn attach(id: &str, file: &Path, provider: &dyn Provider, approve: impl FnOnce() -> Result<()>) -> Result<Attachment> {
     if !is_valid_id(id) {
         bail!(msg!("id.invalid", id));
     }
     let filename = file.file_name().map(|n| n.to_string_lossy().into_owned()).with_context(|| msg!("attach.not_a_file", path = file.display()))?;
     let bytes = std::fs::read(file).with_context(|| format!("reading {}", file.display()))?;
+    approve()?;
     provider.add_attachment(id, &filename, &bytes)
 }
 

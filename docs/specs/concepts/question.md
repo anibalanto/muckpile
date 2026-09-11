@@ -61,7 +61,7 @@ Cada adjunto baja como `files/<nombre>`. Si dos adjuntos se llaman igual, los do
 
 ### Todo comentario dice quién lo escribió
 
-`comment <id> <archivo>` manda un archivo markdown como comentario, y lleva siempre `--ai <modelo>` o `--i-human`. Sin ninguno de los dos, se niega. `--ai` pone el modelo como primer párrafo del comentario, `ai: <modelo>`, con el modelo como código, y así se ve en el proveedor. `pull` lo reconoce, lo saca del cuerpo y lo pasa al header del archivo. `--i-human` no agrega nada al comentario.
+`comment <id> <archivo>` manda un archivo markdown como comentario, y lleva siempre `--ai <modelo>` o `--i-human`. Sin ninguno de los dos, se niega. `--ai` pone el modelo como primer párrafo del comentario, `ai: <modelo>`, con el modelo como código, y así se ve en el proveedor. `pull` lo reconoce, lo saca del cuerpo y lo pasa al header del archivo. `--i-human` no agrega nada al comentario. `--ai` solo manda si el proyecto lo permite, con `auto_comment` ([configuration.md](configuration.md)).
 
 ### `--i-human` lo confirma una persona en la terminal
 
