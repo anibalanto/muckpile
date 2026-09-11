@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `4cf3881`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `f1d8e6f`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -466,13 +466,13 @@ jira_token_env = "JIRA_API_TOKEN_LAMANSYS"   # el nombre de la variable, nunca e
 
 **Y esto no reemplaza el método — lo hace más estricto donde antes había una salida fácil.** La correspondencia entre spec y código sigue siendo la de `AGENTS.md`: se toca la spec, `bilinker check` reporta los endpoints no-OK, cada uno apunta al fragmento que hay que tocar, se cambia el código y se acepta. Es el bilink el que ata el código a la spec —estructural, verificable, y `bilinker check` avisa si se rompe— y no una línea de comentario que diga "ver tal archivo", que es lo que el comentario ya no puede hacer.
 
-**Avance: 2/3.**
+**Avance: 3/3.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
 | Identificadores y comentarios en inglés | `cumple` | — |
 | Ningún comentario cita un ADR, una spec o un ítem | `cumple` | Desde `ae5d5cd`, `git grep "decision [0-9]" -- crates` no encuentra nada; donde la cita decía algo, lo dice en términos del código |
-| Lo que ve el usuario sale de archivos de mensajes, `en` y `es-AR`, y el idioma de `MUCKPILE_LANG` o del locale | `pendiente` | Los mensajes y los errores están todos en castellano, escritos en el código |
+| Lo que ve el usuario sale de archivos de mensajes, `en` y `es-AR`, y el idioma de `MUCKPILE_LANG` o del locale | `cerrada` | `muckpile_core::i18n`: `t` ↔ esta decisión, y `lang_for` ↔ esta decisión, la regla del idioma. 110 claves, las mismas en `i18n/en.toml` y `i18n/es-AR.toml` —un test lo exige, con los mismos `{datos}` en cada una—. La biblioteca habla `es-AR` si nadie elige; el binario elige al arrancar. Quedan en castellano, a propósito, los mensajes de los commits que hace `muckpile` —son historia, no algo que se muestra— y la plantilla de `muckpile.toml`. Probado el 2026-09-10: con `LANG=en_US`, inglés; con `MUCKPILE_LANG=es-AR`, castellano |
 
 ### 12. El header cambia sólo por comando; el cuerpo se edita como texto
 
