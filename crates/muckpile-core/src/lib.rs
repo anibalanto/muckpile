@@ -1,5 +1,6 @@
 pub mod body;
 pub mod codework;
+pub mod i18n;
 pub mod identity;
 pub mod item;
 pub mod ledger;
