@@ -353,7 +353,7 @@ fn run_comment(id: &str, file: &str, flags: &[String]) -> Result<()> {
     let (root, cwd) = standing_in_a_project()?;
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
-    let comment_id = muckpile_cli::comment(id, &cwd.join(file), reply_to, author, provider.as_ref())?;
+    let comment_id = muckpile_cli::comment(id, &cwd.join(file), reply_to, author, provider.as_ref(), &config)?;
     println!("{}", msg!("comment.added", id, comment = comment_id));
     catch_up_view(&cwd, id, provider.as_ref(), &config)
 }

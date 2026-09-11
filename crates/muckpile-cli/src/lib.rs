@@ -1255,8 +1255,9 @@ fn random_below(n: usize) -> usize {
 /// Sends the markdown in `file` as a comment on `id` — a reply to
 /// `reply_to` when given — and returns the new comment's id. Refused unless
 /// it says who wrote it, so a comment with no model on top is never one
-/// that forgot to say.
-pub fn comment(id: &str, file: &Path, reply_to: Option<&str>, author: Option<Author>, provider: &dyn Provider) -> Result<String> {
+/// that forgot to say; and refused from a model unless the project lets one
+/// comment — `auto_comment`.
+pub fn comment(id: &str, file: &Path, reply_to: Option<&str>, author: Option<Author>, provider: &dyn Provider, config: &ProjectConfig) -> Result<String> {
     if !is_valid_id(id) {
         bail!(msg!("id.invalid", id));
     }
@@ -1268,6 +1269,9 @@ pub fn comment(id: &str, file: &Path, reply_to: Option<&str>, author: Option<Aut
     let Some(author) = author else {
         bail!(msg!("comment.no_author"));
     };
+    if matches!(author, Author::Ai(_)) && !config.auto_comment {
+        bail!(msg!("comment.ai.not_allowed"));
+    }
     let text = std::fs::read_to_string(file).with_context(|| format!("reading {}", file.display()))?;
     let markdown = match author {
         Author::Ai(model) => {
