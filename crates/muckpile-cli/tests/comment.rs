@@ -5,6 +5,11 @@ use muckpile_cli::{attach, comment, confirm_human, random_phrase, Author};
 use muckpile_provider::fake::FakeProvider;
 use muckpile_provider::provider::Provider;
 
+/// The person approved it, or the project writes on its own.
+fn approved() -> anyhow::Result<()> {
+    Ok(())
+}
+
 /// A person at a terminal, retyping exactly what they were shown.
 fn person() -> muckpile_cli::HumanProof {
     confirm_human(|phrase| Ok(phrase.to_string())).unwrap()
@@ -87,7 +92,7 @@ fn attach_uploads_the_file_under_its_own_name() {
     let path = dir.path().join("medicion.txt");
     std::fs::write(&path, "34828 bytes").unwrap();
 
-    let attachment = attach("ACC-360", &path, &provider).unwrap();
+    let attachment = attach("ACC-360", &path, &provider, approved).unwrap();
 
     assert_eq!(attachment.filename, "medicion.txt");
     assert_eq!(provider.attachment_content(&attachment.id).unwrap(), b"34828 bytes");
@@ -98,7 +103,7 @@ fn refuses_an_id_with_characters_a_path_cannot_carry() {
     let dir = tempfile::tempdir().unwrap();
     let provider = FakeProvider::new();
     assert!(comment("../x", &draft(dir.path(), "x\n"), None, Some(Author::Human(person())), &provider).is_err());
-    assert!(attach("../x", &draft(dir.path(), "x\n"), &provider).is_err());
+    assert!(attach("../x", &draft(dir.path(), "x\n"), &provider, approved).is_err());
 }
 
 #[test]

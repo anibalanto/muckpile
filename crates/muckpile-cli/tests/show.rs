@@ -20,6 +20,8 @@ fn config() -> ProjectConfig {
         repos: BTreeMap::new(),
         item_type,
         queries: BTreeMap::new(),
+        auto_update: false,
+        auto_comment: false,
     }
 }
 

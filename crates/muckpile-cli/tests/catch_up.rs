@@ -9,6 +9,16 @@ use muckpile_provider::fake::FakeProvider;
 use std::collections::BTreeMap;
 use std::path::Path;
 
+/// What `push` is about to write, approved.
+fn approved_push(_: &[muckpile_cli::Planned]) -> anyhow::Result<()> {
+    Ok(())
+}
+
+/// The person approved it, or the project writes on its own.
+fn approved() -> anyhow::Result<()> {
+    Ok(())
+}
+
 fn config() -> ProjectConfig {
     let mut item_type = BTreeMap::new();
     item_type.insert("task".to_string(), "Tarea".into());
@@ -21,6 +31,8 @@ fn config() -> ProjectConfig {
         repos: BTreeMap::new(),
         item_type,
         queries: BTreeMap::new(),
+        auto_update: false,
+        auto_comment: false,
     }
 }
 
@@ -57,14 +69,14 @@ fn the_view_catches_up_with_what_the_command_wrote() {
     let view = dir.path();
     let provider = FakeProvider::new();
     seed_pulled(&dir, &provider);
-    title("ACC-1", "nueva", &provider).unwrap();
+    title("ACC-1", "nueva", &provider, approved).unwrap();
 
     let caught = catch_up(view, "ACC-1", &provider, &config()).unwrap();
 
     assert_eq!(caught, CatchUp::CaughtUp);
     let text = std::fs::read_to_string(view.join("ACC-1.task.md")).unwrap();
     assert!(text.contains("title: nueva"), "{text}");
-    assert_eq!(push(view, &provider, &config()).unwrap()[0].result, PushResult::Unchanged, "the next push sees nothing new");
+    assert_eq!(push(view, &provider, &config(), approved_push).unwrap()[0].result, PushResult::Unchanged, "the next push sees nothing new");
 }
 
 /// Catching up rewrites the file from the provider: over an edit nobody
@@ -77,7 +89,7 @@ fn an_item_with_uncommitted_edits_is_left_behind() {
     let provider = FakeProvider::new();
     seed_pulled(&dir, &provider);
     std::fs::write(view.join("ACC-1.task.md"), "---\ntitle: vieja\nstatus: Abierta\n---\nun cuerpo a medio escribir\n").unwrap();
-    title("ACC-1", "nueva", &provider).unwrap();
+    title("ACC-1", "nueva", &provider, approved).unwrap();
 
     let caught = catch_up(view, "ACC-1", &provider, &config()).unwrap();
 
@@ -112,7 +124,7 @@ fn a_local_draft_in_files_does_not_hold_it_back() {
     seed_pulled(&dir, &provider);
     std::fs::create_dir_all(view.join("ACC-1_data/files")).unwrap();
     std::fs::write(view.join("ACC-1_data/files/borrador.md"), "sin commitear\n").unwrap();
-    title("ACC-1", "nueva", &provider).unwrap();
+    title("ACC-1", "nueva", &provider, approved).unwrap();
 
     assert_eq!(catch_up(view, "ACC-1", &provider, &config()).unwrap(), CatchUp::CaughtUp);
     assert_eq!(std::fs::read_to_string(view.join("ACC-1_data/files/borrador.md")).unwrap(), "sin commitear\n");

@@ -11,6 +11,11 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::Command;
 
+/// What `push` is about to write, approved.
+fn approved_push(_: &[muckpile_cli::Planned]) -> anyhow::Result<()> {
+    Ok(())
+}
+
 fn config() -> ProjectConfig {
     let mut item_type = BTreeMap::new();
     item_type.insert("task".to_string(), "Tarea".into());
@@ -24,6 +29,8 @@ fn config() -> ProjectConfig {
         repos: BTreeMap::new(),
         item_type,
         queries: BTreeMap::new(),
+        auto_update: false,
+        auto_comment: false,
     }
 }
 
@@ -97,7 +104,7 @@ fn a_title_edited_by_hand_clashes_and_nothing_is_sent() {
     let edited = std::fs::read_to_string(view.join("ACC-1.task.md")).unwrap();
     let before = head_count(view);
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     assert_eq!(outcomes[0].result, PushResult::HeaderClash(vec![field("title", Some("nueva"), Some("vieja"))]));
     assert_eq!(provider.title_of("ACC-1").as_deref(), Some("vieja"));
@@ -114,7 +121,7 @@ fn a_status_edited_by_hand_clashes() {
     seed_pulled(view, &provider, "ACC-1");
     edit_file(view, "ACC-1", "Finalizada", "x", "");
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     assert_eq!(outcomes[0].result, PushResult::HeaderClash(vec![field("status", Some("Finalizada"), Some("En curso"))]));
     assert_eq!(provider.status_of("ACC-1").as_deref(), Some("En curso"));
@@ -132,7 +139,7 @@ fn a_body_edit_next_to_a_header_edit_is_not_sent_either() {
     seed_pulled(view, &provider, "ACC-1");
     edit_file(view, "ACC-1", "Abierta", "otro", "edited body\n");
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     assert!(matches!(outcomes[0].result, PushResult::HeaderClash(_)), "{:?}", outcomes[0].result);
     assert_eq!(provider.body_adf_of("ACC-1").as_deref(), Some(adf));
@@ -151,7 +158,7 @@ fn a_relation_edited_by_hand_clashes_one_edit_per_link() {
     std::fs::write(view.join("ACC-1.task.md"), "---\ntitle: x\nstatus: Abierta\nrelation.blocks: [ACC-3]\n---\n").unwrap();
     run(view, &["-c", "user.name=Ana", "-c", "user.email=ana@x", "commit", "-qam", "edit"]);
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     assert_eq!(
         outcomes[0].result,
@@ -173,7 +180,7 @@ fn sends_the_body_when_it_changed_and_is_canonical() {
     seed_pulled(view, &provider, "ACC-1");
     edit_file(view, "ACC-1", "Abierta", "x", "edited body\n");
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     assert_eq!(outcomes[0].result, PushResult::Written { body: true, body_refused: None });
     let sent = provider.body_adf_of("ACC-1").unwrap();
@@ -198,7 +205,7 @@ fn refuses_a_noncanonical_body() {
     seed_pulled(view, &provider, "ACC-1");
     edit_file(view, "ACC-1", "Abierta", "vieja", "edited by hand, should never reach the provider\n");
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     let PushResult::Written { body, body_refused } = &outcomes[0].result else {
         panic!("expected Written, got {:?}", outcomes[0].result);
@@ -222,7 +229,7 @@ fn the_diff_of_a_refused_body_is_against_the_provider_s_adf() {
     seed_pulled(view, &provider, "ACC-1");
     edit_file(view, "ACC-1", "Abierta", "x", &format!("{pulled_body}\nOne more line.\n"));
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     let PushResult::Written { body_refused: Some(refused), .. } = &outcomes[0].result else {
         panic!("expected a refused body, got {:?}", outcomes[0].result);
@@ -250,7 +257,7 @@ fn refuses_when_the_provider_changed_since_the_last_pull() {
     provider.seed_item("ACC-1", "Tarea", "vieja", "Finalizada", None, Some(adf));
     edit_file(view, "ACC-1", "Abierta", "vieja", "original\n\nmás cuerpo\n");
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     assert_eq!(outcomes[0].result, PushResult::Stale);
     assert_eq!(provider.body_adf_of("ACC-1").as_deref(), Some(adf), "nothing should have been written");
@@ -271,7 +278,7 @@ fn a_clash_with_what_the_provider_did_stops_the_rebase_for_a_person() {
     provider.seed_item("ACC-1", "Tarea", "vieja", "Finalizada", None, None);
     edit_file(view, "ACC-1", "En curso", "vieja", "");
 
-    let err = push(view, &provider, &config()).unwrap_err();
+    let err = push(view, &provider, &config(), approved_push).unwrap_err();
 
     assert!(err.to_string().contains("rebase"), "{err}");
     assert!(muckpile_core::ledger::rebasing(view).unwrap());
@@ -288,7 +295,7 @@ fn refuses_a_view_with_uncommitted_edits() {
     seed_pulled(view, &provider, "ACC-1");
     std::fs::write(view.join("ACC-1.task.md"), "---\ntitle: x\nstatus: Abierta\n---\nsin commitear\n").unwrap();
 
-    let err = push(view, &provider, &config()).unwrap_err();
+    let err = push(view, &provider, &config(), approved_push).unwrap_err();
 
     assert!(err.to_string().contains("sin commitear"), "{err}");
 }
@@ -305,7 +312,7 @@ fn after_a_push_the_view_is_neither_ahead_nor_behind() {
     seed_pulled(view, &provider, "ACC-1");
     edit_file(view, "ACC-1", "Abierta", "x", "editado\n");
 
-    push(view, &provider, &config()).unwrap();
+    push(view, &provider, &config(), approved_push).unwrap();
 
     let status = Command::new("git").arg("-C").arg(view).args(["status", "-sb"]).output().unwrap();
     assert!(String::from_utf8_lossy(&status.stdout).starts_with("## to-work/ACC-1...provider/to-work/ACC-1\n"), "{}", String::from_utf8_lossy(&status.stdout));
@@ -322,7 +329,7 @@ fn a_draft_is_rewritten_to_its_canonical_form_in_its_own_commit_before_it_goes()
     provider.queue_create("ACC-403", "Tareas por hacer");
     write_pending(view, "@algo", "Un borrador", None, "**el `reach`, y el que falla**\n");
 
-    push(view, &provider, &config()).unwrap();
+    push(view, &provider, &config(), approved_push).unwrap();
 
     let log = Command::new("git").arg("-C").arg(view).args(["log", "--format=%an %s"]).output().unwrap();
     let log = String::from_utf8_lossy(&log.stdout);
@@ -341,7 +348,7 @@ fn resolving_records_new_on_the_provider_s_ref_before_the_rename() {
     provider.queue_create("ACC-403", "Tareas por hacer");
     write_pending(view, "@algo", "Un borrador", None, "");
 
-    push(view, &provider, &config()).unwrap();
+    push(view, &provider, &config(), approved_push).unwrap();
 
     let provider_log = Command::new("git").arg("-C").arg(view).args(["log", "-1", "--format=%s", "provider/to-work/ACC-1"]).output().unwrap();
     assert_eq!(String::from_utf8_lossy(&provider_log.stdout).trim(), "new @algo");
@@ -361,7 +368,7 @@ fn only_touches_the_items_that_actually_changed() {
     seed_pulled(view, &provider, "ACC-2");
     edit_file(view, "ACC-2", "Abierta", "b", "a body edit\n");
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     let by_id: std::collections::BTreeMap<_, _> = outcomes.iter().map(|o| (o.id.as_str(), &o.result)).collect();
     assert_eq!(by_id["ACC-1"], &PushResult::Unchanged);
@@ -399,7 +406,7 @@ fn creates_a_pending_slug_that_matches_nothing_on_the_provider() {
     provider.queue_create("ACC-403", "Tareas por hacer");
     write_pending(view, "@algo", "Un borrador", None, "");
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     assert_eq!(outcomes.len(), 1);
     assert_eq!(outcomes[0].id, "@algo");
@@ -419,7 +426,7 @@ fn finds_a_pending_slug_that_already_exists_on_the_provider_instead_of_creating_
     // only passes if `push` really finds it instead of creating it.
     write_pending(view, "@algo", "Ya existe", None, "");
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     assert_eq!(outcomes[0].result, PushResult::Resolved { id: "ACC-9".into(), created: false });
     let committed = std::fs::read_to_string(view.join("ACC-9.task.md")).unwrap();
@@ -435,7 +442,7 @@ fn a_found_item_never_gets_its_body_overwritten() {
     provider.seed_item("ACC-9", "Tarea", "Ya existe", "Abierta", None, Some(real_adf));
     write_pending(view, "@algo", "Ya existe", None, "un borrador que nadie pidió subir\n");
 
-    push(view, &provider, &config()).unwrap();
+    push(view, &provider, &config(), approved_push).unwrap();
 
     assert_eq!(provider.body_adf_of("ACC-9").as_deref(), Some(real_adf), "found means read-only");
 }
@@ -448,7 +455,7 @@ fn a_created_item_sends_its_draft_body_once() {
     provider.queue_create("ACC-403", "Tareas por hacer");
     write_pending(view, "@algo", "Un borrador", None, "el cuerpo del borrador\n");
 
-    push(view, &provider, &config()).unwrap();
+    push(view, &provider, &config(), approved_push).unwrap();
 
     let sent = provider.body_adf_of("ACC-403").unwrap();
     assert!(sent.contains("el cuerpo del borrador"), "{sent}");
@@ -464,7 +471,7 @@ fn translates_an_in_batch_parent_to_the_freshly_resolved_id() {
     write_pending(view, "@padre", "La épica", None, "");
     write_pending(view, "@hijo", "La tarea", Some("@padre"), "");
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     let by_id: std::collections::BTreeMap<_, _> = outcomes.iter().map(|o| (o.id.as_str(), &o.result)).collect();
     assert_eq!(by_id["@padre"], &PushResult::Resolved { id: "ACC-100".into(), created: true });
@@ -483,7 +490,7 @@ fn a_draft_new_wrote_with_a_parent_is_created_under_it() {
     muckpile_cli::new(view, "task", "La tarea", Some("ACC-339"), None).unwrap();
     commit_all(view);
 
-    push(view, &provider, &config()).unwrap();
+    push(view, &provider, &config(), approved_push).unwrap();
 
     assert_eq!(provider.parent_of("ACC-403").as_deref(), Some("ACC-339"));
     let committed = std::fs::read_to_string(view.join("ACC-403.task.md")).unwrap();
@@ -500,7 +507,7 @@ fn a_slug_with_no_configured_item_type_fails_without_touching_the_rest() {
     std::fs::write(view.join("@raro.user-story.md"), "---\ntitle: sin tipo configurado\n---\n").unwrap();
     commit_all(view);
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     let by_id: std::collections::BTreeMap<_, _> = outcomes.iter().map(|o| (o.id.as_str(), &o.result)).collect();
     assert!(matches!(by_id["@raro"], PushResult::ResolveFailed(_)));
@@ -516,7 +523,7 @@ fn a_dependency_that_fails_to_resolve_blocks_only_what_depends_on_it() {
     std::fs::write(view.join("@padre.user-story.md"), "---\ntitle: sin tipo configurado\n---\n").unwrap();
     write_pending(view, "@hijo", "depende del padre", Some("@padre"), "");
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     let by_id: std::collections::BTreeMap<_, _> = outcomes.iter().map(|o| (o.id.as_str(), &o.result)).collect();
     assert!(matches!(by_id["@padre"], PushResult::ResolveFailed(_)));
@@ -532,7 +539,7 @@ fn a_resolved_item_is_not_reported_again_as_unchanged_in_the_same_run() {
     provider.queue_create("ACC-403", "Tareas por hacer");
     write_pending(view, "@algo", "Un borrador", None, "");
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     assert_eq!(outcomes.len(), 1, "one row for the resolve, none from the same-run item scan");
 }
@@ -552,7 +559,7 @@ fn a_created_draft_carries_its_relations_to_the_provider() {
     provider.queue_create("ACC-403", "Tareas por hacer");
     write_pending_with(view, "@pregunta", "¿se hereda?", "relation.blocks: ACC-229\n");
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     assert_eq!(outcomes, vec![PushOutcome { id: "@pregunta".into(), result: PushResult::Resolved { id: "ACC-403".into(), created: true } }]);
     assert_eq!(provider.links_created(), vec![("Blocks".to_string(), "ACC-403".to_string(), "ACC-229".to_string())]);
@@ -571,7 +578,7 @@ fn a_relation_key_with_underscores_is_the_provider_s_phrase() {
     provider.queue_create("ACC-403", "Tareas por hacer");
     write_pending_with(view, "@algo", "bloqueada", "relation.is_blocked_by: [ACC-229]\n");
 
-    push(view, &provider, &config()).unwrap();
+    push(view, &provider, &config(), approved_push).unwrap();
 
     assert_eq!(provider.links_created(), vec![("Blocks".to_string(), "ACC-229".to_string(), "ACC-403".to_string())]);
 }
@@ -587,7 +594,7 @@ fn a_relation_to_another_draft_in_the_batch_links_to_its_resolved_id() {
     write_pending_with(view, "@pregunta", "la pregunta", "relation.blocks: [@tarea]\n");
     write_pending_with(view, "@tarea", "la tarea", "");
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     let resolved: std::collections::BTreeMap<_, _> = outcomes
         .iter()
@@ -610,7 +617,7 @@ fn a_relation_the_provider_has_no_phrase_for_is_reported_with_the_command_to_ret
     provider.queue_create("ACC-403", "Tareas por hacer");
     write_pending_with(view, "@algo", "un borrador", "relation.depends: ACC-229\n");
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     assert_eq!(outcomes[0].result, PushResult::Resolved { id: "ACC-403".into(), created: true });
     let PushResult::RelationFailed { phrase, other, .. } = &outcomes[1].result else {
@@ -631,7 +638,7 @@ fn a_found_item_gets_no_relations_from_the_draft() {
     provider.seed_item("ACC-9", "Tarea", "Ya existe", "Abierta", None, None);
     write_pending_with(view, "@algo", "Ya existe", "relation.blocks: ACC-229\n");
 
-    push(view, &provider, &config()).unwrap();
+    push(view, &provider, &config(), approved_push).unwrap();
 
     assert!(provider.links_created().is_empty());
 }
@@ -647,7 +654,7 @@ fn a_created_question_carries_its_label() {
     std::fs::write(view.join("@se-hereda.question.md"), "---\ntitle: ¿se hereda?\n---\n").unwrap();
     commit_all(view);
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     assert_eq!(outcomes[0].result, PushResult::Resolved { id: "ACC-403".into(), created: true });
     assert_eq!(provider.labels_of("ACC-403"), vec!["question".to_string()]);
@@ -666,7 +673,7 @@ fn a_pending_question_is_not_found_as_a_task_with_the_same_title() {
     std::fs::write(view.join("@se-hereda.question.md"), "---\ntitle: ¿se hereda?\n---\n").unwrap();
     commit_all(view);
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     assert_eq!(outcomes[0].result, PushResult::Resolved { id: "ACC-403".into(), created: true });
 }
@@ -684,12 +691,12 @@ fn a_link_to_an_item_file_goes_up_as_a_card() {
     seed_pulled(view, &provider, "ACC-1");
     edit_file(view, "ACC-1", "Abierta", "x", "Cuelga de [ACC-100](ACC-100.task.md).\n");
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     assert_eq!(outcomes[0].result, PushResult::Written { body: true, body_refused: None });
     let sent = provider.body_adf_of("ACC-1").unwrap();
     assert!(sent.contains(r#""type":"inlineCard""#) && sent.contains(&provider.item_url("ACC-100")), "{sent}");
-    let again = push(view, &provider, &config()).unwrap();
+    let again = push(view, &provider, &config(), approved_push).unwrap();
     assert_eq!(again[0].result, PushResult::Unchanged, "{again:?}");
 }
 
@@ -704,7 +711,7 @@ fn a_draft_nobody_committed_stays_local() {
     write_local(view, "@seguimiento", "Una tarea de seguimiento", None, "");
     let before = head_count(view);
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     assert_eq!(outcomes, vec![PushOutcome { id: "@seguimiento".into(), result: PushResult::Local }]);
     assert!(view.join("@seguimiento.task.md").exists());
@@ -723,7 +730,7 @@ fn a_draft_that_names_a_local_one_waits_for_it() {
     write_pending(view, "@hijo", "La tarea", Some("@padre"), "");
     write_local(view, "@padre", "La épica", None, "");
 
-    let outcomes = push(view, &provider, &config()).unwrap();
+    let outcomes = push(view, &provider, &config(), approved_push).unwrap();
 
     let by_id: std::collections::BTreeMap<_, _> = outcomes.iter().map(|o| (o.id.as_str(), &o.result)).collect();
     assert_eq!(by_id["@padre"], &PushResult::Local);
@@ -744,7 +751,7 @@ fn a_committed_draft_keeps_the_person_s_commit() {
     provider.queue_create("ACC-403", "Tareas por hacer");
     write_pending(view, "@algo", "Un borrador", None, "");
 
-    push(view, &provider, &config()).unwrap();
+    push(view, &provider, &config(), approved_push).unwrap();
 
     let log = Command::new("git").arg("-C").arg(view).args(["log", "--format=%an %s"]).output().unwrap();
     let log = String::from_utf8_lossy(&log.stdout);
