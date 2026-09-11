@@ -14,7 +14,8 @@ use std::path::{Path, PathBuf};
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.as_slice() {
-        [cmd, id] if cmd == "to-work" => run_to_work(id),
+        [cmd, id] if cmd == "to-work" => run_to_work(id, false),
+        [cmd, id, flag] if cmd == "to-work" && flag == "--empty" => run_to_work(id, true),
         [cmd, rest @ ..] if cmd == "pull" => run_pull(rest),
         [cmd, sub] if cmd == "sprint" && sub == "fetch" => run_sprint_fetch(),
         [cmd, id, status] if cmd == "transition" => run_transition(id, status),
@@ -34,16 +35,23 @@ fn main() -> Result<()> {
         [cmd, id, flag] if cmd == "show" && flag == "--local" => run_show(id, true),
         [cmd, sub, repo, rest @ ..] if cmd == "code-work" && sub == "add" => run_code_work_add(repo, rest),
         _ => bail!(
-            "uso: muckpile init <proyecto> | muckpile to-work <id> | muckpile pull [id | backlog/sprint/<sprint> | backlog/queries/<nombre> [--query <consulta>]] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile push <vista> | muckpile link <a> <frase> <b> | muckpile unlink <a> <frase> <b> | muckpile title <id> <título> | muckpile parent <id> <padre> | muckpile comment <id> <archivo> [--reply-to <id>] (--ai <modelo> | --i-human) | muckpile attach <id> <archivo> | muckpile new <tipo> <título> [--parent <id>] [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
+            "uso: muckpile init <proyecto> | muckpile to-work <id> [--empty] | muckpile pull [id | backlog/sprint/<sprint> | backlog/queries/<nombre> [--query <consulta>]] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile push <vista> | muckpile link <a> <frase> <b> | muckpile unlink <a> <frase> <b> | muckpile title <id> <título> | muckpile parent <id> <padre> | muckpile comment <id> <archivo> [--reply-to <id>] (--ai <modelo> | --i-human) | muckpile attach <id> <archivo> | muckpile new <tipo> <título> [--parent <id>] [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
         ),
     }
 }
 
-fn run_to_work(id: &str) -> Result<()> {
+fn run_to_work(id: &str, empty: bool) -> Result<()> {
     let (root, cwd) = standing_in_a_project()?;
-    let view = muckpile_cli::to_work(&root, &cwd, id)?;
-    let rel = view.strip_prefix(&root).unwrap_or(&view);
-    println!("{}/ creada", rel.display());
+    if empty {
+        let view = muckpile_cli::to_work(&root, &cwd, id)?;
+        let rel = view.strip_prefix(&root).unwrap_or(&view);
+        println!("{}/ creada, vacía", rel.display());
+        return Ok(());
+    }
+    let config = load_project_config(&root)?;
+    let provider = build_provider(&root, &config)?;
+    let pulled = muckpile_cli::to_work_and_pull(&root, &cwd, id, provider.as_ref(), &config)?;
+    print_pulled(&root, &pulled);
     Ok(())
 }
 

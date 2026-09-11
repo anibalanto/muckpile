@@ -69,3 +69,43 @@ fn refuses_a_view_that_already_exists() {
     let err = to_work(root, root, "ACC-355").unwrap_err();
     assert!(err.to_string().contains("ACC-355"), "{err}");
 }
+
+fn config_file(root: &Path) {
+    std::fs::write(
+        root.join("muckpile.toml"),
+        "provider = \"jira-rest\"\njira_base_url = \"https://x.atlassian.net\"\njira_project_key = \"ACC\"\ncommit_prefix = \"acc\"\n\n[item_type]\ntask = \"Tarea\"\n",
+    )
+    .unwrap();
+}
+
+/// By default the view comes with its item: `to-work` is a view and a pull.
+#[test]
+fn brings_the_item_into_its_new_view() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    config_file(root);
+    let config = muckpile_core::project::load_project_config(root).unwrap();
+    let provider = muckpile_provider::fake::FakeProvider::new();
+    provider.seed_item("ACC-355", "Tarea", "Vistas", "En curso", None, None);
+
+    let pulled = muckpile_cli::to_work_and_pull(root, root, "ACC-355", &provider, &config).unwrap();
+
+    assert_eq!(pulled.path, root.join("to-work/ACC-355/ACC-355.task.md"));
+    assert!(pulled.path.exists());
+}
+
+/// A view whose item couldn't be brought doesn't stay behind, empty: a
+/// mistyped id leaves nothing to clean up.
+#[test]
+fn an_item_that_cannot_be_brought_leaves_no_view() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    scaffold(root);
+    config_file(root);
+    let config = muckpile_core::project::load_project_config(root).unwrap();
+    let provider = muckpile_provider::fake::FakeProvider::new();
+
+    assert!(muckpile_cli::to_work_and_pull(root, root, "ACC-999", &provider, &config).is_err());
+    assert!(!root.join("to-work/ACC-999").exists());
+}

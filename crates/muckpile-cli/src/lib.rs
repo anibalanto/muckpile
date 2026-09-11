@@ -58,15 +58,28 @@ question = { type = "Tarea", label = "question" }
 "#;
 
 /// Assembles a working view: `<root>/to-work/<id>/`, a worktree of the
-/// project's ledger, empty. Fetching the item is `pull`'s job — see below —
-/// and this doesn't call it: a fresh view and an update to one are two
-/// different moments to fail at.
+/// project's ledger, empty — what `to-work --empty` leaves. By default the
+/// command also brings the item: `to_work_and_pull`.
 pub fn to_work(root: &Path, cwd: &Path, id: &str) -> Result<PathBuf> {
     require_root(root, cwd)?;
     if !is_valid_id(id) {
         bail!("{id}: no es un id válido");
     }
     ledger::open_view(root, &format!("to-work/{id}"))
+}
+
+/// `to-work <id>` as it runs by default: the view, and the item pulled
+/// into it — its file and its `_data/`. When the item can't be brought, the
+/// view just made is closed again, so a mistyped id leaves nothing behind.
+pub fn to_work_and_pull(root: &Path, cwd: &Path, id: &str, provider: &dyn Provider, config: &ProjectConfig) -> Result<Pulled> {
+    let view = to_work(root, cwd, id)?;
+    match pull(root, &view, None, provider, config) {
+        Ok(pulled) => Ok(pulled),
+        Err(e) => {
+            let _ = ledger::close_empty_view(root, &format!("to-work/{id}"));
+            Err(e)
+        }
+    }
 }
 
 /// Writes `@<slug>.<type>.md` into `dir` — no network, no provider: the id
