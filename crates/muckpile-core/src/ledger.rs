@@ -212,6 +212,12 @@ pub fn tracked_changes(view: &Path) -> Result<Vec<String>> {
     Ok(status.lines().map(|line| line.get(3..).unwrap_or(line).to_string()).collect())
 }
 
+/// Whether `path` of `view` is in the view's last commit — not merely on
+/// disk, nor only staged.
+pub fn committed(view: &Path, path: &str) -> Result<bool> {
+    Ok(!git_in(view, &["ls-tree", "--name-only", "HEAD", "--", path], None)?.trim().is_empty())
+}
+
 /// Commits, signed as the tool, exactly `paths` of `view` as they are on
 /// disk — added, changed, or gone.
 pub fn tool_commit(view: &Path, paths: &[&str], message: &str) -> Result<()> {

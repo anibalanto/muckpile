@@ -368,7 +368,8 @@ fn only_touches_the_items_that_actually_changed() {
     assert_eq!(by_id["ACC-2"], &PushResult::Written { body: true, body_refused: None });
 }
 
-fn write_pending(view: &Path, slug: &str, title: &str, parent: Option<&str>, body: &str) {
+/// A draft written and left uncommitted — what `push` leaves local.
+fn write_local(view: &Path, slug: &str, title: &str, parent: Option<&str>, body: &str) {
     let mut text = format!("---\ntitle: {title}\n");
     if let Some(p) = parent {
         text.push_str(&format!("parent: {p}\n"));
@@ -376,6 +377,18 @@ fn write_pending(view: &Path, slug: &str, title: &str, parent: Option<&str>, bod
     text.push_str("---\n");
     text.push_str(body);
     std::fs::write(view.join(format!("{slug}.task.md")), text).unwrap();
+}
+
+/// A draft a person wrote and committed — what `push` sends.
+fn write_pending(view: &Path, slug: &str, title: &str, parent: Option<&str>, body: &str) {
+    write_local(view, slug, title, parent, body);
+    commit_all(view);
+}
+
+/// A person commits everything the view has, new files included.
+fn commit_all(view: &Path) {
+    run(view, &["add", "-A"]);
+    run(view, &["-c", "user.name=Ana", "-c", "user.email=ana@x", "commit", "-qm", "borrador"]);
 }
 
 #[test]
@@ -468,6 +481,7 @@ fn a_draft_new_wrote_with_a_parent_is_created_under_it() {
     provider.seed_item("ACC-339", "Épica", "La épica", "En curso", None, None);
     provider.queue_create("ACC-403", "Tareas por hacer");
     muckpile_cli::new(view, "task", "La tarea", Some("ACC-339"), None).unwrap();
+    commit_all(view);
 
     push(view, &provider, &config()).unwrap();
 
@@ -484,6 +498,7 @@ fn a_slug_with_no_configured_item_type_fails_without_touching_the_rest() {
     provider.seed_item("ACC-1", "Tarea", "a", "Abierta", None, None);
     seed_pulled(view, &provider, "ACC-1");
     std::fs::write(view.join("@raro.user-story.md"), "---\ntitle: sin tipo configurado\n---\n").unwrap();
+    commit_all(view);
 
     let outcomes = push(view, &provider, &config()).unwrap();
 
@@ -524,6 +539,7 @@ fn a_resolved_item_is_not_reported_again_as_unchanged_in_the_same_run() {
 
 fn write_pending_with(view: &Path, slug: &str, title: &str, header: &str) {
     std::fs::write(view.join(format!("{slug}.task.md")), format!("---\ntitle: {title}\n{header}---\n")).unwrap();
+    commit_all(view);
 }
 
 #[test]
@@ -629,6 +645,7 @@ fn a_created_question_carries_its_label() {
     let provider = FakeProvider::new();
     provider.queue_create("ACC-403", "Tareas por hacer");
     std::fs::write(view.join("@se-hereda.question.md"), "---\ntitle: ¿se hereda?\n---\n").unwrap();
+    commit_all(view);
 
     let outcomes = push(view, &provider, &config()).unwrap();
 
@@ -647,6 +664,7 @@ fn a_pending_question_is_not_found_as_a_task_with_the_same_title() {
     provider.seed_item("ACC-9", "Tarea", "¿se hereda?", "Abierta", None, None);
     provider.queue_create("ACC-403", "Tareas por hacer");
     std::fs::write(view.join("@se-hereda.question.md"), "---\ntitle: ¿se hereda?\n---\n").unwrap();
+    commit_all(view);
 
     let outcomes = push(view, &provider, &config()).unwrap();
 
@@ -673,4 +691,63 @@ fn a_link_to_an_item_file_goes_up_as_a_card() {
     assert!(sent.contains(r#""type":"inlineCard""#) && sent.contains(&provider.item_url("ACC-100")), "{sent}");
     let again = push(view, &provider, &config()).unwrap();
     assert_eq!(again[0].result, PushResult::Unchanged, "{again:?}");
+}
+
+/// `push` sends what's committed: a draft nobody committed isn't created,
+/// and `push` says it saw it and that it stays in the view.
+#[test]
+fn a_draft_nobody_committed_stays_local() {
+    let dir = git_view();
+    let view = dir.path();
+    let provider = FakeProvider::new();
+    // No queued key: `create_item` would panic on an empty queue.
+    write_local(view, "@seguimiento", "Una tarea de seguimiento", None, "");
+    let before = head_count(view);
+
+    let outcomes = push(view, &provider, &config()).unwrap();
+
+    assert_eq!(outcomes, vec![PushOutcome { id: "@seguimiento".into(), result: PushResult::Local }]);
+    assert!(view.join("@seguimiento.task.md").exists());
+    assert_eq!(head_count(view), before, "nobody committed it, and neither does push");
+    let status = Command::new("git").arg("-C").arg(view).args(["status", "--porcelain"]).output().unwrap();
+    assert_eq!(String::from_utf8_lossy(&status.stdout), "?? @seguimiento.task.md\n");
+}
+
+/// A committed draft that hangs from one nobody committed has no id to
+/// give its parent, so it waits for it — and says so.
+#[test]
+fn a_draft_that_names_a_local_one_waits_for_it() {
+    let dir = git_view();
+    let view = dir.path();
+    let provider = FakeProvider::new();
+    write_pending(view, "@hijo", "La tarea", Some("@padre"), "");
+    write_local(view, "@padre", "La épica", None, "");
+
+    let outcomes = push(view, &provider, &config()).unwrap();
+
+    let by_id: std::collections::BTreeMap<_, _> = outcomes.iter().map(|o| (o.id.as_str(), &o.result)).collect();
+    assert_eq!(by_id["@padre"], &PushResult::Local);
+    let PushResult::ResolveFailed(reason) = by_id["@hijo"] else {
+        panic!("expected @hijo to wait for @padre, got {:?}", by_id["@hijo"]);
+    };
+    assert!(reason.contains("@padre") && reason.contains("local"), "{reason}");
+    assert!(view.join("@hijo.task.md").exists());
+}
+
+/// The person's commit is the draft's: `push` commits nothing in its place,
+/// only its own commits on top — the rename.
+#[test]
+fn a_committed_draft_keeps_the_person_s_commit() {
+    let dir = git_view();
+    let view = dir.path();
+    let provider = FakeProvider::new();
+    provider.queue_create("ACC-403", "Tareas por hacer");
+    write_pending(view, "@algo", "Un borrador", None, "");
+
+    push(view, &provider, &config()).unwrap();
+
+    let log = Command::new("git").arg("-C").arg(view).args(["log", "--format=%an %s"]).output().unwrap();
+    let log = String::from_utf8_lossy(&log.stdout);
+    assert!(log.contains("Ana borrador"), "{log}");
+    assert!(!log.contains("muckpile borrador"), "{log}");
 }

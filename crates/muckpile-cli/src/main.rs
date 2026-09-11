@@ -273,6 +273,7 @@ fn run_push(view_arg: &str) -> Result<()> {
                 println!("{}", msg!(key, slug = outcome.id, id));
             }
             PushResult::ResolveFailed(reason) => println!("{}", msg!("push.resolve.failed", slug = outcome.id, reason)),
+            PushResult::Local => println!("{}", msg!("push.local", slug = outcome.id)),
             PushResult::RelationFailed { phrase, other, reason } => println!("{}", msg!("push.relation.failed", id = outcome.id, phrase, other, reason)),
             PushResult::HeaderClash(edits) => {
                 println!("{}", msg!("push.clash.header", id = outcome.id));

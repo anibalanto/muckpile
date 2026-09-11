@@ -288,7 +288,8 @@ fn other_views_holding(root: &Path, view: &Path, id: &str) -> Result<Vec<String>
 /// Refuses a view in the middle of a rebase, or with uncommitted edits to
 /// what it tracks: syncing rebases it, and setting those edits aside and
 /// putting them back can clash in a way harder to follow than a rebase's
-/// own. A new file nobody added yet — a fresh draft — isn't in the way.
+/// own. A new file nobody added yet — a fresh draft — isn't in the way, and
+/// doesn't go either.
 fn ready_to_sync(view: &Path) -> Result<()> {
     if ledger::rebasing(view)? {
         bail!(msg!("sync.rebasing", view = view.display()));
@@ -809,8 +810,12 @@ pub enum PushResult {
     Resolved { id: String, created: bool },
     /// A pending `@slug` couldn't be resolved this run — searching or
     /// creating it failed, or it depends on another pending item that
-    /// failed first. The file is left exactly as it was, still pending.
+    /// failed first or stays local. The file is left exactly as it was,
+    /// still pending.
     ResolveFailed(String),
+    /// A pending `@slug` nobody committed: it stays in the view as it is,
+    /// and nothing of it goes to the provider.
+    Local,
     /// A relation a just-created item's draft declared didn't reach the
     /// provider. The item exists all the same; `PushOutcome::id` is its new
     /// id, and `phrase`/`other` are what `link` needs to retry it — the
@@ -840,7 +845,7 @@ pub struct BodyRefused {
     pub diff: String,
 }
 
-/// First resolves every pending `@slug` the view carries — search or
+/// First resolves every pending `@slug` the view has committed — search or
 /// create, then rename, rewrite references, and settle a fresh baseline for
 /// it, same as a `pull` — and then sends the body of every item that
 /// already had a real id and changed since its own last `pull`, refusing
@@ -869,8 +874,10 @@ pub fn push(view: &Path, provider: &dyn Provider, config: &ProjectConfig) -> Res
     Ok(outcomes)
 }
 
-/// Resolves every pending `@slug` directly under `view`: searches by exact
-/// title before creating, so a retry never duplicates; a `parent` naming
+/// Resolves every pending `@slug` directly under `view` that's committed —
+/// one nobody committed stays local, as it is, and so does what names it —
+/// searching by exact title before creating, so a retry never duplicates;
+/// a `parent` naming
 /// another pending item in the same batch is translated to that item's
 /// freshly resolved id first, since the provider has to already know about
 /// a parent before it can be named on creation. Processed in topological
@@ -888,16 +895,24 @@ fn resolve_pending(view: &Path, provider: &dyn Provider, config: &ProjectConfig)
     let by_slug: HashMap<&str, &item::PendingItem> = pending.iter().map(|p| (p.slug.as_str(), p)).collect();
 
     let mut resolved: HashMap<String, String> = HashMap::new();
+    let mut local: HashSet<String> = HashSet::new();
     let mut outcomes = Vec::new();
 
     for slug in &order {
         let pending_item = by_slug[slug.as_str()];
+        let draft = format!("{slug}.{}.md", pending_item.item_type);
+        if !ledger::committed(view, &draft)? {
+            local.insert(slug.clone());
+            outcomes.push(PushOutcome { id: slug.clone(), result: PushResult::Local });
+            continue;
+        }
 
         let (path, _) = find_file(view, slug)?;
         let text = std::fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
         let blocked_by = read_frontmatter_refs(&text).into_iter().find(|r| by_slug.contains_key(r.as_str()) && !resolved.contains_key(r));
         if let Some(blocker) = blocked_by {
-            outcomes.push(PushOutcome { id: slug.clone(), result: PushResult::ResolveFailed(msg!("push.resolve.blocked", blocker)) });
+            let key = if local.contains(&blocker) { "push.resolve.blocked_local" } else { "push.resolve.blocked" };
+            outcomes.push(PushOutcome { id: slug.clone(), result: PushResult::ResolveFailed(msg!(key, blocker)) });
             continue;
         }
 
@@ -910,13 +925,6 @@ fn resolve_pending(view: &Path, provider: &dyn Provider, config: &ProjectConfig)
         };
         let real_id = |r: &str| resolved.get(r).cloned().unwrap_or_else(|| r.to_string());
         let real_parent = pending_item.parent.as_deref().map(real_id);
-
-        // The draft becomes part of the view's history before anything goes:
-        // what follows — its canonical form, the rename — is commits on top.
-        let draft = format!("{slug}.{}.md", pending_item.item_type);
-        let data = format!("{slug}_data");
-        let draft_paths: Vec<&str> = if view.join(&data).is_dir() { vec![&draft, &data] } else { vec![&draft] };
-        commit_paths(view, &draft_paths, &format!("borrador {slug}"))?;
 
         match resolve_one(view, pending_item, provider_type, real_parent.as_deref(), provider, config) {
             Ok((id, created)) => {
