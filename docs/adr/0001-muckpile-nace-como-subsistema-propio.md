@@ -97,9 +97,13 @@ Lo único que se cae es la razón original de que existiera un hook para esto: q
 3. La vista se rebasea encima. El borrador vive en `@<slug>.<tipo>.md`, un nombre que el proveedor nunca tuvo, así que no choca con nada.
 4. Recién ahí, el renombre es un commit de la vista: se borra el borrador, `@<slug>_data/` pasa a `ACC-360_data/`, y se reescriben las referencias.
 
+**Un pendiente que no se pudo resolver no arrastra a nadie más que a lo que depende de él.** Si buscar o crear un borrador falla, lo que lo nombra en `parent` o en `relation.*` ni se intenta —no hay id que ponerle—, y el archivo de cada uno queda como estaba, todavía `@slug`; `push` dice cuál falló y por qué, y sigue con el resto del lote.
+
+**Un ítem que se encontró no recibe nada del borrador:** ni su cuerpo, ni su `parent`, ni sus relaciones, que sólo viajan al crear. Encontrarlo quiere decir que ya existía antes de este `push`, y lo que tiene es suyo. El borrador no se pierde: quedó commiteado en la vista antes de resolverse. Un borde, dicho: si un `push` creó el ítem y se cortó antes de terminar, el siguiente lo encuentra, y una relación que no llegó queda en el mensaje del primero, con el `link` que la crea.
+
 **El orden 3 → 4 no es un detalle.** Si la vista renombrara antes de rebasear, tendría un `ACC-360.task.md` escrito por su lado y la ref del proveedor otro, y el rebase chocaría — el mismo `add/add` de la sección "Contexto", con el mismo remedio mal ofrecido.
 
-**Avance: 6/8.**
+**Avance: 8/8.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -109,8 +113,8 @@ Lo único que se cae es la razón original de que existiera un hook para esto: q
 | Renombre, `_data/` y reescritura de referencias en un solo commit | `cerrada` | `rename_one` ↔ esta decisión: un commit por ítem, con el archivo, su `_data/` y las referencias que reescribió, y nada más —ni la edición sin commitear de otra vista, ni algo que una persona dejó en staging—. Que un `push` deje además un commit `new` y uno `pull` por ítem es el orden viejo, y lo reemplazan las dos dimensiones de abajo |
 | Por cada ítem creado o encontrado, un commit `new @<slug>` o `found @<slug>` en la ref del proveedor, con lo que devolvió | `cerrada` | `resolve_pending` ↔ esta decisión: después de crear o encontrar, `record_item` registra el ítem —su archivo, su ADF, su hilo y sus adjuntos— con ese mensaje |
 | La vista se rebasea sobre ese commit antes de renombrar | `cerrada` | `resolve_pending` ↔ esta decisión: registra, rebasea, y recién ahí `rename_one` retira el borrador —el archivo del ítem ya bajó, así que el borrador se va en vez de moverse, y su `_data/` se funde con la del ítem— |
-| Qué pasa cuando no se puede resolver un pendiente del que otro depende | `falta spec` | Lo decide el código: lo que depende no se intenta, y su archivo queda como estaba (`PushResult::ResolveFailed`) |
-| Qué recibe un ítem que se encontró en vez de crearse | `falta spec` | Lo decide el código: nunca el cuerpo, el `parent` ni las relaciones del borrador, que sólo viajan al crear (`resolve_one`, `resolve_pending`). Tiene un borde: si un `push` creó el ítem y un link falló, el reintento lo encuentra y el link no se vuelve a intentar — queda sólo en el mensaje del primer `push` |
+| Un pendiente que no se pudo resolver sólo frena a lo que depende de él | `cerrada` | `resolve_pending` ↔ esta decisión: lo que lo nombra no se intenta y su archivo queda como estaba (`PushResult::ResolveFailed`); el resto del lote sigue |
+| Un ítem que se encontró no recibe nada del borrador | `cerrada` | `resolve_one` y `resolve_pending` ↔ esta decisión: el cuerpo y el `parent` sólo van en `create_item`, y las relaciones sólo si se creó |
 
 ### 5. Sync por comparación local, no por compare-and-swap en un servidor
 
@@ -128,6 +132,8 @@ Git local es el registro de "qué es lo último que vi del proveedor", y lo llev
 **Un `pull` avanza la rama del proveedor, y la vista se actualiza con rebase sobre ella.** Lo que se editó y todavía no subió se reaplica encima de lo que el proveedor tiene ahora; si choca, el rebase para y lo resuelve quien trabaja, como cualquier rebase. Los commits del proveedor nunca se reescriben; los de la vista que todavía no subieron sí se reaplican — por eso la historia de una vista es siempre la del proveedor, con lo propio encima.
 
 **Un `push` vuelve a preguntar antes de escribir.** Si lo que el proveedor tiene ahora coincide con la punta de su rama, escribe, y la rama del proveedor avanza con lo que el proveedor tiene después de escribir: la vista queda al día. Si difiere, no pisa: registra lo que trajo como un commit nuevo en la rama del proveedor, rebasea la vista encima —igual que un `pull`— y para; quien trabaja revisa el resultado y vuelve a correr `push`. Es el mismo compare-and-swap que `sync.md` describe, movido de un hook en el servidor al cliente — con la diferencia de que lo que el proveedor tenía no se descarta: queda registrado.
+
+**Un ítem que la ref del proveedor nunca registró no se sube.** `push` se niega con él —`nunca se hizo pull acá`— en vez de comparar lo que el proveedor tiene contra nada: sin un registro previo no hay forma de saber si lo que dice el archivo es una edición o una versión vieja.
 
 **La rama del proveedor no se protege, porque nunca decide sola.** En un git local nada impide un `git update-ref`, y la única traba sería un hook — lo que la decisión 1 sacó. No hace falta: `push` le pregunta al proveedor antes de escribir, siempre. Si alguien movió la ref a mano, el `push` siguiente ve que el proveedor no coincide, registra lo que tiene de verdad, y queda una divergencia falsa que el rebase resuelve — nunca una escritura equivocada en el proveedor.
 
@@ -147,7 +153,7 @@ Git local es el registro de "qué es lo último que vi del proveedor", y lo llev
 
 **Cada vista es un worktree de `.muckpile/`**, el git del proyecto (decisión 6), parado en la rama de la vista. `code-work/`, adentro de una vista de trabajo, queda excluido: es un worktree de otro repo.
 
-**Avance: 11/12.**
+**Avance: 12/12.**
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
@@ -162,7 +168,7 @@ Git local es el registro de "qué es lo último que vi del proveedor", y lo llev
 | Los commits que hace `muckpile` los firma `muckpile`; los de la persona, la persona | `cerrada` | `ledger::record`, `ledger::rebase` y `ledger::tool_commit` ↔ esta decisión: firman `muckpile <muckpile@localhost>`; `commit_paths` y `rename_one` commitean por `tool_commit`. Un commit de la persona, rebaseado, conserva su autor |
 | Una vista nace vacía, de un commit sin archivos en sus dos refs | `cerrada` | `ledger::open_view` ↔ esta decisión |
 | La rama lleva `_` donde git no acepta un carácter del nombre de la vista | `cerrada` | `branch_name`, en `ledger.rs` ↔ esta decisión. Probado el 2026-09-10: `sprint fetch` abrió los 21 sprints de `ACC`, `12_El_formato:_…` incluido |
-| Qué hace `push` con un ítem que la vista nunca registró | `falta spec` | Lo decide el código: se niega (`PushResult::NeverPulled`) en vez de comparar contra el proveedor sin base |
+| Un ítem que la ref del proveedor nunca registró no se sube | `cerrada` | `push_one` ↔ esta decisión: sin registro en la ref del proveedor, `PushResult::NeverPulled` |
 
 ### 6. Multi-proyecto: una carpeta propia, y vistas que agrupan un conjunto de ítems para un contexto de desarrollo
 
