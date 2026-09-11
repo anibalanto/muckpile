@@ -18,6 +18,6 @@ pub fn write_states_cache(path: &Path, states: &BTreeMap<String, String>) -> Res
 /// of zero items, it's a question nobody answered yet.
 pub fn read_states_cache(path: &Path) -> Result<BTreeMap<String, String>> {
     let text = std::fs::read_to_string(path)
-        .with_context(|| format!("{}: no existe — correr \"muckpile states discover\" primero", path.display()))?;
+        .with_context(|| crate::msg!("states.no_cache", path = path.display()))?;
     toml::from_str(&text).with_context(|| format!("parsing {}", path.display()))
 }

@@ -1,6 +1,8 @@
 use anyhow::{bail, Context, Result};
 use muckpile_core::body::Loss;
+use muckpile_core::i18n::{lang_from_env, set_lang};
 use muckpile_core::identity::load_identity;
+use muckpile_core::msg;
 use muckpile_core::project::{find_project_root, load_project_config, ProjectConfig};
 use muckpile_core::states::read_states_cache;
 use muckpile_cli::{CatchUp, HeaderEdit, ListFilter, PushResult};
@@ -12,6 +14,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 fn main() -> Result<()> {
+    set_lang(lang_from_env());
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.as_slice() {
         [cmd, id] if cmd == "to-work" => run_to_work(id, false),
@@ -34,9 +37,7 @@ fn main() -> Result<()> {
         [cmd, id] if cmd == "show" => run_show(id, false),
         [cmd, id, flag] if cmd == "show" && flag == "--local" => run_show(id, true),
         [cmd, sub, repo, rest @ ..] if cmd == "code-work" && sub == "add" => run_code_work_add(repo, rest),
-        _ => bail!(
-            "uso: muckpile init <proyecto> | muckpile to-work <id> [--empty] | muckpile pull [id | backlog/sprint/<sprint> | query/<nombre> [--query <consulta>]] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile push <vista> | muckpile link <a> <frase> <b> | muckpile unlink <a> <frase> <b> | muckpile title <id> <título> | muckpile parent <id> <padre> | muckpile comment <id> <archivo> [--reply-to <id>] (--ai <modelo> | --i-human) | muckpile attach <id> <archivo> | muckpile new <tipo> <título> [--parent <id>] [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
-        ),
+        _ => bail!(msg!("usage.all")),
     }
 }
 
@@ -45,7 +46,7 @@ fn run_to_work(id: &str, empty: bool) -> Result<()> {
     if empty {
         let view = muckpile_cli::to_work(&root, &cwd, id)?;
         let rel = view.strip_prefix(&root).unwrap_or(&view);
-        println!("{}/ creada, vacía", rel.display());
+        println!("{}", msg!("to_work.created_empty", view = rel.display()));
         return Ok(());
     }
     let config = load_project_config(&root)?;
@@ -60,31 +61,31 @@ fn run_pull(args: &[String]) -> Result<()> {
     let mut rest = args.iter();
     while let Some(arg) = rest.next() {
         match arg.as_str() {
-            "--query" => query = Some(rest.next().context("--query necesita la consulta")?.as_str()),
+            "--query" => query = Some(rest.next().with_context(|| msg!("pull.query.needs_value"))?.as_str()),
             other if target.is_none() => target = Some(other),
-            other => bail!("{other}: argumento de más para pull"),
+            other => bail!(msg!("pull.extra_argument", arg = other)),
         }
     }
     let (root, cwd) = standing_in_a_project()?;
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
     let membership = if let Some(view) = muckpile_cli::query_view_of(&root, &cwd, target) {
-        Some((view.clone(), muckpile_cli::pull_query(&root, &view, query, provider.as_ref(), &config)?, "ya no coincide con la consulta"))
+        Some((view.clone(), muckpile_cli::pull_query(&root, &view, query, provider.as_ref(), &config)?, msg!("pull.gone.query")))
     } else if query.is_some() {
-        bail!("--query es para la vista de una consulta: query/<nombre>");
+        bail!(msg!("pull.query.only_in_query_view"));
     } else if let Some(view) = muckpile_cli::sprint_view_of(&root, &cwd, target) {
-        Some((view.clone(), muckpile_cli::pull_sprint(&root, &view, provider.as_ref(), &config)?, "salió del sprint"))
+        Some((view.clone(), muckpile_cli::pull_sprint(&root, &view, provider.as_ref(), &config)?, msg!("pull.gone.sprint")))
     } else {
         None
     };
     if let Some((view, pulled, why_gone)) = membership {
         let name = view.strip_prefix(&root).unwrap_or(&view).display().to_string();
-        println!("{name}/: {} ítem(s) traído(s)", pulled.items.len());
+        println!("{}", msg!("pull.view.brought", view = name, count = pulled.items.len()));
         for item in &pulled.items {
             print_pulled(&root, item);
         }
         for id in &pulled.gone {
-            println!("  {id}: {why_gone} — sacado de la vista");
+            println!("  {}", msg!("pull.view.gone", id, why = why_gone));
         }
         return Ok(());
     }
@@ -98,31 +99,31 @@ fn run_pull(args: &[String]) -> Result<()> {
 fn print_pulled(root: &Path, pulled: &muckpile_cli::Pulled) {
     let rel = pulled.path.strip_prefix(root).unwrap_or(&pulled.path);
     if pulled.losses.is_empty() {
-        println!("{} traído", rel.display());
+        println!("{}", msg!("pull.brought", path = rel.display()));
     } else {
-        println!("{} traído — el cuerpo es de sólo lectura: {}", rel.display(), describe_losses(&pulled.losses));
+        println!("{}", msg!("pull.brought_read_only", path = rel.display(), losses = describe_losses(&pulled.losses)));
     }
     if !pulled.also_in.is_empty() {
-        println!("  también en {}", pulled.also_in.join(", "));
+        println!("  {}", msg!("pull.also_in", views = pulled.also_in.join(", ")));
     }
 }
 
 /// One header edit `push` won't send, and the command that makes it — as help:
 /// the file is left as it is either way.
 fn describe_header_edit(id: &str, edit: &HeaderEdit) -> String {
-    let shown = |v: &Option<String>| v.as_deref().map(|v| format!("\"{v}\"")).unwrap_or_else(|| "nada".to_string());
+    let shown = |v: &Option<String>| v.as_deref().map(|v| format!("\"{v}\"")).unwrap_or_else(|| msg!("push.clash.nothing"));
     match edit {
         HeaderEdit::Field { name, written, provider } => {
             let command = match (name.as_str(), written) {
                 ("title", Some(v)) => format!("muckpile title {id} \"{v}\""),
                 ("status", Some(v)) => format!("muckpile transition {id} \"{v}\""),
                 ("parent", Some(v)) => format!("muckpile parent {id} {v}"),
-                _ => "ningún comando lo borra".to_string(),
+                _ => msg!("push.clash.no_command"),
             };
-            format!("{name}: {} (el proveedor tiene {}) — {command}", shown(written), shown(provider))
+            msg!("push.clash.field", name, written = shown(written), provider = shown(provider), command)
         }
-        HeaderEdit::Relation { phrase, other, added: true } => format!("relation.{phrase}: {other} agregada — muckpile link {id} {phrase} {other}"),
-        HeaderEdit::Relation { phrase, other, added: false } => format!("relation.{phrase}: {other} quitada — muckpile unlink {id} {phrase} {other}"),
+        HeaderEdit::Relation { phrase, other, added: true } => msg!("push.clash.relation_added", phrase, other, id),
+        HeaderEdit::Relation { phrase, other, added: false } => msg!("push.clash.relation_removed", phrase, other, id),
     }
 }
 
@@ -131,8 +132,8 @@ fn describe_losses(losses: &[Loss]) -> String {
     losses
         .iter()
         .map(|loss| match loss {
-            Loss::Lossy(construct) => format!("el conversor sólo puede aproximar {construct}"),
-            Loss::Differs => "no vuelve igual por markdown".to_string(),
+            Loss::Lossy(construct) => msg!("loss.lossy", construct),
+            Loss::Differs => msg!("loss.differs"),
         })
         .collect::<Vec<_>>()
         .join("; ")
@@ -144,13 +145,13 @@ fn run_sprint_fetch() -> Result<()> {
     let provider = build_provider(&root, &config)?;
     let result = muckpile_cli::sprint_fetch(&root, provider.as_ref(), &config)?;
 
-    let project = root.file_name().context("la raíz del proyecto no tiene nombre")?.to_string_lossy().into_owned();
-    println!("{project}: {} sprint(s) abierto(s)", result.open);
+    let project = root.file_name().with_context(|| msg!("project.root_unnamed"))?.to_string_lossy().into_owned();
+    println!("{}", msg!("sprint_fetch.open", project, count = result.open));
     for slug in &result.created {
-        println!("  backlog/sprint/{slug}/       creada, vacía");
+        println!("  {}", msg!("sprint_fetch.created", slug));
     }
     for slug in &result.removed {
-        println!("  backlog/sprint/{slug}/       borrada, ya no está abierto y no tenía nada adentro");
+        println!("  {}", msg!("sprint_fetch.removed", slug));
     }
     Ok(())
 }
@@ -161,11 +162,11 @@ fn run_transition(id: &str, target_status: &str) -> Result<()> {
     let provider = build_provider(&root, &config)?;
     match muckpile_cli::transition(id, target_status, provider.as_ref())? {
         Outcome::Applied { transition_name } => {
-            println!("{id}: transición \"{transition_name}\" -> {target_status}");
+            println!("{}", msg!("transition.applied", id, transition = transition_name, status = target_status));
             catch_up_view(&cwd, id, provider.as_ref(), &config)?;
         }
         Outcome::NoSuchTransition { available } => {
-            println!("{id}: no hay transición hacia \"{target_status}\" — disponibles: {}", available.join(", "));
+            println!("{}", msg!("transition.none", id, status = target_status, available = available.join(", ")));
         }
     }
     Ok(())
@@ -175,20 +176,20 @@ fn run_states_discover() -> Result<()> {
     let (root, _cwd) = standing_in_a_project()?;
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
-    let project = root.file_name().context("la raíz del proyecto no tiene nombre")?.to_string_lossy().into_owned();
+    let project = root.file_name().with_context(|| msg!("project.root_unnamed"))?.to_string_lossy().into_owned();
     let states = muckpile_cli::states_discover(&root, &project, provider.as_ref(), &config)?;
 
-    println!("{project}: {} estado(s)", states.len());
+    println!("{}", msg!("states.count", project, count = states.len()));
     for (name, category) in &states {
         println!("  {name}    {category}");
     }
-    println!("cacheado en {project}.states.toml");
+    println!("{}", msg!("states.cached", project));
     Ok(())
 }
 
 fn run_list(args: &[String]) -> Result<()> {
     let Some((view_arg, flags)) = args.split_first() else {
-        bail!("uso: muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>]");
+        bail!(msg!("usage.list"));
     };
 
     let mut state = None;
@@ -197,12 +198,12 @@ fn run_list(args: &[String]) -> Result<()> {
     let mut i = 0;
     while i < flags.len() {
         let flag = &flags[i];
-        let value = flags.get(i + 1).with_context(|| format!("{flag}: falta el valor"))?;
+        let value = flags.get(i + 1).with_context(|| msg!("flag.missing_value", flag))?;
         match flag.as_str() {
             "--state" => state = Some(value.as_str()),
             "--category" => category = Some(value.as_str()),
             "--parent" => parent = Some(value.as_str()),
-            _ => bail!("{flag}: opción desconocida"),
+            _ => bail!(msg!("flag.unknown_option", flag)),
         }
         i += 2;
     }
@@ -212,7 +213,7 @@ fn run_list(args: &[String]) -> Result<()> {
 
     let categories = match category {
         Some(_) => {
-            let project = root.file_name().context("la raíz del proyecto no tiene nombre")?.to_string_lossy().into_owned();
+            let project = root.file_name().with_context(|| msg!("project.root_unnamed"))?.to_string_lossy().into_owned();
             read_states_cache(&root.join(format!("{project}.states.toml")))?
         }
         None => BTreeMap::new(),
@@ -234,7 +235,7 @@ fn run_status(view_arg: &str) -> Result<()> {
 
     for item in muckpile_cli::status(&view, provider.as_ref())? {
         if !item.changed {
-            println!("{}: sin cambios", item.id);
+            println!("{}", msg!("item.unchanged", id = item.id));
             continue;
         }
         let mut diffs = Vec::new();
@@ -252,8 +253,8 @@ fn run_status(view_arg: &str) -> Result<()> {
     Ok(())
 }
 
-fn display_parent(parent: &Option<String>) -> &str {
-    parent.as_deref().unwrap_or("(ninguno)")
+fn display_parent(parent: &Option<String>) -> String {
+    parent.clone().unwrap_or_else(|| msg!("status.no_parent"))
 }
 
 fn run_push(view_arg: &str) -> Result<()> {
@@ -264,37 +265,29 @@ fn run_push(view_arg: &str) -> Result<()> {
 
     for outcome in muckpile_cli::push(&view, provider.as_ref(), &config)? {
         match outcome.result {
-            PushResult::Unchanged => println!("{}: sin cambios", outcome.id),
-            PushResult::NeverPulled => println!("{}: nunca se hizo pull acá — nada para comparar", outcome.id),
-            PushResult::Stale => println!("{}: cambió del otro lado desde tu último pull — no se escribió nada", outcome.id),
+            PushResult::Unchanged => println!("{}", msg!("item.unchanged", id = outcome.id)),
+            PushResult::NeverPulled => println!("{}", msg!("push.never_pulled", id = outcome.id)),
+            PushResult::Stale => println!("{}", msg!("push.stale", id = outcome.id)),
             PushResult::Resolved { id, created } => {
-                let how = if created { "creado" } else { "encontrado" };
-                println!("{}: {how} como {id}", outcome.id);
+                let key = if created { "push.resolve.created" } else { "push.resolve.found" };
+                println!("{}", msg!(key, slug = outcome.id, id));
             }
-            PushResult::ResolveFailed(reason) => println!("{}: no se pudo resolver — {reason}", outcome.id),
-            PushResult::RelationFailed { phrase, other, reason } => println!(
-                "{}: relation.{phrase} {other} no llegó al proveedor — {reason}. Para reintentarlo: muckpile link {} {phrase} {other}",
-                outcome.id, outcome.id
-            ),
+            PushResult::ResolveFailed(reason) => println!("{}", msg!("push.resolve.failed", slug = outcome.id, reason)),
+            PushResult::RelationFailed { phrase, other, reason } => println!("{}", msg!("push.relation.failed", id = outcome.id, phrase, other, reason)),
             PushResult::HeaderClash(edits) => {
-                println!("{}: el header no es el del proveedor — no se manda nada de este ítem (git diff muestra qué se editó):", outcome.id);
+                println!("{}", msg!("push.clash.header", id = outcome.id));
                 for edit in &edits {
                     println!("  {}", describe_header_edit(&outcome.id, edit));
                 }
             }
             PushResult::Written { body, body_refused } => {
                 if body {
-                    println!("{}: cuerpo enviado", outcome.id);
+                    println!("{}", msg!("push.body_sent", id = outcome.id));
                 }
                 if let Some(refused) = body_refused {
-                    println!(
-                        "{}: el cuerpo no es canónico ({}) — no se sube. Diff contra el ADF del proveedor:\n{}",
-                        outcome.id,
-                        describe_losses(&refused.losses),
-                        refused.diff
-                    );
+                    println!("{}", msg!("push.body_refused", id = outcome.id, losses = describe_losses(&refused.losses), diff = refused.diff));
                 } else if !body {
-                    println!("{}: sin cambios para enviar", outcome.id);
+                    println!("{}", msg!("push.nothing_to_send", id = outcome.id));
                 }
             }
         }
@@ -304,7 +297,7 @@ fn run_push(view_arg: &str) -> Result<()> {
 
 fn run_init(name: &str) -> Result<()> {
     let project = muckpile_cli::init(&std::env::current_dir()?, name)?;
-    println!("{}/ creado: completá {}/muckpile.toml", project.display(), name);
+    println!("{}", msg!("init.created", project = project.display(), name));
     Ok(())
 }
 
@@ -313,7 +306,7 @@ fn run_title(id: &str, new_title: &str) -> Result<()> {
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
     muckpile_cli::title(id, new_title, provider.as_ref())?;
-    println!("{id}: título cambiado a \"{new_title}\"");
+    println!("{}", msg!("title.changed", id, title = new_title));
     catch_up_view(&cwd, id, provider.as_ref(), &config)
 }
 
@@ -323,8 +316,8 @@ fn run_title(id: &str, new_title: &str) -> Result<()> {
 fn catch_up_view(cwd: &Path, id: &str, provider: &dyn Provider, config: &ProjectConfig) -> Result<()> {
     match muckpile_cli::catch_up(cwd, id, provider, config)? {
         CatchUp::NotHere => {}
-        CatchUp::CaughtUp => println!("  {id}: vista al día"),
-        CatchUp::Behind(why) => println!("  {id}: la vista queda atrás hasta el próximo pull — {why}"),
+        CatchUp::CaughtUp => println!("  {}", msg!("catch_up.caught_up", id)),
+        CatchUp::Behind(why) => println!("  {}", msg!("catch_up.behind", id, why)),
     }
     Ok(())
 }
@@ -334,7 +327,7 @@ fn run_parent(id: &str, parent_id: &str) -> Result<()> {
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
     muckpile_cli::parent(id, parent_id, provider.as_ref())?;
-    println!("{id}: padre cambiado a {parent_id}");
+    println!("{}", msg!("parent.changed", id, parent = parent_id));
     catch_up_view(&cwd, id, provider.as_ref(), &config)
 }
 
@@ -343,14 +336,14 @@ fn run_comment(id: &str, file: &str, flags: &[String]) -> Result<()> {
     let mut rest = flags.iter();
     while let Some(flag) = rest.next() {
         match flag.as_str() {
-            "--reply-to" => reply_to = Some(rest.next().context("--reply-to necesita el id de un comentario")?.as_str()),
-            "--ai" => model = Some(rest.next().context("--ai necesita el modelo")?.as_str()),
+            "--reply-to" => reply_to = Some(rest.next().with_context(|| msg!("comment.reply_to.needs_value"))?.as_str()),
+            "--ai" => model = Some(rest.next().with_context(|| msg!("comment.ai.needs_value"))?.as_str()),
             "--i-human" => human = true,
-            other => bail!("{other}: flag desconocido para comment"),
+            other => bail!(msg!("comment.unknown_flag", flag = other)),
         }
     }
     let author = match (model, human) {
-        (Some(_), true) => bail!("--ai y --i-human a la vez: un comentario lo escribió uno de los dos"),
+        (Some(_), true) => bail!(msg!("comment.ai_and_human")),
         (Some(model), false) => Some(muckpile_cli::Author::Ai(model)),
         (None, true) => Some(muckpile_cli::Author::Human(muckpile_cli::confirm_human(ask_on_terminal)?)),
         (None, false) => None,
@@ -359,7 +352,7 @@ fn run_comment(id: &str, file: &str, flags: &[String]) -> Result<()> {
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
     let comment_id = muckpile_cli::comment(id, &cwd.join(file), reply_to, author, provider.as_ref())?;
-    println!("{id}: comentario {comment_id} agregado");
+    println!("{}", msg!("comment.added", id, comment = comment_id));
     catch_up_view(&cwd, id, provider.as_ref(), &config)
 }
 
@@ -371,11 +364,11 @@ fn ask_on_terminal(phrase: &str) -> Result<String> {
     let (input, output) = ("CONIN$", "CONOUT$");
     #[cfg(not(windows))]
     let (input, output) = ("/dev/tty", "/dev/tty");
-    let mut out = std::fs::OpenOptions::new().write(true).open(output).with_context(|| format!("abriendo {output}"))?;
-    write!(out, "Para confirmar que lo escribió una persona, escribí: {phrase}\n> ")?;
+    let mut out = std::fs::OpenOptions::new().write(true).open(output).with_context(|| msg!("terminal.opening", path = output))?;
+    write!(out, "{}", msg!("comment.human.prompt", phrase))?;
     out.flush()?;
     let mut answer = String::new();
-    std::io::BufReader::new(std::fs::File::open(input).with_context(|| format!("abriendo {input}"))?).read_line(&mut answer)?;
+    std::io::BufReader::new(std::fs::File::open(input).with_context(|| msg!("terminal.opening", path = input))?).read_line(&mut answer)?;
     Ok(answer)
 }
 
@@ -384,7 +377,7 @@ fn run_attach(id: &str, file: &str) -> Result<()> {
     let config = load_project_config(&root)?;
     let provider = build_provider(&root, &config)?;
     let attachment = muckpile_cli::attach(id, &cwd.join(file), provider.as_ref())?;
-    println!("{id}: {} adjuntado ({})", attachment.filename, attachment.id);
+    println!("{}", msg!("attach.done", id, filename = attachment.filename, attachment = attachment.id));
     catch_up_view(&cwd, id, provider.as_ref(), &config)
 }
 
@@ -400,7 +393,7 @@ fn run_link(a: &str, phrase: &str, b: &str) -> Result<()> {
             catch_up_view(&cwd, b, provider.as_ref(), &config)?;
         }
         LinkOutcome::NoSuchPhrase { available } => {
-            println!("\"{phrase}\": no es una frase de relación del proveedor — disponibles: {}", available.join(", "));
+            println!("{}", msg!("link.no_such_phrase", phrase, available = available.join(", ")));
         }
     }
     Ok(())
@@ -412,15 +405,15 @@ fn run_unlink(a: &str, phrase: &str, b: &str) -> Result<()> {
     let provider = build_provider(&root, &config)?;
     match muckpile_cli::unlink(a, phrase, b, provider.as_ref())? {
         UnlinkOutcome::Removed { type_name } => {
-            println!("{a} {phrase} {b}  ({type_name}) — quitada");
+            println!("{}", msg!("unlink.removed", a, phrase, b, type_name));
             // A link shows on both of its ends.
             catch_up_view(&cwd, a, provider.as_ref(), &config)?;
             catch_up_view(&cwd, b, provider.as_ref(), &config)?;
         }
         UnlinkOutcome::NoSuchPhrase { available } => {
-            println!("\"{phrase}\": no es una frase de relación del proveedor — disponibles: {}", available.join(", "));
+            println!("{}", msg!("link.no_such_phrase", phrase, available = available.join(", ")));
         }
-        UnlinkOutcome::NoSuchLink { type_name } => println!("{a} {phrase} {b}: el proveedor no tiene esa relación ({type_name}) — nada que quitar"),
+        UnlinkOutcome::NoSuchLink { type_name } => println!("{}", msg!("unlink.no_such_link", a, phrase, b, type_name)),
     }
     Ok(())
 }
@@ -431,19 +424,19 @@ fn run_new(item_type: &str, title: &str, flags: &[String]) -> Result<()> {
     let mut i = 0;
     while i < flags.len() {
         let flag = &flags[i];
-        let value = flags.get(i + 1).with_context(|| format!("{flag}: falta el valor"))?;
+        let value = flags.get(i + 1).with_context(|| msg!("flag.missing_value", flag))?;
         match flag.as_str() {
             "--parent" => parent = Some(value.as_str()),
             "--blocks" => blocks = Some(value.as_str()),
-            _ => bail!("{flag}: opción desconocida"),
+            _ => bail!(msg!("flag.unknown_option", flag)),
         }
         i += 2;
     }
 
     let cwd = std::env::current_dir()?;
     let path = muckpile_cli::new(&cwd, item_type, title, parent, blocks)?;
-    let name = path.file_name().context("el path creado no tiene nombre")?.to_string_lossy();
-    println!("{name} creado");
+    let name = path.file_name().with_context(|| msg!("new.unnamed_path"))?.to_string_lossy();
+    println!("{}", msg!("path.created", path = name));
     Ok(())
 }
 
@@ -479,11 +472,11 @@ fn run_code_work_add(repo: &str, flags: &[String]) -> Result<()> {
     let mut i = 0;
     while i < flags.len() {
         let flag = &flags[i];
-        let value = flags.get(i + 1).with_context(|| format!("{flag}: falta el valor"))?;
+        let value = flags.get(i + 1).with_context(|| msg!("flag.missing_value", flag))?;
         match flag.as_str() {
             "--from" => from = Some(value.as_str()),
             "--branch" => branch = Some(value.as_str()),
-            _ => bail!("{flag}: opción desconocida"),
+            _ => bail!(msg!("flag.unknown_option", flag)),
         }
         i += 2;
     }
@@ -492,14 +485,14 @@ fn run_code_work_add(repo: &str, flags: &[String]) -> Result<()> {
     let config = load_project_config(&root)?;
     let worktree = muckpile_cli::code_work_add(&root, &cwd, repo, from, branch, &config)?;
     let rel = worktree.strip_prefix(&root).unwrap_or(&worktree);
-    println!("{}/ creado", rel.display());
+    println!("{}", msg!("path.created", path = format!("{}/", rel.display())));
     Ok(())
 }
 
 fn standing_in_a_project() -> Result<(PathBuf, PathBuf)> {
     let cwd = std::env::current_dir()?;
     let Some(root) = find_project_root(&cwd) else {
-        bail!("no estás parado dentro de un proyecto de muckpile");
+        bail!(msg!("project.not_inside"));
     };
     Ok((root, cwd))
 }
@@ -508,14 +501,14 @@ fn standing_in_a_project() -> Result<(PathBuf, PathBuf)> {
 /// the credentials this machine's `identity.toml` has for this project.
 fn build_provider(root: &Path, config: &ProjectConfig) -> Result<Box<dyn Provider>> {
     if config.provider != "jira-rest" {
-        bail!("{}: proveedor sin soporte", config.provider);
+        bail!(msg!("provider.unsupported", provider = config.provider));
     }
-    let project = root.file_name().context("la raíz del proyecto no tiene nombre")?.to_string_lossy().into_owned();
-    let home = std::env::var("HOME").context("no hay HOME en el entorno")?;
+    let project = root.file_name().with_context(|| msg!("project.root_unnamed"))?.to_string_lossy().into_owned();
+    let home = std::env::var("HOME").with_context(|| msg!("env.no_home"))?;
     let identity_path = Path::new(&home).join(".config/muckpile/identity.toml");
     let identity = load_identity(&identity_path, &project)?;
     let token = std::env::var(&identity.jira_token_env)
-        .with_context(|| format!("{}: variable de entorno no seteada", identity.jira_token_env))?;
+        .with_context(|| msg!("env.unset", var = identity.jira_token_env))?;
     let creds = Credentials::new(identity.jira_email, token);
     Ok(Box::new(JiraRest::new(&config.jira_base_url, creds)))
 }

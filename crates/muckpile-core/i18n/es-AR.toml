@@ -1,1 +1,138 @@
+# What muckpile says, in es-AR. Each key names one message; its data goes
+# between braces, with the same names as in en.toml.
+
+usage.all = "uso: muckpile init <proyecto> | muckpile to-work <id> [--empty] | muckpile pull [id | backlog/sprint/<sprint> | query/<nombre> [--query <consulta>]] | muckpile sprint fetch | muckpile transition <id> <estado> | muckpile states discover | muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>] | muckpile status <vista> | muckpile push <vista> | muckpile link <a> <frase> <b> | muckpile unlink <a> <frase> <b> | muckpile title <id> <título> | muckpile parent <id> <padre> | muckpile comment <id> <archivo> [--reply-to <id>] (--ai <modelo> | --i-human) | muckpile attach <id> <archivo> | muckpile new <tipo> <título> [--parent <id>] [--blocks <id>] | muckpile show <id> [--local] | muckpile code-work add <repo> [--from <rama>] [--branch <rama>]"
+usage.list = "uso: muckpile list <vista> [--state <estado>] [--category <categoria>] [--parent <id>]"
+
+flag.missing_value = "{flag}: falta el valor"
+flag.unknown_option = "{flag}: opción desconocida"
+
 id.invalid = "{id}: no es un id válido"
+path.exists = "{path}: ya existe"
+path.created = "{path} creado"
+words.and = " y "
+
+project.not_inside = "no estás parado dentro de un proyecto de muckpile"
+project.root_unnamed = "la raíz del proyecto no tiene nombre"
+provider.unsupported = "{provider}: proveedor sin soporte"
+env.no_home = "no hay HOME en el entorno"
+env.unset = "{var}: variable de entorno no seteada"
+identity.missing = "{project}: sin identidad en {path}"
+terminal.opening = "abriendo {path}"
+
+config.no_board_id = "muckpile.toml no tiene jira_board_id"
+config.no_item_type = "{type_name}: sin tipo de item para él en muckpile.toml"
+config.item_type.clash_unlabeled = "{names} son \"{jira_type}\" sin etiqueta: un ítem de ese tipo no diría cuál es — a todos menos uno les falta `label`"
+config.item_type.clash_same_label = "{names} son \"{jira_type}\" con la misma etiqueta, \"{label}\": un ítem de ese tipo no diría cuál es"
+
+item.no_frontmatter = "{file}: no empieza con frontmatter"
+item.no_title = "{file}: sin title en el frontmatter"
+item.no_title_in_text = "sin title en el frontmatter"
+item.no_status = "{file}: sin status en el frontmatter"
+item.bad_filename = "{path}: nombre de archivo inválido"
+item.not_md = "{name}: no es un .md"
+item.bad_name = "{name}: no tiene la forma <id>.<tipo>.md"
+item.unchanged = "{id}: sin cambios"
+
+init.bad_name = "{name}: el nombre de un proyecto es una carpeta, sin / y sin empezar con punto"
+init.already_a_project = "{name}: ya es un proyecto"
+init.created = "{project}/ creado: completá {name}/muckpile.toml"
+
+to_work.not_at_root = "to-work corre en la raíz del proyecto, no en {path}"
+to_work.created_empty = "{view}/ creada, vacía"
+
+view.not_in_work_view = "corré esto parado en una vista de to-work/<id>/"
+view.not_at_root = "corré esto en la raíz de la vista, no en {path}"
+
+new.unknown_type = "{item_type}: tipo desconocido — {known}"
+new.unnamed_path = "el path creado no tiene nombre"
+
+sync.rebasing = "hay un rebase a medias en {view} — terminalo con git (git rebase --continue) antes"
+sync.uncommitted = "hay cambios sin commitear ({paths}) — commitealos o descartalos antes"
+sync.rebase_stopped = "la vista quedó en un rebase a medias: resolvé el choque con git y corré git rebase --continue\n{what}"
+
+pull.brought = "{path} traído"
+pull.brought_read_only = "{path} traído — el cuerpo es de sólo lectura: {losses}"
+pull.also_in = "también en {views}"
+pull.extra_argument = "{arg}: argumento de más para pull"
+pull.view.brought = "{view}/: {count} ítem(s) traído(s)"
+pull.view.gone = "{id}: {why} — sacado de la vista"
+pull.gone.query = "ya no coincide con la consulta"
+pull.gone.sprint = "salió del sprint"
+pull.sprint.not_a_view = "{view}: no es la vista de un sprint"
+pull.sprint.not_open = "{slug}: no es un sprint abierto del board — sprint fetch lista los que hay"
+pull.query.not_a_view = "{view}: no es la vista de una consulta"
+pull.query.unknown = "{name}: no hay consulta con ese nombre en muckpile.toml — declarala en [queries], o pasala con --query"
+pull.query.needs_value = "--query necesita la consulta"
+pull.query.only_in_query_view = "--query es para la vista de una consulta: query/<nombre>"
+
+loss.lossy = "el conversor sólo puede aproximar {construct}"
+loss.differs = "no vuelve igual por markdown"
+
+catch_up.caught_up = "{id}: vista al día"
+catch_up.behind = "{id}: la vista queda atrás hasta el próximo pull — {why}"
+catch_up.rebasing = "la vista tiene un rebase a medias"
+catch_up.uncommitted = "hay cambios sin commitear: {paths}"
+catch_up.rebase_stopped = "el rebase paró en un choque, que hay que resolver con git: {what}"
+
+sprint_fetch.open = "{project}: {count} sprint(s) abierto(s)"
+sprint_fetch.created = "backlog/sprint/{slug}/       creada, vacía"
+sprint_fetch.removed = "backlog/sprint/{slug}/       borrada, ya no está abierto y no tenía nada adentro"
+
+transition.applied = "{id}: transición \"{transition}\" -> {status}"
+transition.none = "{id}: no hay transición hacia \"{status}\" — disponibles: {available}"
+
+states.count = "{project}: {count} estado(s)"
+states.cached = "cacheado en {project}.states.toml"
+states.no_cache = "{path}: no existe — correr \"muckpile states discover\" primero"
+
+status.no_parent = "(ninguno)"
+
+push.never_pulled = "{id}: nunca se hizo pull acá — nada para comparar"
+push.stale = "{id}: cambió del otro lado desde tu último pull — no se escribió nada"
+push.body_sent = "{id}: cuerpo enviado"
+push.body_refused = "{id}: el cuerpo no es canónico ({losses}) — no se sube. Diff contra el ADF del proveedor:\n{diff}"
+push.nothing_to_send = "{id}: sin cambios para enviar"
+push.resolve.created = "{slug}: creado como {id}"
+push.resolve.found = "{slug}: encontrado como {id}"
+push.resolve.failed = "{slug}: no se pudo resolver — {reason}"
+push.resolve.blocked = "depende de {blocker}, que no se pudo resolver"
+push.relation.failed = "{id}: relation.{phrase} {other} no llegó al proveedor — {reason}. Para reintentarlo: muckpile link {id} {phrase} {other}"
+push.relation.no_such_phrase = "ningún tipo de relación del proveedor dice \"{phrase}\""
+push.clash.header = "{id}: el header no es el del proveedor — no se manda nada de este ítem (git diff muestra qué se editó):"
+push.clash.field = "{name}: {written} (el proveedor tiene {provider}) — {command}"
+push.clash.nothing = "nada"
+push.clash.no_command = "ningún comando lo borra"
+push.clash.relation_added = "relation.{phrase}: {other} agregada — muckpile link {id} {phrase} {other}"
+push.clash.relation_removed = "relation.{phrase}: {other} quitada — muckpile unlink {id} {phrase} {other}"
+
+title.empty = "el título no puede quedar vacío"
+title.changed = "{id}: título cambiado a \"{title}\""
+
+parent.self = "{id}: un ítem no puede ser su propio padre"
+parent.changed = "{id}: padre cambiado a {parent}"
+
+comment.no_author = "decí quién lo escribió: --ai <modelo> o --i-human"
+comment.unknown_flag = "{flag}: flag desconocido para comment"
+comment.ai_and_human = "--ai y --i-human a la vez: un comentario lo escribió uno de los dos"
+comment.added = "{id}: comentario {comment} agregado"
+comment.reply_to.invalid = "{id}: no es el id de un comentario"
+comment.reply_to.needs_value = "--reply-to necesita el id de un comentario"
+comment.ai.needs_value = "--ai necesita el modelo"
+comment.ai.bad_model = "{model}: no es un nombre de modelo que se pueda leer de vuelta"
+comment.human.prompt = "Para confirmar que lo escribió una persona, escribí: {phrase}\n> "
+comment.human.no_terminal = "--i-human necesita una terminal donde una persona escriba la frase"
+comment.human.mismatch = "--i-human: lo escrito no es la frase que se mostró"
+
+attach.not_a_file = "{path}: no es un archivo"
+attach.done = "{id}: {filename} adjuntado ({attachment})"
+
+link.no_such_phrase = "\"{phrase}\": no es una frase de relación del proveedor — disponibles: {available}"
+unlink.removed = "{a} {phrase} {b}  ({type_name}) — quitada"
+unlink.no_such_link = "{a} {phrase} {b}: el proveedor no tiene esa relación ({type_name}) — nada que quitar"
+
+code_work.unknown_repo = "{repo}: no está en muckpile.toml"
+code_work.bad_id = "{id}: no tiene la forma <prefijo>-<número>"
+
+jira.search.nothing_left = "{title}: no queda nada con qué buscar después de reducirlo para JQL"
+jira.create.no_key = "create no devolvió 'key': {response}"

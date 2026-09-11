@@ -31,7 +31,7 @@ pub enum Rebase {
 pub fn init(project: &Path) -> Result<()> {
     let ledger = project.join(LEDGER);
     if ledger.exists() {
-        bail!("{}: ya existe", ledger.display());
+        bail!(crate::msg!("path.exists", path = ledger.display()));
     }
     run(project, &["init", "-q", "--bare", LEDGER])?;
     // A code worktree inside a view is another repository's, and none of
@@ -66,7 +66,7 @@ pub fn open_view(project: &Path, name: &str) -> Result<PathBuf> {
     let ledger = project.join(LEDGER);
     let view = project.join(name);
     if view.exists() {
-        bail!("{name}: ya existe");
+        bail!(crate::msg!("path.exists", path = name));
     }
     let name = &branch_name(name);
     let empty_tree = git_in(&ledger, &["hash-object", "-t", "tree", "-w", "--stdin"], Some(b""))?;

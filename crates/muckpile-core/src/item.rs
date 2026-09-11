@@ -33,13 +33,13 @@ pub struct FullItem {
 pub fn read_summary(path: &Path) -> Result<ItemSummary> {
     let (id, item_type) = id_and_type(path)?;
     let text = std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
-    let parsed = parse_frontmatter(&text).with_context(|| format!("{}: no empieza con frontmatter", path.display()))?;
+    let parsed = parse_frontmatter(&text).with_context(|| crate::msg!("item.no_frontmatter", file = path.display()))?;
 
     Ok(ItemSummary {
         id,
         item_type,
-        title: parsed.title.with_context(|| format!("{}: sin title en el frontmatter", path.display()))?,
-        status: parsed.status.with_context(|| format!("{}: sin status en el frontmatter", path.display()))?,
+        title: parsed.title.with_context(|| crate::msg!("item.no_title", file = path.display()))?,
+        status: parsed.status.with_context(|| crate::msg!("item.no_status", file = path.display()))?,
         parent: parsed.parent,
     })
 }
@@ -55,11 +55,11 @@ pub fn read_full(path: &Path) -> Result<FullItem> {
 /// disk — `push` reads the working copy through it, and the copy the
 /// provider's ref recorded is never on disk at all.
 pub fn parse_full(id: String, item_type: String, text: &str) -> Result<FullItem> {
-    let parsed = parse_frontmatter(text).with_context(|| format!("{id}.{item_type}.md: no empieza con frontmatter"))?;
+    let parsed = parse_frontmatter(text).with_context(|| crate::msg!("item.no_frontmatter", file = format!("{id}.{item_type}.md")))?;
     Ok(FullItem {
         id,
         item_type,
-        title: parsed.title.with_context(|| "sin title en el frontmatter".to_string())?,
+        title: parsed.title.with_context(|| crate::msg!("item.no_title_in_text"))?,
         status: parsed.status,
         parent: parsed.parent,
         body: parsed.body,
@@ -104,9 +104,9 @@ fn parse_frontmatter(text: &str) -> Result<Frontmatter> {
 
 fn id_and_type(path: &Path) -> Result<(String, String)> {
     let name =
-        path.file_name().and_then(|n| n.to_str()).with_context(|| format!("{}: nombre de archivo inválido", path.display()))?;
-    let stem = name.strip_suffix(".md").with_context(|| format!("{name}: no es un .md"))?;
-    let (id, item_type) = stem.split_once('.').with_context(|| format!("{name}: no tiene la forma <id>.<tipo>.md"))?;
+        path.file_name().and_then(|n| n.to_str()).with_context(|| crate::msg!("item.bad_filename", path = path.display()))?;
+    let stem = name.strip_suffix(".md").with_context(|| crate::msg!("item.not_md", name))?;
+    let (id, item_type) = stem.split_once('.').with_context(|| crate::msg!("item.bad_name", name))?;
     Ok((id.to_string(), item_type.to_string()))
 }
 
@@ -142,11 +142,11 @@ pub fn list_pending(view: &Path) -> Result<Vec<PendingItem>> {
         }
         let (id, item_type) = id_and_type(&path)?;
         let text = std::fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
-        let parsed = parse_frontmatter(&text).with_context(|| format!("{}: no empieza con frontmatter", path.display()))?;
+        let parsed = parse_frontmatter(&text).with_context(|| crate::msg!("item.no_frontmatter", file = path.display()))?;
         out.push(PendingItem {
             slug: id,
             item_type,
-            title: parsed.title.with_context(|| format!("{}: sin title en el frontmatter", path.display()))?,
+            title: parsed.title.with_context(|| crate::msg!("item.no_title", file = path.display()))?,
             parent: parsed.parent,
             body: parsed.body,
         });

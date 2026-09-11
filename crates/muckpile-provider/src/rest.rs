@@ -4,6 +4,7 @@
 use crate::jql::search_text;
 use crate::provider::{Attachment, Comment, Item, ItemLink, LinkType, Provider, Sprint, Status, Transition};
 use anyhow::{anyhow, bail, Context, Result};
+use muckpile_core::msg;
 use std::collections::BTreeMap;
 use std::io::Read;
 
@@ -364,7 +365,7 @@ impl Provider for JiraRest {
     fn find_by_title(&self, project_key: &str, jira_type: &str, label: Option<&str>, title: &str) -> Result<Option<String>> {
         let needle = search_text(title);
         if needle.is_empty() {
-            bail!("{title:?}: no queda nada con qué buscar después de reducirlo para JQL");
+            bail!(msg!("jira.search.nothing_left", title = format!("{title:?}")));
         }
         let mut jql = format!("project = {project_key} AND issuetype = \"{jira_type}\" AND summary ~ \"{needle}\"");
         if let Some(label) = label {
@@ -405,7 +406,7 @@ impl Provider for JiraRest {
         v.get("key")
             .and_then(|k| k.as_str())
             .map(str::to_string)
-            .ok_or_else(|| anyhow!("create no devolvió 'key': {v}"))
+            .ok_or_else(|| anyhow!(msg!("jira.create.no_key", response = v)))
     }
 }
 

@@ -10,7 +10,7 @@ use std::process::Command;
 /// `commit_prefix` — the tail after the key's last `-`, so `SGE-9876` with
 /// `commit_prefix = "jr"` gives `jr-9876`, never the key lowercased whole.
 pub fn derive_branch(id: &str, commit_prefix: &str) -> Result<String> {
-    let (_, number) = id.rsplit_once('-').with_context(|| format!("{id}: no tiene la forma <prefijo>-<número>"))?;
+    let (_, number) = id.rsplit_once('-').with_context(|| crate::msg!("code_work.bad_id", id))?;
     Ok(format!("{commit_prefix}-{number}"))
 }
 

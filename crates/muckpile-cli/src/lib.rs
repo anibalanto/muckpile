@@ -9,7 +9,7 @@ use muckpile_core::item::{self, list_summaries, parse_full, read_full, ItemSumma
 use muckpile_core::ledger::{self, Rebase};
 use muckpile_core::project::{classify, require_root, ItemType, Position, ProjectConfig};
 use muckpile_core::states::write_states_cache;
-use muckpile_core::{commit_paths, find_file, is_valid_id, read_frontmatter_refs, read_relations, rename_one, rewrite_type_references, slugify_title, topo_order, MARKER, TYPES};
+use muckpile_core::{commit_paths, msg, find_file, is_valid_id, read_frontmatter_refs, read_relations, rename_one, rewrite_type_references, slugify_title, topo_order, MARKER, TYPES};
 use muckpile_provider::link::{link as provider_link, unlink as provider_unlink, Outcome as LinkOutcome, UnlinkOutcome};
 use muckpile_provider::provider::{Attachment, Comment, Item, ItemLink, Provider, Sprint};
 use muckpile_provider::transition::{transition as provider_transition, Outcome};
@@ -21,11 +21,11 @@ use std::path::{Path, PathBuf};
 /// a ledger — every other one refuses outside a project that has one.
 pub fn init(multitask: &Path, name: &str) -> Result<PathBuf> {
     if name.is_empty() || name.starts_with('.') || name.contains(['/', '\\']) {
-        bail!("{name:?}: el nombre de un proyecto es una carpeta, sin / y sin empezar con punto");
+        bail!(msg!("init.bad_name", name = format!("{name:?}")));
     }
     let project = multitask.join(name);
     if project.join(ledger::LEDGER).exists() {
-        bail!("{name}: ya es un proyecto");
+        bail!(msg!("init.already_a_project", name));
     }
     for folder in ["base", "backlog/sprint", "to-work", "query"] {
         std::fs::create_dir_all(project.join(folder)).with_context(|| format!("creating {}/{folder}", project.display()))?;
@@ -63,7 +63,7 @@ question = { type = "Tarea", label = "question" }
 pub fn to_work(root: &Path, cwd: &Path, id: &str) -> Result<PathBuf> {
     require_root(root, cwd)?;
     if !is_valid_id(id) {
-        bail!("{id}: no es un id válido");
+        bail!(msg!("id.invalid", id));
     }
     ledger::open_view(root, &format!("to-work/{id}"))
 }
@@ -91,23 +91,23 @@ pub fn to_work_and_pull(root: &Path, cwd: &Path, id: &str, provider: &dyn Provid
 /// with the rest of the header when the item is created, and never after.
 pub fn new(dir: &Path, item_type: &str, title: &str, parent: Option<&str>, blocks: Option<&str>) -> Result<PathBuf> {
     if !TYPES.contains(&item_type) {
-        bail!("{item_type}: tipo desconocido — {}", TYPES.join(", "));
+        bail!(msg!("new.unknown_type", item_type, known = TYPES.join(", ")));
     }
     if let Some(parent) = parent {
         if !is_valid_id(parent) {
-            bail!("{parent}: no es un id válido");
+            bail!(msg!("id.invalid", id = parent));
         }
     }
     if let Some(blocks) = blocks {
         if !is_valid_id(blocks) {
-            bail!("{blocks}: no es un id válido");
+            bail!(msg!("id.invalid", id = blocks));
         }
     }
 
     let slug = format!("{MARKER}{}", slugify_title(title));
     let path = dir.join(format!("{slug}.{item_type}.md"));
     if path.exists() {
-        bail!("{slug}.{item_type}.md: ya existe");
+        bail!(msg!("path.exists", path = format!("{slug}.{item_type}.md")));
     }
 
     let mut text = format!("---\ntitle: {title}\n");
@@ -144,7 +144,7 @@ pub fn pull(root: &Path, cwd: &Path, id: Option<&str>, provider: &dyn Provider, 
     let id = match id {
         Some(id) => {
             if !is_valid_id(id) {
-                bail!("{id}: no es un id válido");
+                bail!(msg!("id.invalid", id));
             }
             id.to_string()
         }
@@ -172,15 +172,15 @@ pub struct SprintPull {
 /// the open one whose folder is `<slug>`, as `sprint fetch` names it.
 pub fn pull_sprint(root: &Path, view: &Path, provider: &dyn Provider, config: &ProjectConfig) -> Result<SprintPull> {
     if classify(root, view) != Position::SprintView {
-        bail!("{}: no es la vista de un sprint", view.display());
+        bail!(msg!("pull.sprint.not_a_view", view = view.display()));
     }
     let slug = view.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-    let board_id = config.jira_board_id.with_context(|| "muckpile.toml no tiene jira_board_id".to_string())?;
+    let board_id = config.jira_board_id.with_context(|| msg!("config.no_board_id"))?;
     let sprint = provider
         .open_sprints(board_id)?
         .into_iter()
         .find(|s| slugify(&legible_name(s)) == slug)
-        .with_context(|| format!("{slug}: no es un sprint abierto del board — sprint fetch lista los que hay"))?;
+        .with_context(|| msg!("pull.sprint.not_open", slug))?;
     ready_to_sync(view)?;
     let keys = provider.sprint_items(sprint.id)?;
     pull_membership(root, view, &keys, provider, config)
@@ -192,12 +192,12 @@ pub fn pull_sprint(root: &Path, view: &Path, provider: &dyn Provider, config: &P
 /// `muckpile.toml` declares under that name.
 pub fn pull_query(root: &Path, view: &Path, query: Option<&str>, provider: &dyn Provider, config: &ProjectConfig) -> Result<SprintPull> {
     if classify(root, view) != Position::QueryView || view.parent() != Some(&root.join("query")) {
-        bail!("{}: no es la vista de una consulta", view.display());
+        bail!(msg!("pull.query.not_a_view", view = view.display()));
     }
     let name = view.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     let query = match query {
         Some(query) => query.to_string(),
-        None => config.queries.get(&name).cloned().with_context(|| format!("{name}: no hay consulta con ese nombre en muckpile.toml — declarala en [queries], o pasala con --query"))?,
+        None => config.queries.get(&name).cloned().with_context(|| msg!("pull.query.unknown", name))?,
     };
     if !view.exists() {
         ledger::open_view(root, &format!("query/{name}"))?;
@@ -291,11 +291,11 @@ fn other_views_holding(root: &Path, view: &Path, id: &str) -> Result<Vec<String>
 /// own. A new file nobody added yet — a fresh draft — isn't in the way.
 fn ready_to_sync(view: &Path) -> Result<()> {
     if ledger::rebasing(view)? {
-        bail!("hay un rebase a medias en {} — terminalo con git (git rebase --continue) antes", view.display());
+        bail!(msg!("sync.rebasing", view = view.display()));
     }
     let changed = ledger::tracked_changes(view)?;
     if !changed.is_empty() {
-        bail!("hay cambios sin commitear ({}) — commitealos o descartalos antes", changed.join(", "));
+        bail!(msg!("sync.uncommitted", paths = changed.join(", ")));
     }
     Ok(())
 }
@@ -305,7 +305,7 @@ fn ready_to_sync(view: &Path) -> Result<()> {
 fn rebase_or_explain(view: &Path) -> Result<()> {
     match ledger::rebase(view)? {
         Rebase::Done => Ok(()),
-        Rebase::Stopped(what) => bail!("la vista quedó en un rebase a medias: resolvé el choque con git y corré git rebase --continue\n{what}"),
+        Rebase::Stopped(what) => bail!(msg!("sync.rebase_stopped", what)),
     }
 }
 
@@ -333,7 +333,7 @@ fn item_changes(view: &Path, id: &str, provider: &dyn Provider, config: &Project
     let item = provider.item(id)?;
     let item_type = config
         .muckpile_type_of(&item.jira_type, &item.labels)
-        .with_context(|| format!("{}: sin tipo de item para él en muckpile.toml", item.jira_type))?;
+        .with_context(|| msg!("config.no_item_type", type_name = item.jira_type))?;
     let (text, losses) = render_pulled_text(&item, provider, config)?;
     let filename = format!("{id}.{item_type}.md");
 
@@ -486,16 +486,16 @@ pub fn catch_up(view: &Path, id: &str, provider: &dyn Provider, config: &Project
         return Ok(CatchUp::NotHere);
     }
     if ledger::rebasing(view)? {
-        return Ok(CatchUp::Behind("la vista tiene un rebase a medias".to_string()));
+        return Ok(CatchUp::Behind(msg!("catch_up.rebasing")));
     }
     let changed = ledger::tracked_changes(view)?;
     if !changed.is_empty() {
-        return Ok(CatchUp::Behind(format!("hay cambios sin commitear: {}", changed.join(", "))));
+        return Ok(CatchUp::Behind(msg!("catch_up.uncommitted", paths = changed.join(", "))));
     }
     record_item(view, id, provider, config, &format!("pull {id}"))?;
     match ledger::rebase(view)? {
         Rebase::Done => Ok(CatchUp::CaughtUp),
-        Rebase::Stopped(what) => Ok(CatchUp::Behind(format!("el rebase paró en un choque, que hay que resolver con git: {what}"))),
+        Rebase::Stopped(what) => Ok(CatchUp::Behind(msg!("catch_up.rebase_stopped", what))),
     }
 }
 /// A body or a comment from the provider, as markdown. First, each card —
@@ -531,14 +531,14 @@ fn to_adf(markdown: &str, provider: &dyn Provider) -> Result<String> {
 /// only makes sense run from inside a view's own root.
 fn work_view_id(root: &Path, cwd: &Path) -> Result<String> {
     if classify(root, cwd) != Position::WorkView {
-        bail!("corré esto parado en una vista de to-work/<id>/");
+        bail!(msg!("view.not_in_work_view"));
     }
     let rel = cwd.strip_prefix(root).unwrap_or(cwd);
     let mut parts = rel.components();
     parts.next(); // "to-work"
     let id = parts.next().unwrap().as_os_str().to_string_lossy().into_owned();
     if parts.next().is_some() {
-        bail!("corré esto en la raíz de la vista, no en {}", rel.display());
+        bail!(msg!("view.not_at_root", path = rel.display()));
     }
     Ok(id)
 }
@@ -558,7 +558,7 @@ pub fn code_work_add(
     config: &ProjectConfig,
 ) -> Result<PathBuf> {
     let id = work_view_id(root, cwd)?;
-    let repo_config = config.repos.get(repo_name).with_context(|| format!("{repo_name}: no está en muckpile.toml"))?;
+    let repo_config = config.repos.get(repo_name).with_context(|| msg!("code_work.unknown_repo", repo = repo_name))?;
 
     let base = root.join("base").join(repo_name);
     ensure_cloned(&repo_config.remote, &base, &repo_config.branch)?;
@@ -571,7 +571,7 @@ pub fn code_work_add(
 
     let worktree_path = cwd.join("code-work").join(repo_name);
     if worktree_path.exists() {
-        bail!("code-work/{repo_name}: ya existe");
+        bail!(msg!("path.exists", path = format!("code-work/{repo_name}")));
     }
 
     add_worktree(&base, &worktree_path, &branch, from_branch)?;
@@ -593,7 +593,7 @@ pub struct SprintFetch {
 /// Never deletes a folder with anything in it; only one it left empty whose
 /// sprint isn't open any more.
 pub fn sprint_fetch(root: &Path, provider: &dyn Provider, config: &ProjectConfig) -> Result<SprintFetch> {
-    let board_id = config.jira_board_id.with_context(|| "muckpile.toml no tiene jira_board_id".to_string())?;
+    let board_id = config.jira_board_id.with_context(|| msg!("config.no_board_id"))?;
     let sprints = provider.open_sprints(board_id)?;
     let slugs: Vec<String> = sprints.iter().map(|s| slugify(&legible_name(s))).collect();
 
@@ -667,7 +667,7 @@ fn date_only(iso: &str) -> &str {
 /// every other command already applies to an argument coming from argv.
 pub fn transition(id: &str, target_status: &str, provider: &dyn Provider) -> Result<Outcome> {
     if !is_valid_id(id) {
-        bail!("{id}: no es un id válido");
+        bail!(msg!("id.invalid", id));
     }
     provider_transition(provider, id, target_status)
 }
@@ -679,10 +679,10 @@ pub fn transition(id: &str, target_status: &str, provider: &dyn Provider) -> Res
 /// coming from argv.
 pub fn link(a: &str, phrase: &str, b: &str, provider: &dyn Provider) -> Result<LinkOutcome> {
     if !is_valid_id(a) {
-        bail!("{a}: no es un id válido");
+        bail!(msg!("id.invalid", id = a));
     }
     if !is_valid_id(b) {
-        bail!("{b}: no es un id válido");
+        bail!(msg!("id.invalid", id = b));
     }
     provider_link(provider, a, phrase, b)
 }
@@ -693,10 +693,10 @@ pub fn link(a: &str, phrase: &str, b: &str, provider: &dyn Provider) -> Result<L
 /// every other command applies to arguments coming from argv.
 pub fn unlink(a: &str, phrase: &str, b: &str, provider: &dyn Provider) -> Result<UnlinkOutcome> {
     if !is_valid_id(a) {
-        bail!("{a}: no es un id válido");
+        bail!(msg!("id.invalid", id = a));
     }
     if !is_valid_id(b) {
-        bail!("{b}: no es un id válido");
+        bail!(msg!("id.invalid", id = b));
     }
     provider_unlink(provider, a, phrase, b)
 }
@@ -897,14 +897,14 @@ fn resolve_pending(view: &Path, provider: &dyn Provider, config: &ProjectConfig)
         let text = std::fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
         let blocked_by = read_frontmatter_refs(&text).into_iter().find(|r| by_slug.contains_key(r.as_str()) && !resolved.contains_key(r));
         if let Some(blocker) = blocked_by {
-            outcomes.push(PushOutcome { id: slug.clone(), result: PushResult::ResolveFailed(format!("depende de {blocker}, que no se pudo resolver")) });
+            outcomes.push(PushOutcome { id: slug.clone(), result: PushResult::ResolveFailed(msg!("push.resolve.blocked", blocker)) });
             continue;
         }
 
         let Some(provider_type) = config.item_type.get(&pending_item.item_type) else {
             outcomes.push(PushOutcome {
                 id: slug.clone(),
-                result: PushResult::ResolveFailed(format!("{}: sin tipo de item para él en muckpile.toml", pending_item.item_type)),
+                result: PushResult::ResolveFailed(msg!("config.no_item_type", type_name = pending_item.item_type)),
             });
             continue;
         };
@@ -955,7 +955,7 @@ fn resolve_pending(view: &Path, provider: &dyn Provider, config: &ProjectConfig)
 fn link_failure(provider: &dyn Provider, id: &str, phrase: &str, other: &str) -> Option<String> {
     match provider_link(provider, id, phrase, other) {
         Ok(LinkOutcome::Applied { .. }) => None,
-        Ok(LinkOutcome::NoSuchPhrase { .. }) => Some(format!("ningún tipo de relación del proveedor dice \"{phrase}\"")),
+        Ok(LinkOutcome::NoSuchPhrase { .. }) => Some(msg!("push.relation.no_such_phrase", phrase)),
         Err(e) => Some(e.to_string()),
     }
 }
@@ -1095,10 +1095,10 @@ fn header_edits(id: &str, item_type: &str, working: &str, remote: &Item) -> Resu
 /// away, with no conversion — `push` never sends a title edited by hand.
 pub fn title(id: &str, new_title: &str, provider: &dyn Provider) -> Result<()> {
     if !is_valid_id(id) {
-        bail!("{id}: no es un id válido");
+        bail!(msg!("id.invalid", id));
     }
     if new_title.trim().is_empty() {
-        bail!("el título no puede quedar vacío");
+        bail!(msg!("title.empty"));
     }
     provider.update_title(id, new_title)
 }
@@ -1108,13 +1108,13 @@ pub fn title(id: &str, new_title: &str, provider: &dyn Provider) -> Result<()> {
 /// the parent exists, and can hold this item, is the provider's to say.
 pub fn parent(id: &str, parent_id: &str, provider: &dyn Provider) -> Result<()> {
     if !is_valid_id(id) {
-        bail!("{id}: no es un id válido");
+        bail!(msg!("id.invalid", id));
     }
     if !is_valid_id(parent_id) {
-        bail!("{parent_id}: no es un id válido");
+        bail!(msg!("id.invalid", id = parent_id));
     }
     if id == parent_id {
-        bail!("{id}: un ítem no puede ser su propio padre");
+        bail!(msg!("parent.self", id));
     }
     provider.set_parent(id, parent_id)
 }
@@ -1140,9 +1140,9 @@ pub struct HumanProof(());
 /// answer, and no confirmation.
 pub fn confirm_human(ask: impl FnOnce(&str) -> Result<String>) -> Result<HumanProof> {
     let phrase = random_phrase();
-    let typed = ask(&phrase).context("--i-human necesita una terminal donde una persona escriba la frase")?;
+    let typed = ask(&phrase).with_context(|| msg!("comment.human.no_terminal"))?;
     if typed.trim() != phrase {
-        bail!("--i-human: lo escrito no es la frase que se mostró");
+        bail!(msg!("comment.human.mismatch"));
     }
     Ok(HumanProof(()))
 }
@@ -1179,21 +1179,21 @@ fn random_below(n: usize) -> usize {
 /// that forgot to say.
 pub fn comment(id: &str, file: &Path, reply_to: Option<&str>, author: Option<Author>, provider: &dyn Provider) -> Result<String> {
     if !is_valid_id(id) {
-        bail!("{id}: no es un id válido");
+        bail!(msg!("id.invalid", id));
     }
     if let Some(parent) = reply_to {
         if parent.is_empty() || !parent.chars().all(|c| c.is_ascii_digit()) {
-            bail!("{parent}: no es el id de un comentario");
+            bail!(msg!("comment.reply_to.invalid", id = parent));
         }
     }
     let Some(author) = author else {
-        bail!("decí quién lo escribió: --ai <modelo> o --i-human");
+        bail!(msg!("comment.no_author"));
     };
     let text = std::fs::read_to_string(file).with_context(|| format!("reading {}", file.display()))?;
     let markdown = match author {
         Author::Ai(model) => {
             if model.trim().is_empty() || model.contains(['`', '\n']) {
-                bail!("{model:?}: no es un nombre de modelo que se pueda leer de vuelta");
+                bail!(msg!("comment.ai.bad_model", model = format!("{model:?}")));
             }
             format!("ai: `{model}`\n\n{text}")
         }
@@ -1205,9 +1205,9 @@ pub fn comment(id: &str, file: &Path, reply_to: Option<&str>, author: Option<Aut
 /// Uploads `file` as an attachment of `id`, under its own name.
 pub fn attach(id: &str, file: &Path, provider: &dyn Provider) -> Result<Attachment> {
     if !is_valid_id(id) {
-        bail!("{id}: no es un id válido");
+        bail!(msg!("id.invalid", id));
     }
-    let filename = file.file_name().map(|n| n.to_string_lossy().into_owned()).with_context(|| format!("{}: no es un archivo", file.display()))?;
+    let filename = file.file_name().map(|n| n.to_string_lossy().into_owned()).with_context(|| msg!("attach.not_a_file", path = file.display()))?;
     let bytes = std::fs::read(file).with_context(|| format!("reading {}", file.display()))?;
     provider.add_attachment(id, &filename, &bytes)
 }
@@ -1229,7 +1229,7 @@ pub struct Show {
 /// included.
 pub fn show_live(dir: &Path, id: &str, provider: &dyn Provider, config: &ProjectConfig) -> Result<Show> {
     if !is_valid_id(id) {
-        bail!("{id}: no es un id válido");
+        bail!(msg!("id.invalid", id));
     }
     let item = provider.item(id)?;
     let body = match &item.body_adf {

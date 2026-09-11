@@ -103,10 +103,10 @@ fn check_item_types(item_types: &BTreeMap<String, ItemType>) -> Result<()> {
     }
     for ((jira_type, label), names) in by_key {
         if names.len() > 1 {
-            let names = names.join(" y ");
+            let names = names.join(&crate::msg!("words.and"));
             match label {
-                None => bail!("{names} son \"{jira_type}\" sin etiqueta: un ítem de ese tipo no diría cuál es — a todos menos uno les falta `label`"),
-                Some(label) => bail!("{names} son \"{jira_type}\" con la misma etiqueta, \"{label}\": un ítem de ese tipo no diría cuál es"),
+                None => bail!(crate::msg!("config.item_type.clash_unlabeled", names, jira_type)),
+                Some(label) => bail!(crate::msg!("config.item_type.clash_same_label", names, jira_type, label)),
             }
         }
     }
@@ -180,5 +180,5 @@ pub fn require_root(root: &Path, cwd: &Path) -> Result<()> {
         return Ok(());
     }
     let rel = cwd.strip_prefix(root).unwrap_or(cwd);
-    bail!("to-work corre en la raíz del proyecto, no en {}", rel.display());
+    bail!(crate::msg!("to_work.not_at_root", path = rel.display()));
 }

@@ -24,5 +24,5 @@ struct IdentityFile {
 pub fn load_identity(path: &Path, project: &str) -> Result<Identity> {
     let text = std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
     let file: IdentityFile = toml::from_str(&text).with_context(|| format!("parsing {}", path.display()))?;
-    file.projects.get(project).cloned().with_context(|| format!("{project}: sin identidad en {}", path.display()))
+    file.projects.get(project).cloned().with_context(|| crate::msg!("identity.missing", project, path = path.display()))
 }
