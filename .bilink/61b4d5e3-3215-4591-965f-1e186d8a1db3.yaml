@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 8829568cac4f68469330cea8fb2d1852
-      hash: 9fdab8fbf91dcb60eedcad3fb07894570f317742d5e4987613ae5e461cf7f576
+      hash: c2ef19f03ca4f9447ffbe25bccf6b83f786378a245139804f54bec6bc95e2cec
     name: push-row
   1:
     link: capture 31535b5f714d57ffb8fdbab35db097b9
