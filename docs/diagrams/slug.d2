@@ -7,8 +7,8 @@ jira: Jira
 
 persona -> mp: "muckpile new question \"¿se hereda?\" --blocks ACC-229"
 mp -> persona: "@se-hereda.question.md, sin red"
+persona -> reg: "git add @se-hereda.question.md\ngit commit"
 persona -> mp: "muckpile push ."
-mp -> reg: "commitea el borrador"
 mp -> jira: "¿hay una Tarea con ese título y la etiqueta question?"
 jira -> mp: "no"
 mp -> jira: "la crea, con la etiqueta, el cuerpo y el padre"

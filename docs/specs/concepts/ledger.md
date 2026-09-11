@@ -51,7 +51,7 @@ Un ítem que el proveedor ya no pone en la vista —lo sacaron del sprint, dejó
 
 ### Con ediciones sin commitear, o con un rebase a medias, `pull` y `push` se niegan
 
-Con cambios sin commitear en lo que la vista trackea, `pull` y `push` se niegan: primero se commitea o se descarta. Con un rebase a medias, todo comando que toque la vista se niega hasta que se termine con `git rebase --continue`. Un archivo nuevo que nadie agregó —un borrador— no estorba: `push` lo commitea al resolverlo.
+Con cambios sin commitear en lo que la vista trackea, `pull` y `push` se niegan: primero se commitea o se descarta. Con un rebase a medias, todo comando que toque la vista se niega hasta que se termine con `git rebase --continue`. Un archivo nuevo que nadie agregó —un borrador— no estorba, y tampoco sube: queda local ([drafts.md](drafts.md)).
 
 ## `push` frente al proveedor
 
