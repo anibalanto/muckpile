@@ -28,7 +28,7 @@ Sin ítem — es la excepción que `AGENTS.md` § "Cómo se trabaja acá" ya pre
 
 ## Decisión
 
-**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `aaf8838`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
+**Cómo leer el avance de cada decisión.** Medido el 2026-09-10 sobre `4cf3881`, con la vara de `accreta-devs`: una dimensión está terminada cuando hay código **y** un bilink aceptado que lo ata al fragmento de esta spec que la dice — no alcanza con que compile y pasen los tests.
 
 | Estado | Qué quiere decir |
 |---|---|
@@ -260,7 +260,7 @@ sin-sprint = "project = ACC AND sprint is empty"
 
 | Dimensión | Estado | Evidencia |
 |---|---|---|
-| Tres nombres reservados, y `to-work` sólo en la raíz | `cerrada` | `to_work` → `require_root`/`classify` ↔ fila `to-work` |
+| Cuatro nombres reservados —`base/`, `backlog/`, `to-work/`, `query/`—, y `to-work` sólo en la raíz | `cerrada` | `to_work` → `require_root`/`classify` ↔ fila `to-work` |
 | `to-work <id>` trae el ítem y su `_data/` —`--empty` la deja vacía— | `cerrada` | `to_work_and_pull` ↔ fila `to-work`: la vista y un `pull` del ítem; si el ítem no se puede traer, la vista recién abierta se cierra. Probado el 2026-09-10 en `ACC-354` |
 | `code-work add`: rama derivada de `commit_prefix`, clon a demanda de `base/<repo>/`, `--from`, `--branch` | `cerrada` | `code_work_add` ↔ fila `code-work add` |
 | `sprint fetch`: una carpeta vacía por sprint abierto, `…` → fecha, nunca borra una poblada | `cerrada` | `sprint_fetch` ↔ fila; `legible_name` ↔ esta decisión. Un borde: borra cualquier carpeta vacía que no sea de un sprint abierto, aunque no la haya dejado él |
