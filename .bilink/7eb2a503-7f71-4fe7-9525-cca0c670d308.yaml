@@ -10,4 +10,9 @@ endpoint:
     name: decisiones-vivas-1
   1:
     link: capture c52a6e2f502e20a795a666322a07be96
+    accepted:
+    - agree:
+      - anibal
+      link: capture c52a6e2f502e20a795a666322a07be96
+      hash: c846e4b44251e2973eb74349f657df1c89f325fc43d4e41ec599bd439d7f1342
     name: push-asks-once
