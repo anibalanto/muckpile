@@ -69,6 +69,8 @@ Queda **futuro**: sin fechas, sin objetivo, y sin arrancar. `muckpile` no arranc
 
 Es una escritura en el proveedor, así que pasa por `auto_update` ([configuration.md](configuration.md)).
 
+Medido el 2026-09-12 contra el board 701 de un proyecto real: `POST /rest/agile/1.0/sprint` con `name` y `originBoardId`, sin fechas, devuelve el sprint con su `id` y `state: future`, y el `sprint fetch` siguiente —que pide `state=active`— no lo trae ni le hace vista.
+
 ### `sprint fetch` deja una carpeta vacía por sprint abierto
 
 `sprint fetch` trae los sprints abiertos del board —los que el proveedor da con `state=active`— y crea, por cada uno, una vista vacía en `backlog/sprint/`, con el nombre del sprint en slug: los espacios pasan a `_`, y el resto queda igual. No trae ítems. Nunca borra una carpeta con algo adentro, y cierra las vistas vacías que ya no son de un sprint abierto.
