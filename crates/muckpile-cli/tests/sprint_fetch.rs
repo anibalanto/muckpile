@@ -229,3 +229,54 @@ fn a_created_sprint_has_no_view_until_it_is_open() {
     assert!(fetched.created.is_empty());
     assert!(!root.join("backlog/sprint/22_Después_de_muckpile").exists());
 }
+
+/// `sprint add` con el id del sprint: los ítems se mueven, y ningún archivo
+/// de la vista cambia.
+#[test]
+fn sprint_add_moves_the_items_by_sprint_id() {
+    let provider = FakeProvider::new();
+
+    muckpile_cli::sprint_add("6533", &["ACC-1".into(), "ACC-2".into()], &provider, &config(), approved).unwrap();
+
+    assert_eq!(provider.sprint_additions(), vec![(6533, vec!["ACC-1".to_string(), "ACC-2".to_string()])]);
+}
+
+/// Y con el slug de la vista de un sprint abierto, que es como se lo nombra
+/// todos los días.
+#[test]
+fn sprint_add_takes_the_slug_of_an_open_sprint() {
+    let provider = FakeProvider::new();
+    provider.seed_sprints(&[("22 Las vistas", "2026-08-01T00:00:00.000Z")]);
+
+    muckpile_cli::sprint_add("22_Las_vistas", &["ACC-1".into()], &provider, &config(), approved).unwrap();
+
+    assert_eq!(provider.sprint_additions(), vec![(1, vec!["ACC-1".to_string()])]);
+}
+
+#[test]
+fn a_slug_that_is_no_open_sprint_is_refused() {
+    let provider = FakeProvider::new();
+    provider.seed_sprints(&[("22 Las vistas", "2026-08-01T00:00:00.000Z")]);
+
+    assert!(muckpile_cli::sprint_add("23_Otra_cosa", &["ACC-1".into()], &provider, &config(), approved).is_err());
+    assert!(provider.sprint_additions().is_empty());
+}
+
+#[test]
+fn adding_nothing_or_an_invalid_id_is_refused_before_asking_anyone() {
+    let provider = FakeProvider::new();
+    let asked = || -> anyhow::Result<()> { panic!("pidió la frase antes de mirar los argumentos") };
+
+    assert!(muckpile_cli::sprint_add("6533", &[], &provider, &config(), asked).is_err());
+    assert!(muckpile_cli::sprint_add("6533", &["../escape".into()], &provider, &config(), asked).is_err());
+    assert!(provider.sprint_additions().is_empty());
+}
+
+#[test]
+fn items_not_approved_are_not_moved() {
+    let provider = FakeProvider::new();
+
+    assert!(muckpile_cli::sprint_add("6533", &["ACC-1".into()], &provider, &config(), refused).is_err());
+
+    assert!(provider.sprint_additions().is_empty());
+}
