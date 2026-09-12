@@ -10,4 +10,11 @@ endpoint:
     name: sprint-create-regla
   1:
     link: capture 49a51bf1de3c4c50402edd1c9cd6058a
+    accepted:
+    - agree:
+      - anibal
+      link: capture 49a51bf1de3c4c50402edd1c9cd6058a
+      hash: bdaa7fc5b5a3978f94b05b97532875e1993440e5bb8ac9c1e60d27561daba1ec
+      hash_ast: 57a002f6a32ad35f41b05922aa51f470b2267838958e53b39d76f1c6efbfe7a2
+      n: declined
     name: sprint_create
