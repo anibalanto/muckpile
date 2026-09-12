@@ -56,6 +56,17 @@ fn a_command_that_does_not_exist_is_said_in_one_line() {
     assert!(!err.contains("attach"), "not the whole list: {err}");
 }
 
+/// Two commands share their first word, and the usage shown is the one
+/// asked for: `sprint create` with no name doesn't explain `sprint fetch`.
+#[test]
+fn a_two_word_command_shows_its_own_usage() {
+    let out = muckpile(&["sprint", "create"]);
+
+    assert!(!out.status.success());
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("uso: muckpile sprint create <nombre>"), "{err}");
+}
+
 #[test]
 fn a_command_with_the_wrong_arguments_shows_only_its_usage() {
     let out = muckpile(&["push"]);
