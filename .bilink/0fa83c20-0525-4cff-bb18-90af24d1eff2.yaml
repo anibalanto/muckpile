@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture aa5dc81cac4c4cbf994feb6a3cd02cf2
-      hash: 378d4ec7490dc1bfb263f9f126bf4e890c26990735e26bf72bd1fe6c7b469d6b
+      hash: 4a618091ffc03317791e64515bc94b224fb4ff72e1b20293fb9fd1c791689ece
     name: crear-sprints-4
   1:
     link: capture 56637f17097b2ca102b3a7165234a82e
