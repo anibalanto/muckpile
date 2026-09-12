@@ -10,4 +10,11 @@ endpoint:
     name: fila-sprint-create
   1:
     link: capture 2cf7fcc8669a094d30b598ddc288163b
+    accepted:
+    - agree:
+      - anibal
+      link: capture 2cf7fcc8669a094d30b598ddc288163b
+      hash: 259255d4ad97c46416ead21fed6fc23abc15223c113448f0c0dc4a9fa118db38
+      hash_ast: f1ec94a5d83597b1172239120d6b16fd9ebd2acc9ffe6bf4ae25ba47de5381e2
+      n: declined
     name: create_sprint
