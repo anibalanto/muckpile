@@ -666,3 +666,19 @@ fn create_sprint_posts_the_name_and_the_board_and_nothing_else() {
     assert_eq!(body["originBoardId"], 701);
     assert_eq!(body.as_object().unwrap().len(), 2, "ni fechas ni objetivo: {}", captured.body);
 }
+
+/// Sumar ítems a un sprint es un POST al endpoint del sprint, con las claves
+/// en `issues`.
+#[test]
+fn add_to_sprint_posts_the_keys_to_the_sprint_endpoint() {
+    let (base, rx) = one_shot(204, "");
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    provider.add_to_sprint(6533, &["ACC-1".to_string(), "ACC-2".to_string()]).unwrap();
+
+    let captured = rx.recv().unwrap();
+    assert_eq!(captured.method, "POST");
+    assert_eq!(captured.path, "/rest/agile/1.0/sprint/6533/issue");
+    let body: serde_json::Value = serde_json::from_str(&captured.body).unwrap();
+    assert_eq!(body["issues"], serde_json::json!(["ACC-1", "ACC-2"]));
+}

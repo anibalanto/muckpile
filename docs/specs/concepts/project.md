@@ -71,6 +71,12 @@ Es una escritura en el proveedor, así que pasa por `auto_update` ([configuratio
 
 Medido el 2026-09-12 contra el board 701 de un proyecto real: `POST /rest/agile/1.0/sprint` con `name` y `originBoardId`, sin fechas, devuelve el sprint con su `id` y `state: future`, y el `sprint fetch` siguiente —que pide `state=active`— no lo trae ni le hace vista.
 
+### `sprint add` suma ítems a un sprint, por id o por slug
+
+`muckpile sprint add <sprint> <id>...` mueve esos ítems al sprint. El sprint se nombra de dos formas, y cuál se usa lo dice su forma: **todo dígitos es el id** que el proveedor le dio —el que imprime `sprint create`—, y cualquier otra cosa es el **slug de su vista**, que se busca entre los sprints abiertos. Un sprint futuro no tiene vista, así que sólo se lo nombra por id.
+
+**No toca el archivo de ningún ítem**: a qué sprint pertenece no está en su header, y la vista de un sprint se arma con `pull`, que le pregunta al proveedor qué tiene. Es una escritura en el proveedor, así que pasa por `auto_update` ([configuration.md](configuration.md)).
+
 ### `sprint fetch` deja una carpeta vacía por sprint abierto
 
 `sprint fetch` trae los sprints abiertos del board —los que el proveedor da con `state=active`— y crea, por cada uno, una vista vacía en `backlog/sprint/`, con el nombre del sprint en slug: los espacios pasan a `_`, y el resto queda igual. No trae ítems. Nunca borra una carpeta con algo adentro, y cierra las vistas vacías que ya no son de un sprint abierto.

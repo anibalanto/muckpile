@@ -20,6 +20,7 @@ pub struct FakeProvider {
     next_id: RefCell<u64>,
     sprint_keys: RefCell<Vec<u64>>,
     sprints_created: RefCell<Vec<(u64, String)>>,
+    sprint_additions: RefCell<Vec<(u64, Vec<String>)>>,
 }
 
 /// What `FakeProvider` holds per item — a superset of what any one `Provider`
@@ -51,7 +52,13 @@ impl FakeProvider {
             next_id: RefCell::new(1),
             sprint_keys: RefCell::new(Vec::new()),
             sprints_created: RefCell::new(Vec::new()),
+            sprint_additions: RefCell::new(Vec::new()),
         }
+    }
+
+    /// Every move into a sprint, as `(sprint, keys)`, in order.
+    pub fn sprint_additions(&self) -> Vec<(u64, Vec<String>)> {
+        self.sprint_additions.borrow().clone()
     }
 
     /// Queues the id `create_sprint` hands back the next time it's called.
@@ -309,6 +316,11 @@ impl Provider for FakeProvider {
 
     fn open_sprints(&self, _board_id: u64) -> Result<Vec<Sprint>> {
         Ok(self.sprints.borrow().clone())
+    }
+
+    fn add_to_sprint(&self, sprint_id: u64, keys: &[String]) -> Result<()> {
+        self.sprint_additions.borrow_mut().push((sprint_id, keys.to_vec()));
+        Ok(())
     }
 
     fn create_sprint(&self, board_id: u64, name: &str) -> Result<u64> {

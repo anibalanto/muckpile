@@ -118,6 +118,10 @@ pub trait Provider {
     /// provider leaves it future: no dates, and not started.
     fn create_sprint(&self, board_id: u64, name: &str) -> Result<u64>;
 
+    /// Moves `keys` into the sprint. Nothing of an item's own fields
+    /// changes: which sprint holds it is the board's, not the item's.
+    fn add_to_sprint(&self, sprint_id: u64, keys: &[String]) -> Result<()>;
+
     /// Every status the project's workflow uses today, one per name — a
     /// status can be offered by more than one issue type, but its category
     /// never differs between them on the same project (measured against

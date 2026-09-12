@@ -267,6 +267,15 @@ impl Provider for JiraRest {
         v.get("id").and_then(|id| id.as_u64()).ok_or_else(|| anyhow!("no `id` in the created sprint"))
     }
 
+    /// One call for every key: the endpoint takes them together, and a move
+    /// that lands for some and not others would be harder to read than one
+    /// that lands or doesn't.
+    fn add_to_sprint(&self, sprint_id: u64, keys: &[String]) -> Result<()> {
+        let body = serde_json::json!({ "issues": keys });
+        self.call("POST", &format!("/rest/agile/1.0/sprint/{sprint_id}/issue"), Some(body))?;
+        Ok(())
+    }
+
     /// `sprint = <id>` — measured on ACC's board: the sprint's items come
     /// back in one search.
     fn sprint_items(&self, sprint_id: u64) -> Result<Vec<String>> {

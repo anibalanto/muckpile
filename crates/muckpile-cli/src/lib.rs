@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 /// and each command's first word as argv spells it. How it's run and what
 /// it does are messages, `help.usage.<command>` and `help.what.<command>`.
 const COMMANDS: &[(&str, &[&str])] = &[
-    ("project", &["init", "to-work", "code-work", "sprint", "sprint-create", "states"]),
+    ("project", &["init", "to-work", "code-work", "sprint", "sprint-create", "sprint-add", "states"]),
     ("read", &["show", "list", "status"]),
     ("sync", &["new", "pull", "push"]),
     ("write", &["title", "transition", "parent", "link", "unlink", "comment", "attach"]),
@@ -625,6 +625,35 @@ pub fn sprint_create(name: &str, provider: &dyn Provider, config: &ProjectConfig
     let board_id = config.jira_board_id.with_context(|| msg!("config.no_board_id"))?;
     approve()?;
     provider.create_sprint(board_id, name)
+}
+
+/// Moves `ids` into a sprint, named by its provider id — all digits — or by
+/// the slug of its view, which only an open sprint has. Nothing of the
+/// items' files changes: which sprint holds one is the board's to say.
+pub fn sprint_add(sprint: &str, ids: &[String], provider: &dyn Provider, config: &ProjectConfig, approve: impl FnOnce() -> Result<()>) -> Result<u64> {
+    if ids.is_empty() {
+        bail!(msg!("sprint.add.no_items"));
+    }
+    for id in ids {
+        if !is_valid_id(id) {
+            bail!(msg!("id.invalid", id));
+        }
+    }
+    let sprint_id = match sprint.parse::<u64>() {
+        Ok(id) => id,
+        Err(_) => {
+            let board_id = config.jira_board_id.with_context(|| msg!("config.no_board_id"))?;
+            provider
+                .open_sprints(board_id)?
+                .into_iter()
+                .find(|s| slugify(&legible_name(s)) == sprint)
+                .with_context(|| msg!("sprint.add.unknown", sprint))?
+                .id
+        }
+    };
+    approve()?;
+    provider.add_to_sprint(sprint_id, ids)?;
+    Ok(sprint_id)
 }
 
 /// What `sprint_fetch` did: the slugs it created, the slugs it removed
