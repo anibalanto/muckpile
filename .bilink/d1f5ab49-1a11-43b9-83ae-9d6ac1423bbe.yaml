@@ -1,0 +1,8 @@
+kind: governs
+endpoint:
+  0:
+    link: capture d631fe7368b4641807c8f3ef38eec76f
+    name: fila-sprint-add
+  1:
+    link: capture ea1099cfad4bb0671bc8599b8c285149
+    name: add_to_sprint

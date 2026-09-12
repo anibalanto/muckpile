@@ -1,0 +1,8 @@
+kind: governs
+endpoint:
+  0:
+    link: capture aa5dc81cac4c4cbf994feb6a3cd02cf2
+    name: crear-sprints-4
+  1:
+    link: capture 56637f17097b2ca102b3a7165234a82e
+    name: sprint-add-regla
