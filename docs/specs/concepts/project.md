@@ -77,6 +77,8 @@ Medido el 2026-09-12 contra el board 701 de un proyecto real: `POST /rest/agile/
 
 **No toca el archivo de ningún ítem**: a qué sprint pertenece no está en su header, y la vista de un sprint se arma con `pull`, que le pregunta al proveedor qué tiene. Es una escritura en el proveedor, así que pasa por `auto_update` ([configuration.md](configuration.md)).
 
+Medido el 2026-09-12 contra un board real: `POST /rest/agile/1.0/sprint/{id}/issue` con las claves en `issues` mueve los ítems a un sprint **futuro** igual que a uno abierto, y contesta 204 sin cuerpo. Los ítems de un sprint futuro se leen con una consulta, `pull query/<nombre> --query "sprint = <id>"`, porque la vista de sprint es de los abiertos.
+
 ### `sprint fetch` deja una carpeta vacía por sprint abierto
 
 `sprint fetch` trae los sprints abiertos del board —los que el proveedor da con `state=active`— y crea, por cada uno, una vista vacía en `backlog/sprint/`, con el nombre del sprint en slug: los espacios pasan a `_`, y el resto queda igual. No trae ítems. Nunca borra una carpeta con algo adentro, y cierra las vistas vacías que ya no son de un sprint abierto.
