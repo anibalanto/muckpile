@@ -10,4 +10,11 @@ endpoint:
     name: sprint-start-regla
   1:
     link: capture c6a03140f562b114310aa1a95eded23f
+    accepted:
+    - agree:
+      - anibal
+      link: capture c6a03140f562b114310aa1a95eded23f
+      hash: a008b439ef4774d6c358c741f359d36366aa512ccecd8c41b2e799e20107fb0f
+      hash_ast: 000e80ded8128b268c0500c2de8dbb6cafba1551426d7898875ca00398dcdf50
+      n: declined
     name: sprint_start
