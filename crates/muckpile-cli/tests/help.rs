@@ -4,9 +4,12 @@
 use muckpile_cli::{help, usage_of};
 use std::process::{Command, Output};
 
-const EVERY_COMMAND: [&str; 18] = [
-    "init", "to-work", "code-work", "sprint", "states", "show", "list", "status", "new", "pull", "push", "title", "transition", "parent", "link",
-    "unlink", "comment", "attach",
+/// Every command by how its usage line starts. Two that share the first
+/// word — `sprint fetch` and `sprint create` — are told apart by the second,
+/// which is how whoever reads the help tells them apart too.
+const EVERY_COMMAND: [&str; 19] = [
+    "init", "to-work", "code-work add", "sprint fetch", "sprint create", "states discover", "show", "list", "status", "new", "pull", "push",
+    "title", "transition", "parent", "link", "unlink", "comment", "attach",
 ];
 
 #[test]

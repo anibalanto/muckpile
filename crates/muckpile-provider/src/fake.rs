@@ -18,6 +18,8 @@ pub struct FakeProvider {
     links_created: RefCell<Vec<(String, String, String)>>,
     next_keys: RefCell<VecDeque<(String, String)>>,
     next_id: RefCell<u64>,
+    sprint_keys: RefCell<Vec<u64>>,
+    sprints_created: RefCell<Vec<(u64, String)>>,
 }
 
 /// What `FakeProvider` holds per item — a superset of what any one `Provider`
@@ -47,7 +49,19 @@ impl FakeProvider {
             links_created: RefCell::new(Vec::new()),
             next_keys: RefCell::new(VecDeque::new()),
             next_id: RefCell::new(1),
+            sprint_keys: RefCell::new(Vec::new()),
+            sprints_created: RefCell::new(Vec::new()),
         }
+    }
+
+    /// Queues the id `create_sprint` hands back the next time it's called.
+    pub fn queue_sprint(&self, id: u64) {
+        self.sprint_keys.borrow_mut().push(id);
+    }
+
+    /// Every sprint created, as `(board, name)`, in order.
+    pub fn sprints_created(&self) -> Vec<(u64, String)> {
+        self.sprints_created.borrow().clone()
     }
 
     /// Queues the `(key, initial status)` `create_item` hands back the next
@@ -295,6 +309,12 @@ impl Provider for FakeProvider {
 
     fn open_sprints(&self, _board_id: u64) -> Result<Vec<Sprint>> {
         Ok(self.sprints.borrow().clone())
+    }
+
+    fn create_sprint(&self, board_id: u64, name: &str) -> Result<u64> {
+        let id = self.sprint_keys.borrow_mut().pop().context("FakeProvider: no queued sprint id — call queue_sprint first")?;
+        self.sprints_created.borrow_mut().push((board_id, name.to_string()));
+        Ok(id)
     }
 
     fn project_statuses(&self, _project_key: &str) -> Result<Vec<Status>> {

@@ -114,6 +114,10 @@ pub trait Provider {
     /// The board's currently open sprints.
     fn open_sprints(&self, board_id: u64) -> Result<Vec<Sprint>>;
 
+    /// Makes a sprint on `board_id`, named as given, and answers its id. The
+    /// provider leaves it future: no dates, and not started.
+    fn create_sprint(&self, board_id: u64, name: &str) -> Result<u64>;
+
     /// Every status the project's workflow uses today, one per name — a
     /// status can be offered by more than one issue type, but its category
     /// never differs between them on the same project (measured against

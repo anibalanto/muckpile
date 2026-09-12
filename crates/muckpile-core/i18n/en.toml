@@ -18,6 +18,8 @@ help.usage.code-work = "code-work add <repo> [--from <branch>] [--branch <branch
 help.what.code-work = "Inside a work view, adds a worktree of one of the project's repos."
 help.usage.sprint = "sprint fetch"
 help.what.sprint = "An empty view for every open sprint on the board."
+help.usage.sprint-create = "sprint create <name>"
+help.what.sprint-create = "Makes a sprint on the board, with that name. It stays future, and gets no view."
 help.usage.states = "states discover"
 help.what.states = "The workflow's statuses, with their category, cached for --category."
 help.usage.show = "show <id> [--local]"
@@ -119,6 +121,8 @@ catch_up.uncommitted = "there are uncommitted changes: {paths}"
 catch_up.rebase_stopped = "the rebase stopped at a clash, to be resolved with git: {what}"
 
 sprint_fetch.open = "{project}: {count} open sprint(s)"
+sprint.create.no_name = "a sprint needs a name"
+sprint.create.done = "{name}: created, future, id={id}. It gets a view when it starts"
 sprint_fetch.created = "backlog/sprint/{slug}/       created, empty"
 sprint_fetch.removed = "backlog/sprint/{slug}/       removed, no longer open and had nothing in it"
 

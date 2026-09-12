@@ -258,6 +258,15 @@ impl Provider for JiraRest {
             .collect())
     }
 
+    /// The agile endpoint makes a sprint, and makes it **future**: with no
+    /// `startDate` and no `endDate` it isn't started, which is what the
+    /// board's own "create sprint" does. Only the name and the board travel.
+    fn create_sprint(&self, board_id: u64, name: &str) -> Result<u64> {
+        let body = serde_json::json!({ "name": name, "originBoardId": board_id });
+        let v = self.call("POST", "/rest/agile/1.0/sprint", Some(body))?;
+        v.get("id").and_then(|id| id.as_u64()).ok_or_else(|| anyhow!("no `id` in the created sprint"))
+    }
+
     /// `sprint = <id>` — measured on ACC's board: the sprint's items come
     /// back in one search.
     fn sprint_items(&self, sprint_id: u64) -> Result<Vec<String>> {

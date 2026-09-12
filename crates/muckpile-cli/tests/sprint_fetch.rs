@@ -8,6 +8,32 @@ use muckpile_core::project::load_project_config;
 use muckpile_provider::fake::FakeProvider;
 use std::path::Path;
 
+/// La config de un proyecto con board, para lo que no lee del disco.
+fn config() -> muckpile_core::project::ProjectConfig {
+    muckpile_core::project::ProjectConfig {
+        provider: "jira-rest".into(),
+        jira_base_url: "https://x.atlassian.net".into(),
+        jira_project_key: "ACC".into(),
+        jira_board_id: Some(701),
+        commit_prefix: "acc".into(),
+        repos: Default::default(),
+        item_type: Default::default(),
+        queries: Default::default(),
+        auto_update: false,
+        auto_comment: false,
+    }
+}
+
+/// La persona aprobó la escritura, o el proyecto escribe solo.
+fn approved() -> anyhow::Result<()> {
+    Ok(())
+}
+
+/// Nadie la aprobó.
+fn refused() -> anyhow::Result<()> {
+    anyhow::bail!("sin aprobar")
+}
+
 fn scaffold(root: &Path) {
     muckpile_core::ledger::init(root).unwrap();
     std::fs::create_dir_all(root.join("base")).unwrap();
@@ -139,4 +165,67 @@ fn refuses_without_a_configured_board_id() {
 
     let err = sprint_fetch(root, &provider, &config).unwrap_err();
     assert!(err.to_string().contains("jira_board_id"), "{err}");
+}
+
+/// `sprint create` manda el nombre entero al board del proyecto y devuelve el
+/// id que el proveedor le dio.
+#[test]
+fn sprint_create_sends_the_name_whole_and_returns_the_id() {
+    let provider = FakeProvider::new();
+    provider.queue_sprint(44);
+
+    let id = muckpile_cli::sprint_create("22 Después de muckpile", &provider, &config(), approved).unwrap();
+
+    assert_eq!(id, 44);
+    assert_eq!(provider.sprints_created(), vec![(701, "22 Después de muckpile".to_string())]);
+}
+
+/// Sin aprobación no se escribe nada: es una escritura en el proveedor como
+/// cualquier otra.
+#[test]
+fn a_sprint_not_approved_is_not_created() {
+    let provider = FakeProvider::new();
+
+    assert!(muckpile_cli::sprint_create("22 Después de muckpile", &provider, &config(), refused).is_err());
+
+    assert!(provider.sprints_created().is_empty());
+}
+
+#[test]
+fn a_sprint_without_a_name_is_refused_before_asking_anyone() {
+    let provider = FakeProvider::new();
+    let asked = || -> anyhow::Result<()> { panic!("pidió la frase antes de mirar el nombre") };
+
+    assert!(muckpile_cli::sprint_create("   ", &provider, &config(), asked).is_err());
+    assert!(provider.sprints_created().is_empty());
+}
+
+/// El board sale de `muckpile.toml`: sin él, no hay dónde crearlo.
+#[test]
+fn a_project_without_a_board_cannot_create_a_sprint() {
+    let provider = FakeProvider::new();
+    let mut config = config();
+    config.jira_board_id = None;
+
+    assert!(muckpile_cli::sprint_create("22 Después de muckpile", &provider, &config, approved).is_err());
+    assert!(provider.sprints_created().is_empty());
+}
+
+/// El sprint nuevo queda futuro, así que `sprint fetch` —que trae los
+/// abiertos— no le hace vista.
+#[test]
+fn a_created_sprint_has_no_view_until_it_is_open() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    muckpile_core::ledger::init(root).unwrap();
+    std::fs::create_dir_all(root.join("backlog/sprint")).unwrap();
+    let provider = FakeProvider::new();
+    provider.queue_sprint(44);
+
+    muckpile_cli::sprint_create("22 Después de muckpile", &provider, &config(), approved).unwrap();
+    let fetched = muckpile_cli::sprint_fetch(root, &provider, &config()).unwrap();
+
+    assert_eq!(fetched.open, 0);
+    assert!(fetched.created.is_empty());
+    assert!(!root.join("backlog/sprint/22_Después_de_muckpile").exists());
 }
