@@ -6,7 +6,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 56637f17097b2ca102b3a7165234a82e
-      hash: ac5b4601a098405fef125fc2a561fc49beb6eae8c4cd4a8ab9af35e94d7b5192
+      hash: 1d797664e74ea85d18be8b9aa250d0bdf1091fa228c66eff454aea9502b4ea3f
     name: sprint-add-regla
   1:
     link: capture 17d226d099aa8080135fe4bb14fbfcda
