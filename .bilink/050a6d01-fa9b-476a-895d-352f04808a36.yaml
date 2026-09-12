@@ -10,4 +10,11 @@ endpoint:
     name: sprint-add-regla
   1:
     link: capture 17d226d099aa8080135fe4bb14fbfcda
+    accepted:
+    - agree:
+      - anibal
+      link: capture 17d226d099aa8080135fe4bb14fbfcda
+      hash: 204ee7f9bd60374cbc7a06de18912818639e2a1bb742c7c95eb209529c4e07a9
+      hash_ast: dc0b2438b4f3129c71a68613e3810c1d97d6d4ad25ad68c287de52d13e450c86
+      n: declined
     name: sprint_add
