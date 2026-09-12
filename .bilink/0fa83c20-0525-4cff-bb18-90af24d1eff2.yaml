@@ -10,4 +10,9 @@ endpoint:
     name: crear-sprints-4
   1:
     link: capture 56637f17097b2ca102b3a7165234a82e
+    accepted:
+    - agree:
+      - anibal
+      link: capture 56637f17097b2ca102b3a7165234a82e
+      hash: ac5b4601a098405fef125fc2a561fc49beb6eae8c4cd4a8ab9af35e94d7b5192
     name: sprint-add-regla
