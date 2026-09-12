@@ -40,10 +40,16 @@ fn main() -> Result<()> {
         [cmd, id] if cmd == "show" => run_show(id, false),
         [cmd, id, flag] if cmd == "show" && flag == "--local" => run_show(id, true),
         [cmd, sub, repo, rest @ ..] if cmd == "code-work" && sub == "add" => run_code_work_add(repo, rest),
-        [cmd, ..] => match muckpile_cli::usage_of(cmd) {
-            Some(usage) => bail!(usage),
-            None => bail!(msg!("usage.unknown", command = cmd)),
-        },
+        // Two commands can share their first word — `sprint fetch` and
+        // `sprint create` — so the usage shown comes from the first two, and
+        // only when those name none does it fall back to the first alone.
+        [cmd, rest @ ..] => {
+            let pair = rest.first().and_then(|sub| muckpile_cli::usage_of(&format!("{cmd}-{sub}")));
+            match pair.or_else(|| muckpile_cli::usage_of(cmd)) {
+                Some(usage) => bail!(usage),
+                None => bail!(msg!("usage.unknown", command = cmd)),
+            }
+        }
     }
 }
 
