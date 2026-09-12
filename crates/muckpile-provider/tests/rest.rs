@@ -682,3 +682,21 @@ fn add_to_sprint_posts_the_keys_to_the_sprint_endpoint() {
     let body: serde_json::Value = serde_json::from_str(&captured.body).unwrap();
     assert_eq!(body["issues"], serde_json::json!(["ACC-1", "ACC-2"]));
 }
+
+/// Arrancar un sprint es un POST al sprint, con el estado y las dos fechas
+/// que el proveedor exige para activarlo.
+#[test]
+fn start_sprint_posts_the_state_and_both_dates() {
+    let (base, rx) = one_shot(200, r#"{"id":6533,"state":"active"}"#);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    provider.start_sprint(6533, "2026-09-12", "2026-09-26").unwrap();
+
+    let captured = rx.recv().unwrap();
+    assert_eq!(captured.method, "POST");
+    assert_eq!(captured.path, "/rest/agile/1.0/sprint/6533");
+    let body: serde_json::Value = serde_json::from_str(&captured.body).unwrap();
+    assert_eq!(body["state"], "active");
+    assert_eq!(body["startDate"], "2026-09-12T00:00:00.000+0000");
+    assert_eq!(body["endDate"], "2026-09-26T00:00:00.000+0000");
+}

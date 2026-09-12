@@ -79,6 +79,14 @@ Medido el 2026-09-12 contra el board 701 de un proyecto real: `POST /rest/agile/
 
 Medido el 2026-09-12 contra un board real: `POST /rest/agile/1.0/sprint/{id}/issue` con las claves en `issues` mueve los ítems a un sprint **futuro** igual que a uno abierto, y contesta 204 sin cuerpo. Los ítems de un sprint futuro se leen con una consulta, `pull query/<nombre> --query "sprint = <id>"`, porque la vista de sprint es de los abiertos.
 
+### `sprint start` arranca un sprint hoy, hasta la fecha que se le da
+
+`muckpile sprint start <sprint> --until <AAAA-MM-DD>` pasa el sprint a abierto: arranca hoy y termina en esa fecha. El sprint se nombra igual que en `sprint add`: por su id, o por el slug de su vista si ya tuviera una.
+
+**La fecha de fin se dice, y no tiene default.** El proveedor exige las dos fechas para activar un sprint, y cuánto dura es del equipo: la herramienta no la inventa. La de arranque es hoy, y no se elige — un sprint que arranca otro día es una corrección del tablero.
+
+Una vez abierto, el `sprint fetch` siguiente le hace su vista ([`sprint fetch`](#sprint-fetch-deja-una-carpeta-vacía-por-sprint-abierto)). Es una escritura en el proveedor, así que pasa por `auto_update` ([configuration.md](configuration.md)).
+
 ### `sprint fetch` deja una carpeta vacía por sprint abierto
 
 `sprint fetch` trae los sprints abiertos del board —los que el proveedor da con `state=active`— y crea, por cada uno, una vista vacía en `backlog/sprint/`, con el nombre del sprint en slug: los espacios pasan a `_`, y el resto queda igual. No trae ítems. Nunca borra una carpeta con algo adentro, y cierra las vistas vacías que ya no son de un sprint abierto.

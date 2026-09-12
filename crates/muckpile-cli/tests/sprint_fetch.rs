@@ -280,3 +280,33 @@ fn items_not_approved_are_not_moved() {
 
     assert!(provider.sprint_additions().is_empty());
 }
+
+/// `sprint start` arranca hoy y termina en la fecha que se le da.
+#[test]
+fn sprint_start_opens_it_from_today_until_the_given_date() {
+    let provider = FakeProvider::new();
+
+    muckpile_cli::sprint_start("6533", "2026-09-26", &provider, &config(), approved).unwrap();
+
+    assert_eq!(provider.sprints_started(), vec![(6533, "2026-09-26".to_string())]);
+}
+
+#[test]
+fn a_sprint_start_without_a_readable_date_is_refused_before_asking_anyone() {
+    let provider = FakeProvider::new();
+    let asked = || -> anyhow::Result<()> { panic!("pidió la frase antes de mirar la fecha") };
+
+    for date in ["", "26-09-2026", "2026-9-26", "mañana"] {
+        assert!(muckpile_cli::sprint_start("6533", date, &provider, &config(), asked).is_err(), "{date}");
+    }
+    assert!(provider.sprints_started().is_empty());
+}
+
+#[test]
+fn a_sprint_not_approved_is_not_started() {
+    let provider = FakeProvider::new();
+
+    assert!(muckpile_cli::sprint_start("6533", "2026-09-26", &provider, &config(), refused).is_err());
+
+    assert!(provider.sprints_started().is_empty());
+}

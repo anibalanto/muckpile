@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 /// and each command's first word as argv spells it. How it's run and what
 /// it does are messages, `help.usage.<command>` and `help.what.<command>`.
 const COMMANDS: &[(&str, &[&str])] = &[
-    ("project", &["init", "to-work", "code-work", "sprint", "sprint-create", "sprint-add", "states"]),
+    ("project", &["init", "to-work", "code-work", "sprint", "sprint-create", "sprint-add", "sprint-start", "states"]),
     ("read", &["show", "list", "status"]),
     ("sync", &["new", "pull", "push"]),
     ("write", &["title", "transition", "parent", "link", "unlink", "comment", "attach"]),
@@ -639,21 +639,53 @@ pub fn sprint_add(sprint: &str, ids: &[String], provider: &dyn Provider, config:
             bail!(msg!("id.invalid", id));
         }
     }
-    let sprint_id = match sprint.parse::<u64>() {
-        Ok(id) => id,
-        Err(_) => {
-            let board_id = config.jira_board_id.with_context(|| msg!("config.no_board_id"))?;
-            provider
-                .open_sprints(board_id)?
-                .into_iter()
-                .find(|s| slugify(&legible_name(s)) == sprint)
-                .with_context(|| msg!("sprint.add.unknown", sprint))?
-                .id
-        }
-    };
+    let sprint_id = sprint_id_of(sprint, provider, config)?;
     approve()?;
     provider.add_to_sprint(sprint_id, ids)?;
     Ok(sprint_id)
+}
+
+/// Opens a sprint, named as `sprint_add` names one, from today until
+/// `until` — `AAAA-MM-DD`. The end date has no default: how long a sprint
+/// lasts is the team's, and the provider needs both dates to activate one.
+pub fn sprint_start(sprint: &str, until: &str, provider: &dyn Provider, config: &ProjectConfig, approve: impl FnOnce() -> Result<()>) -> Result<u64> {
+    if !is_a_day(until) {
+        bail!(msg!("sprint.start.bad_date", date = until));
+    }
+    let sprint_id = sprint_id_of(sprint, provider, config)?;
+    approve()?;
+    provider.start_sprint(sprint_id, &today(), until)?;
+    Ok(sprint_id)
+}
+
+/// A day as the commands take it: `AAAA-MM-DD`, digits and dashes, nothing
+/// else. The provider is the one that says whether the day exists.
+fn is_a_day(text: &str) -> bool {
+    let parts: Vec<&str> = text.split('-').collect();
+    matches!(parts.as_slice(), [y, m, d] if y.len() == 4 && m.len() == 2 && d.len() == 2 && text.chars().all(|c| c.is_ascii_digit() || c == '-'))
+}
+
+/// Today, as `AAAA-MM-DD` in UTC — the same day the provider stamps.
+fn today() -> String {
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or_default();
+    let (mut y, mut days) = (1970i64, (secs / 86_400) as i64);
+    loop {
+        let leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+        let in_year = if leap { 366 } else { 365 };
+        if days < in_year {
+            break;
+        }
+        days -= in_year;
+        y += 1;
+    }
+    let leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+    let months = [31, if leap { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let mut m = 0;
+    while days >= months[m] {
+        days -= months[m];
+        m += 1;
+    }
+    format!("{y:04}-{:02}-{:02}", m + 1, days + 1)
 }
 
 /// What `sprint_fetch` did: the slugs it created, the slugs it removed
@@ -1080,6 +1112,22 @@ fn resolve_pending(view: &Path, provider: &dyn Provider, config: &ProjectConfig)
     }
 
     Ok(outcomes)
+}
+
+/// The sprint a command means: all digits is the provider's id, and
+/// anything else the slug of an open sprint's view. A future sprint has no
+/// view, so only its id names it.
+fn sprint_id_of(sprint: &str, provider: &dyn Provider, config: &ProjectConfig) -> Result<u64> {
+    if let Ok(id) = sprint.parse::<u64>() {
+        return Ok(id);
+    }
+    let board_id = config.jira_board_id.with_context(|| msg!("config.no_board_id"))?;
+    Ok(provider
+        .open_sprints(board_id)?
+        .into_iter()
+        .find(|s| slugify(&legible_name(s)) == sprint)
+        .with_context(|| msg!("sprint.add.unknown", sprint))?
+        .id)
 }
 
 /// Creates one relation a draft declared, `id phrase other` — `None` when it

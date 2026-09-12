@@ -276,6 +276,15 @@ impl Provider for JiraRest {
         Ok(())
     }
 
+    /// A date travels as the timestamp the provider writes back, midnight
+    /// UTC: a bare `AAAA-MM-DD` is refused.
+    fn start_sprint(&self, sprint_id: u64, start: &str, end: &str) -> Result<()> {
+        let at = |day: &str| format!("{day}T00:00:00.000+0000");
+        let body = serde_json::json!({ "state": "active", "startDate": at(start), "endDate": at(end) });
+        self.call("POST", &format!("/rest/agile/1.0/sprint/{sprint_id}"), Some(body))?;
+        Ok(())
+    }
+
     /// `sprint = <id>` — measured on ACC's board: the sprint's items come
     /// back in one search.
     fn sprint_items(&self, sprint_id: u64) -> Result<Vec<String>> {

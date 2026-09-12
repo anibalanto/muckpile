@@ -7,9 +7,9 @@ use std::process::{Command, Output};
 /// Every command by how its usage line starts. Two that share the first
 /// word — `sprint fetch` and `sprint create` — are told apart by the second,
 /// which is how whoever reads the help tells them apart too.
-const EVERY_COMMAND: [&str; 20] = [
-    "init", "to-work", "code-work add", "sprint fetch", "sprint create", "sprint add", "states discover", "show", "list", "status", "new", "pull",
-    "push", "title", "transition", "parent", "link", "unlink", "comment", "attach",
+const EVERY_COMMAND: [&str; 21] = [
+    "init", "to-work", "code-work add", "sprint fetch", "sprint create", "sprint add", "sprint start", "states discover", "show", "list", "status",
+    "new", "pull", "push", "title", "transition", "parent", "link", "unlink", "comment", "attach",
 ];
 
 #[test]

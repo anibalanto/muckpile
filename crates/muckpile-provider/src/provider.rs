@@ -122,6 +122,10 @@ pub trait Provider {
     /// changes: which sprint holds it is the board's, not the item's.
     fn add_to_sprint(&self, sprint_id: u64, keys: &[String]) -> Result<()>;
 
+    /// Opens the sprint, from `start` to `end`, both `AAAA-MM-DD`. The
+    /// provider needs both to activate one.
+    fn start_sprint(&self, sprint_id: u64, start: &str, end: &str) -> Result<()>;
+
     /// Every status the project's workflow uses today, one per name — a
     /// status can be offered by more than one issue type, but its category
     /// never differs between them on the same project (measured against

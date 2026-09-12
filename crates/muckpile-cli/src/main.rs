@@ -25,6 +25,7 @@ fn main() -> Result<()> {
         [cmd, sub] if cmd == "sprint" && sub == "fetch" => run_sprint_fetch(),
         [cmd, sub, name] if cmd == "sprint" && sub == "create" => run_sprint_create(name),
         [cmd, sub, sprint, ids @ ..] if cmd == "sprint" && sub == "add" && !ids.is_empty() => run_sprint_add(sprint, ids),
+        [cmd, sub, sprint, flag, until] if cmd == "sprint" && sub == "start" && flag == "--until" => run_sprint_start(sprint, until),
         [cmd, id, status] if cmd == "transition" => run_transition(id, status),
         [cmd, sub] if cmd == "states" && sub == "discover" => run_states_discover(),
         [cmd, rest @ ..] if cmd == "list" => run_list(rest),
@@ -172,6 +173,15 @@ fn run_sprint_add(sprint: &str, ids: &[String]) -> Result<()> {
     let provider = build_provider(&root, &config)?;
     let sprint_id = muckpile_cli::sprint_add(sprint, ids, provider.as_ref(), &config, approve(&config))?;
     println!("{}", msg!("sprint.add.done", ids = ids.join(", "), sprint = sprint_id));
+    Ok(())
+}
+
+fn run_sprint_start(sprint: &str, until: &str) -> Result<()> {
+    let (root, _cwd) = standing_in_a_project()?;
+    let config = load_project_config(&root)?;
+    let provider = build_provider(&root, &config)?;
+    let sprint_id = muckpile_cli::sprint_start(sprint, until, provider.as_ref(), &config, approve(&config))?;
+    println!("{}", msg!("sprint.start.done", sprint = sprint_id, until));
     Ok(())
 }
 

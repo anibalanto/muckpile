@@ -11,6 +11,7 @@ Cada comando corre parado en un proyecto iniciado —en su raíz o adentro de un
 | `list` | `list <vista> [--state <estado>] [--category <categoría>] [--parent <id>]` | Lista los ítems de una vista, filtrados por el estado literal, por su categoría o por padre ([states.md](concepts/states.md)). |
 | `sprint create` | `sprint create "<nombre>"` | Crea un sprint en el board del proyecto, con ese nombre entero. Queda futuro: no arranca, y no deja vista ([project.md](concepts/project.md)). |
 | `sprint add` | `sprint add <sprint> <id>...` | Mueve esos ítems al sprint, que se nombra por su id o por el slug de su vista. No toca el archivo del ítem ([project.md](concepts/project.md)). |
+| `sprint start` | `sprint start <sprint> --until <AAAA-MM-DD>` | Arranca el sprint hoy, hasta esa fecha. La fecha de fin no tiene default: cuánto dura un sprint es del equipo ([project.md](concepts/project.md)). |
 | `sprint fetch` | sin argumentos | Crea una vista vacía en `backlog/sprint/` por cada sprint abierto del board, con el nombre en slug. Nunca borra una carpeta con algo adentro ([project.md](concepts/project.md)). |
 | `states discover` | sin argumentos | Lista en vivo los estados del workflow con su categoría, y los guarda en `<proyecto>.states.toml` ([states.md](concepts/states.md)). |
 | `to-work` | `to-work <id> [--empty]` | Abre la vista de trabajo `to-work/<id>/` y trae el ítem y su `_data/`; `--empty` la deja vacía. No toca código. Sólo corre en la raíz del proyecto ([project.md](concepts/project.md)). |
