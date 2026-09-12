@@ -1,0 +1,6 @@
+file: docs/specs/concepts/project.md
+query: |-
+  (section
+    (atx_heading (inline) @n0 (#eq? @n0 "Los sprints"))
+    (section
+    (atx_heading (inline) @n1 (#eq? @n1 "`sprint create` crea un sprint futuro, y no deja vista"))) @target)

@@ -1,0 +1,8 @@
+kind: governs
+endpoint:
+  0:
+    link: capture 4c79f43ede7b88df67e55e28e734dfd8
+    name: fila-sprint-create
+  1:
+    link: capture 2cf7fcc8669a094d30b598ddc288163b
+    name: create_sprint

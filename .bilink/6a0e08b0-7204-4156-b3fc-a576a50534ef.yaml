@@ -1,0 +1,13 @@
+kind: governs
+endpoint:
+  0:
+    link: capture 8b3164acdef3054d295b98e09a601c8b
+    accepted:
+    - agree:
+      - anibal
+      link: capture 8b3164acdef3054d295b98e09a601c8b
+      hash: bc62f3a16c8d9fb7cb65adc525c6dcbc12e4a2690b757ea1b665c0cdaa3bdcd5
+    name: sprint-create-regla
+  1:
+    link: capture 49a51bf1de3c4c50402edd1c9cd6058a
+    name: sprint_create
