@@ -10,4 +10,11 @@ endpoint:
     name: fila-sprint-start
   1:
     link: capture 080274d5831f1bf4b260ad0fe9e3c317
+    accepted:
+    - agree:
+      - anibal
+      link: capture 080274d5831f1bf4b260ad0fe9e3c317
+      hash: 4cb5c076446fed2a2c0653003690ea824958e7741b6f8778296435661d033611
+      hash_ast: e3ac183ff7c8fdb105fd7c20555f62b2f7c0d2e2e43be7d73beae75eecd19b0b
+      n: declined
     name: start_sprint
