@@ -14,5 +14,5 @@ endpoint:
     - agree:
       - anibal
       link: capture 8b3164acdef3054d295b98e09a601c8b
-      hash: bc62f3a16c8d9fb7cb65adc525c6dcbc12e4a2690b757ea1b665c0cdaa3bdcd5
+      hash: 42e03074817c972a286d5b5dde4344e7185b99e00027daaa2471388a1e5d71bb
     name: sprint-create-regla
