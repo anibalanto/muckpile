@@ -2,6 +2,11 @@ kind: governs
 endpoint:
   0:
     link: capture 4c79f43ede7b88df67e55e28e734dfd8
+    accepted:
+    - agree:
+      - anibal
+      link: capture 4c79f43ede7b88df67e55e28e734dfd8
+      hash: 6d9d6f005a0f94f374beae95c6cb916da65a1ed35e6cefcf38dd4e5c5d823fcf
     name: fila-sprint-create
   1:
     link: capture 2cf7fcc8669a094d30b598ddc288163b
