@@ -14,7 +14,7 @@ endpoint:
     - agree:
       - anibal
       link: capture 17d226d099aa8080135fe4bb14fbfcda
-      hash: 204ee7f9bd60374cbc7a06de18912818639e2a1bb742c7c95eb209529c4e07a9
-      hash_ast: dc0b2438b4f3129c71a68613e3810c1d97d6d4ad25ad68c287de52d13e450c86
+      hash: 481ad468e3adcfb539ee2a5c253bf216c1673ae62ee947cc9eec392a21ddcdda
+      hash_ast: 21b914a8abe75ce7052e7406bfba3766173c2087634562cda51024f7c66dbc05
       n: declined
     name: sprint_add
