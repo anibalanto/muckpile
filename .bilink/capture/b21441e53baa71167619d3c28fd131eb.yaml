@@ -1,0 +1,6 @@
+file: docs/specs/concepts/project.md
+query: |-
+  (section
+    (atx_heading (inline) @n0 (#eq? @n0 "Los sprints"))
+    (section
+    (atx_heading (inline) @n1 (#eq? @n1 "`sprint start` arranca un sprint hoy, hasta la fecha que se le da"))) @target)

@@ -1,0 +1,13 @@
+kind: governs
+endpoint:
+  0:
+    link: capture b21441e53baa71167619d3c28fd131eb
+    accepted:
+    - agree:
+      - anibal
+      link: capture b21441e53baa71167619d3c28fd131eb
+      hash: bd14171363b717b128be030becbbc2ad32201998aa851a5ec06838b02a2977ac
+    name: sprint-start-regla
+  1:
+    link: capture c6a03140f562b114310aa1a95eded23f
+    name: sprint_start
