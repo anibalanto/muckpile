@@ -1,0 +1,13 @@
+kind: governs
+endpoint:
+  0:
+    link: capture f005d0d5e96c8332d3c220cc037ac927
+    accepted:
+    - agree:
+      - anibal
+      link: capture f005d0d5e96c8332d3c220cc037ac927
+      hash: b2d0680e7abdb9b19c3010d9506364a0421d761075ef33513ebcbdabc85edd12
+    name: crear-sprints-5
+  1:
+    link: capture b21441e53baa71167619d3c28fd131eb
+    name: sprint-start-regla
