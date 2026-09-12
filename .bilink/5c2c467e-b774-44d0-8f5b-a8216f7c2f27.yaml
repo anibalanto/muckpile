@@ -2,6 +2,11 @@ kind: governs
 endpoint:
   0:
     link: capture 1a83d8624125ca11f61d103a7ae2f98b
+    accepted:
+    - agree:
+      - anibal
+      link: capture 1a83d8624125ca11f61d103a7ae2f98b
+      hash: 5b329529a30216aa33f06492e2c7d0b1a44dec834cb1a2636e96141653a18b6f
     name: crear-sprints-1
   1:
     link: capture 8b3164acdef3054d295b98e09a601c8b
