@@ -23,6 +23,7 @@ fn main() -> Result<()> {
         [cmd, id, flag] if cmd == "to-work" && flag == "--empty" => run_to_work(id, true),
         [cmd, rest @ ..] if cmd == "pull" => run_pull(rest),
         [cmd, sub] if cmd == "sprint" && sub == "fetch" => run_sprint_fetch(),
+        [cmd, sub, name] if cmd == "sprint" && sub == "create" => run_sprint_create(name),
         [cmd, id, status] if cmd == "transition" => run_transition(id, status),
         [cmd, sub] if cmd == "states" && sub == "discover" => run_states_discover(),
         [cmd, rest @ ..] if cmd == "list" => run_list(rest),
@@ -147,6 +148,15 @@ fn describe_losses(losses: &[Loss]) -> String {
         })
         .collect::<Vec<_>>()
         .join("; ")
+}
+
+fn run_sprint_create(name: &str) -> Result<()> {
+    let (root, _cwd) = standing_in_a_project()?;
+    let config = load_project_config(&root)?;
+    let provider = build_provider(&root, &config)?;
+    let id = muckpile_cli::sprint_create(name, provider.as_ref(), &config, approve(&config))?;
+    println!("{}", msg!("sprint.create.done", name, id));
+    Ok(())
 }
 
 fn run_sprint_fetch() -> Result<()> {

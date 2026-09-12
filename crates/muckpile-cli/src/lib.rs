@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 /// and each command's first word as argv spells it. How it's run and what
 /// it does are messages, `help.usage.<command>` and `help.what.<command>`.
 const COMMANDS: &[(&str, &[&str])] = &[
-    ("project", &["init", "to-work", "code-work", "sprint", "states"]),
+    ("project", &["init", "to-work", "code-work", "sprint", "sprint-create", "states"]),
     ("read", &["show", "list", "status"]),
     ("sync", &["new", "pull", "push"]),
     ("write", &["title", "transition", "parent", "link", "unlink", "comment", "attach"]),
@@ -613,6 +613,18 @@ pub fn code_work_add(
 
     add_worktree(&base, &worktree_path, &branch, from_branch)?;
     Ok(worktree_path)
+}
+
+/// Makes a sprint on the project's board, named as given, and answers its
+/// id. The provider leaves it future, so no view is opened: a sprint's view
+/// shows up when `sprint_fetch` finds it open.
+pub fn sprint_create(name: &str, provider: &dyn Provider, config: &ProjectConfig, approve: impl FnOnce() -> Result<()>) -> Result<u64> {
+    if name.trim().is_empty() {
+        bail!(msg!("sprint.create.no_name"));
+    }
+    let board_id = config.jira_board_id.with_context(|| msg!("config.no_board_id"))?;
+    approve()?;
+    provider.create_sprint(board_id, name)
 }
 
 /// What `sprint_fetch` did: the slugs it created, the slugs it removed

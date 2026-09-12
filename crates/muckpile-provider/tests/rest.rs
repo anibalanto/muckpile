@@ -647,3 +647,22 @@ fn query_items_searches_with_the_query_as_given() {
     let path = rx.recv().unwrap().path;
     assert!(path.starts_with("/rest/api/3/search/jql?jql=project%20%3D%20ACC"), "{path}");
 }
+
+/// Crear un sprint es un POST al endpoint ágil, con el nombre entero y el
+/// board de origen, y nada más: ni fechas ni objetivo.
+#[test]
+fn create_sprint_posts_the_name_and_the_board_and_nothing_else() {
+    let (base, rx) = one_shot(201, r#"{"id":44,"name":"22 Después de muckpile","state":"future"}"#);
+    let provider = JiraRest::new(base, Credentials::new("a@b.com", "tok"));
+
+    let id = provider.create_sprint(701, "22 Después de muckpile").unwrap();
+
+    assert_eq!(id, 44);
+    let captured = rx.recv().unwrap();
+    assert_eq!(captured.method, "POST");
+    assert_eq!(captured.path, "/rest/agile/1.0/sprint");
+    let body: serde_json::Value = serde_json::from_str(&captured.body).unwrap();
+    assert_eq!(body["name"], "22 Después de muckpile");
+    assert_eq!(body["originBoardId"], 701);
+    assert_eq!(body.as_object().unwrap().len(), 2, "ni fechas ni objetivo: {}", captured.body);
+}

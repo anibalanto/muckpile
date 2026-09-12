@@ -61,6 +61,14 @@ La rama sale del `commit_prefix` del proyecto y del número de la clave: `SGE-98
 
 ## Los sprints
 
+### `sprint create` crea un sprint futuro, y no deja vista
+
+`muckpile sprint create "<nombre>"` crea un sprint en el board que declara `jira_board_id`, con el nombre entero como se lo escribe: la herramienta no numera ni completa nada, porque cómo se numera un sprint es de la organización que usa el board.
+
+Queda **futuro**: sin fechas, sin objetivo, y sin arrancar. `muckpile` no arranca sprints. Y no deja vista, porque la vista de un sprint aparece cuando el sprint está abierto y `sprint fetch` lo trae; crearla antes sería dejar una carpeta que el primer `fetch` borraría.
+
+Es una escritura en el proveedor, así que pasa por `auto_update` ([configuration.md](configuration.md)).
+
 ### `sprint fetch` deja una carpeta vacía por sprint abierto
 
 `sprint fetch` trae los sprints abiertos del board —los que el proveedor da con `state=active`— y crea, por cada uno, una vista vacía en `backlog/sprint/`, con el nombre del sprint en slug: los espacios pasan a `_`, y el resto queda igual. No trae ítems. Nunca borra una carpeta con algo adentro, y cierra las vistas vacías que ya no son de un sprint abierto.

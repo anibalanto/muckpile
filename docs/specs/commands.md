@@ -9,6 +9,7 @@ Cada comando corre parado en un proyecto iniciado —en su raíz o adentro de un
 | `new` | `new <tipo> "<título>" [--parent <id>] [--blocks <id>]` | Escribe el borrador `@<slug>.<tipo>.md`, sin red. `<tipo>` es uno de los de `item_type`, `question` incluido. `--parent` y `--blocks` escriben el header que viaja al crearlo ([drafts.md](concepts/drafts.md)). |
 | `show` | `show <id> [--local]` | Muestra el header, el cuerpo y el listado de `<id>_data/`, del proveedor en vivo o, con `--local`, de la copia de la vista. |
 | `list` | `list <vista> [--state <estado>] [--category <categoría>] [--parent <id>]` | Lista los ítems de una vista, filtrados por el estado literal, por su categoría o por padre ([states.md](concepts/states.md)). |
+| `sprint create` | `sprint create "<nombre>"` | Crea un sprint en el board del proyecto, con ese nombre entero. Queda futuro: no arranca, y no deja vista ([project.md](concepts/project.md)). |
 | `sprint fetch` | sin argumentos | Crea una vista vacía en `backlog/sprint/` por cada sprint abierto del board, con el nombre en slug. Nunca borra una carpeta con algo adentro ([project.md](concepts/project.md)). |
 | `states discover` | sin argumentos | Lista en vivo los estados del workflow con su categoría, y los guarda en `<proyecto>.states.toml` ([states.md](concepts/states.md)). |
 | `to-work` | `to-work <id> [--empty]` | Abre la vista de trabajo `to-work/<id>/` y trae el ítem y su `_data/`; `--empty` la deja vacía. No toca código. Sólo corre en la raíz del proyecto ([project.md](concepts/project.md)). |
