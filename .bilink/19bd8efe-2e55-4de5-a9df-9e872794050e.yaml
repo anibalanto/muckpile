@@ -14,7 +14,11 @@ endpoint:
     - agree:
       - anibal
       link: capture f502ee6026e17f60202ff9509c8fc9bb
-      hash: f79648dd2436c0a71315e038bf966d655d94f215a0e9caa525352004a5358d82
-      hash_ast: ea88ecb87a5f2527ef9a1a925985ecb2089fe778708981adf3ce4d6bcf12d0b7
-      n: declined
+      hash: 8dfeb7b40316230de549c54743ad0ead0a3595d73e3e11760c446135dee88e1b
+      hash_ast: 2340fc037d1bf26dcc03d9fa51729610cc0c5d42d66ab634e63f2ca72d227e8f
+      n:
+        1:
+          link: capture 7bbe871e6e927e03d4858eea9ed42f5a
+          hash: 74cd8bda4d442036f956e0c9eb0a2fd11c8f4ca3848a7fa315e17ae6ace2f452
+          hash_ast: 477a581eac79993cc7e615dd94780ac3991965cd0b026e6ddb60dc8483e6a30e
     name: code-work-add-impl
