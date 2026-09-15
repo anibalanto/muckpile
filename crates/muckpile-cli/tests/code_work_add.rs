@@ -145,3 +145,62 @@ fn refuses_a_worktree_that_already_exists() {
     let err = code_work_add(root, &view, "sge", None, None, &config).unwrap_err();
     assert!(err.to_string().contains("code-work/sge"), "{err}");
 }
+
+#[test]
+fn in_a_slug_view_the_branch_comes_from_the_key_of_the_item_it_holds() {
+    let remote = remote_repo("main");
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let config = scaffold(root, "@remove-sin-ref", remote.path());
+    let view = root.join("to-work/@remove-sin-ref");
+    write(&view, "SGE-9876.task.md", "---\ntitle: t\n---\n");
+
+    let worktree = code_work_add(root, &view, "sge", None, None, &config).unwrap();
+
+    assert_eq!(current_branch(&worktree), "jr-9876");
+}
+
+#[test]
+fn a_slug_view_without_a_keyed_item_refuses_and_creates_nothing() {
+    let remote = remote_repo("main");
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let config = scaffold(root, "@remove-sin-ref", remote.path());
+    let view = root.join("to-work/@remove-sin-ref");
+    write(&view, "@remove-sin-ref.task.md", "---\ntitle: t\n---\n");
+
+    let err = code_work_add(root, &view, "sge", None, None, &config).unwrap_err().to_string();
+
+    assert!(err.contains("--branch"), "names the way out: {err}");
+    assert!(!view.join("code-work/sge").exists());
+    assert!(!root.join("base/sge").exists());
+}
+
+#[test]
+fn a_slug_view_with_two_keyed_items_refuses() {
+    let remote = remote_repo("main");
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let config = scaffold(root, "@two", remote.path());
+    let view = root.join("to-work/@two");
+    write(&view, "SGE-1.task.md", "---\ntitle: a\n---\n");
+    write(&view, "SGE-2.task.md", "---\ntitle: b\n---\n");
+
+    let err = code_work_add(root, &view, "sge", None, None, &config).unwrap_err().to_string();
+
+    assert!(err.contains("--branch"), "names the way out: {err}");
+    assert!(!view.join("code-work/sge").exists());
+}
+
+#[test]
+fn a_slug_view_with_branch_needs_no_key() {
+    let remote = remote_repo("main");
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let config = scaffold(root, "@remove-sin-ref", remote.path());
+    let view = root.join("to-work/@remove-sin-ref");
+
+    let worktree = code_work_add(root, &view, "sge", None, Some("remove-sin-ref"), &config).unwrap();
+
+    assert_eq!(current_branch(&worktree), "remove-sin-ref");
+}

@@ -580,6 +580,33 @@ fn work_view_id(root: &Path, cwd: &Path) -> Result<String> {
     Ok(id)
 }
 
+/// The key a work view's branch is derived from. A view named by a key is
+/// that key; a view named by a slug keeps its name after its draft is
+/// resolved, so the key comes from the one keyed item at its root — none
+/// (the draft hasn't crossed yet) or several is a refusal, never a guess.
+fn branch_key(view: &Path, view_id: &str) -> Result<String> {
+    if !muckpile_core::is_unassigned(view_id) {
+        return Ok(view_id.to_string());
+    }
+    let mut keys: Vec<String> = std::fs::read_dir(view)
+        .with_context(|| format!("reading {}", view.display()))?
+        .filter_map(|e| e.ok())
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().into_owned();
+            let (id, item_type) = name.strip_suffix(".md")?.rsplit_once('.')?;
+            let keyed = TYPES.contains(&item_type) && is_valid_id(id) && !muckpile_core::is_unassigned(id);
+            keyed.then(|| id.to_string())
+        })
+        .collect();
+    keys.sort();
+    keys.dedup();
+    match keys.len() {
+        1 => Ok(keys.remove(0)),
+        0 => bail!(msg!("code_work.no_keyed_item", view = view_id)),
+        count => bail!(msg!("code_work.many_keyed_items", view = view_id, count)),
+    }
+}
+
 /// Adds `code-work/<repo>/` as a worktree of `<root>/base/<repo>/`, cloning
 /// the latter on demand — one repo at a time, run from inside the
 /// `to-work/<id>/` view it belongs to. `from` overrides the starting point
@@ -597,13 +624,15 @@ pub fn code_work_add(
     let id = work_view_id(root, cwd)?;
     let repo_config = config.repos.get(repo_name).with_context(|| msg!("code_work.unknown_repo", repo = repo_name))?;
 
-    let base = root.join("base").join(repo_name);
-    ensure_cloned(&repo_config.remote, &base, &repo_config.branch)?;
-
+    // The branch is settled before anything is cloned: a view that can't name
+    // one leaves nothing behind.
     let branch = match branch_override {
         Some(b) => b.to_string(),
-        None => derive_branch(&id, &config.commit_prefix)?,
+        None => derive_branch(&branch_key(cwd, &id)?, &config.commit_prefix)?,
     };
+
+    let base = root.join("base").join(repo_name);
+    ensure_cloned(&repo_config.remote, &base, &repo_config.branch)?;
     let from_branch = from.unwrap_or(&repo_config.branch);
 
     let worktree_path = cwd.join("code-work").join(repo_name);
