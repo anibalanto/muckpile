@@ -57,6 +57,12 @@ Corrido adentro de una vista de trabajo, `code-work add <repo>` deja `code-work/
 
 La rama sale del `commit_prefix` del proyecto y del número de la clave: `SGE-9876` con `commit_prefix = "jr"` da `jr-9876`. Si esa rama ya existe en el remoto, se trackea. Si no, se crea desde la rama principal de `base/<repo>/`. `--from <rama>` cambia el punto de partida, por ejemplo un hotfix desde `rc-3.2`, y `--branch <rama>` usa una rama que no se llama como la clave. Los dos valen por repo.
 
+### En una vista con slug, la clave sale del ítem que la vista tiene
+
+Una vista abierta con `to-work @<slug> --empty` se llama por el slug, y sigue llamándose así cuando `push` resuelve su borrador y el ítem pasa a tener clave. La rama no sale del nombre de la vista: sale de la clave del único ítem con clave que la vista tiene en su raíz.
+
+Si la vista no tiene ningún ítem con clave —el borrador todavía no cruzó— o tiene más de uno, `code-work add` se niega sin crear nada, y pide `--branch`. Un slug no tiene número, y cortarlo por el último guion inventaría una rama que no nombra a nadie.
+
 `muckpile` no sincroniza `code-work/`: es de otro repo, y lo que se haga ahí adentro —un cherry-pick, un merge— se hace con git.
 
 ## Los sprints
