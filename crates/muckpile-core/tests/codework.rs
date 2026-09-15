@@ -38,6 +38,11 @@ fn derive_branch_takes_the_key_s_number_with_the_project_s_prefix() {
 }
 
 #[test]
+fn derive_branch_never_takes_a_slug() {
+    assert!(derive_branch("@remove-sin-ref", "acc").is_err());
+}
+
+#[test]
 fn derive_branch_refuses_a_key_with_no_dash() {
     assert!(derive_branch("nodash", "jr").is_err());
 }

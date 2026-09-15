@@ -198,6 +198,9 @@ unlink.no_such_link = "{a} {phrase} {b}: the provider has no such relation ({typ
 
 code_work.unknown_repo = "{repo}: not in muckpile.toml"
 code_work.bad_id = "{id}: not of the form <prefix>-<number>"
+code_work.slug_id = "{id}: a slug has no number — name the branch with --branch"
+code_work.no_keyed_item = "to-work/{view}: no item with a key yet — name the branch with --branch"
+code_work.many_keyed_items = "to-work/{view}: {count} items with a key — name the branch with --branch"
 
 jira.search.nothing_left = "{title}: nothing left to search with after cutting it down for JQL"
 jira.create.no_key = "create returned no 'key': {response}"
