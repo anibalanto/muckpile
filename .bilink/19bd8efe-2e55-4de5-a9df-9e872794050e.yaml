@@ -10,6 +10,9 @@ endpoint:
     name: code-work-add-spec
   1:
     link: capture f502ee6026e17f60202ff9509c8fc9bb
+    n:
+      1:
+        link: capture 7bbe871e6e927e03d4858eea9ed42f5a
     accepted:
     - agree:
       - anibal
